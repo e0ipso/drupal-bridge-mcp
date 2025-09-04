@@ -1,0 +1,18 @@
+afd86179b09da6a17d0158520083a68f
+"use strict";
+/**
+ * Jest setup file for global test configuration
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+// Set up Node.js environment variables for testing
+process.env.NODE_ENV = 'test';
+// Global test configuration
+beforeEach(() => {
+    // Clear all mocks before each test
+    jest.clearAllMocks();
+});
+afterEach(() => {
+    // Clean up after each test
+    jest.restoreAllMocks();
+});
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL3dvcmtzcGFjZS90ZXN0cy9zZXR1cC50cyIsIm1hcHBpbmdzIjoiO0FBQUE7O0dBRUc7O0FBRUgsbURBQW1EO0FBQ25ELE9BQU8sQ0FBQyxHQUFHLENBQUMsUUFBUSxHQUFHLE1BQU0sQ0FBQztBQUU5Qiw0QkFBNEI7QUFDNUIsVUFBVSxDQUFDLEdBQUcsRUFBRTtJQUNkLG1DQUFtQztJQUNuQyxJQUFJLENBQUMsYUFBYSxFQUFFLENBQUM7QUFDdkIsQ0FBQyxDQUFDLENBQUM7QUFFSCxTQUFTLENBQUMsR0FBRyxFQUFFO0lBQ2IsMkJBQTJCO0lBQzNCLElBQUksQ0FBQyxlQUFlLEVBQUUsQ0FBQztBQUN6QixDQUFDLENBQUMsQ0FBQyIsIm5hbWVzIjpbXSwic291cmNlcyI6WyIvd29ya3NwYWNlL3Rlc3RzL3NldHVwLnRzIl0sInNvdXJjZXNDb250ZW50IjpbIi8qKlxuICogSmVzdCBzZXR1cCBmaWxlIGZvciBnbG9iYWwgdGVzdCBjb25maWd1cmF0aW9uXG4gKi9cblxuLy8gU2V0IHVwIE5vZGUuanMgZW52aXJvbm1lbnQgdmFyaWFibGVzIGZvciB0ZXN0aW5nXG5wcm9jZXNzLmVudi5OT0RFX0VOViA9ICd0ZXN0JztcblxuLy8gR2xvYmFsIHRlc3QgY29uZmlndXJhdGlvblxuYmVmb3JlRWFjaCgoKSA9PiB7XG4gIC8vIENsZWFyIGFsbCBtb2NrcyBiZWZvcmUgZWFjaCB0ZXN0XG4gIGplc3QuY2xlYXJBbGxNb2NrcygpO1xufSk7XG5cbmFmdGVyRWFjaCgoKSA9PiB7XG4gIC8vIENsZWFuIHVwIGFmdGVyIGVhY2ggdGVzdFxuICBqZXN0LnJlc3RvcmVBbGxNb2NrcygpO1xufSk7XG5cbi8vIEdsb2JhbCB0ZXN0IHV0aWxpdGllc1xuZGVjbGFyZSBnbG9iYWwge1xuICBuYW1lc3BhY2UgamVzdCB7XG4gICAgaW50ZXJmYWNlIE1hdGNoZXJzPFI+IHtcbiAgICAgIC8vIEN1c3RvbSBKZXN0IG1hdGNoZXJzIGNhbiBiZSBhZGRlZCBoZXJlIGlmIG5lZWRlZFxuICAgIH1cbiAgfVxufVxuXG5leHBvcnQge307Il0sInZlcnNpb24iOjN9

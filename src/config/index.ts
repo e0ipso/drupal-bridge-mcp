@@ -1,6 +1,6 @@
 /**
  * Configuration management for the MCP server
- * 
+ *
  * Centralizes all configuration options with type safety and validation
  */
 
@@ -43,7 +43,7 @@ export interface ServerConfig {
  */
 function loadConfig(): ServerConfig {
   const env = process.env.NODE_ENV || 'development';
-  
+
   return {
     environment: env as 'development' | 'production' | 'test',
     port: parseInt(process.env.PORT || '3000', 10),

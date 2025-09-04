@@ -1,14 +1,14 @@
 /**
  * MCP Server factory and configuration
- * 
+ *
  * Creates and configures the Model Context Protocol server with all necessary
  * tools and handlers for Drupal integration.
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { 
-  CallToolRequestSchema, 
-  ListToolsRequestSchema 
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { logger } from '@/utils/logger.js';
@@ -40,7 +40,8 @@ export async function createServer(): Promise<Server> {
         // Tools will be registered here as we implement them
         {
           name: 'search_content',
-          description: 'Search Drupalize.me content with subscription-aware access',
+          description:
+            'Search Drupalize.me content with subscription-aware access',
           inputSchema: {
             type: 'object',
             properties: {
@@ -62,14 +63,14 @@ export async function createServer(): Promise<Server> {
     };
   });
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async request => {
     const { name, arguments: args } = request.params;
 
     switch (name) {
       case 'search_content': {
         // Implementation will be added when we build the Drupal integration
         logger.info('Search content tool called', { args });
-        
+
         return {
           content: [
             {
@@ -86,6 +87,6 @@ export async function createServer(): Promise<Server> {
   });
 
   logger.info('MCP Server created and configured');
-  
+
   return server;
 }

@@ -2,7 +2,7 @@
  * Configuration tests
  */
 
-import { config } from '@/config/index.js';
+import { config } from '@/config';
 
 describe('Configuration', () => {
   test('should load default configuration', () => {

@@ -1,6 +1,6 @@
 /**
  * Main entry point for the Drupalize.me MCP Server
- * 
+ *
  * This server provides Model Context Protocol (MCP) integration with Drupalize.me's
  * Drupal installation, enabling LLMs to access and search educational content with
  * proper OAuth authentication and subscription-level access control.
@@ -28,11 +28,13 @@ async function main(): Promise<void> {
 
     // Set up transport (stdio for MCP communication)
     const transport = new StdioServerTransport();
-    
+
     // Connect server to transport
     await server.connect(transport);
 
-    logger.info('MCP Server successfully started and listening for connections');
+    logger.info(
+      'MCP Server successfully started and listening for connections'
+    );
 
     // Handle graceful shutdown
     process.on('SIGINT', async () => {
@@ -46,9 +48,11 @@ async function main(): Promise<void> {
       await server.close();
       process.exit(0);
     });
-
   } catch (error) {
-    logger.error('Failed to start MCP Server:', error instanceof Error ? error : { error: String(error) });
+    logger.error(
+      'Failed to start MCP Server:',
+      error instanceof Error ? error : { error: String(error) }
+    );
     process.exit(1);
   }
 }

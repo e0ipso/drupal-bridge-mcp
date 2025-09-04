@@ -1,14 +1,28 @@
 /**
- * Jest test setup file
- * 
- * Global test configuration and mocks
+ * Jest setup file for global test configuration
  */
 
-// Mock environment variables for testing
+// Set up Node.js environment variables for testing
 process.env.NODE_ENV = 'test';
-process.env.LOG_LEVEL = 'error';
-process.env.DB_HOST = 'localhost';
-process.env.DB_PORT = '5432';
-process.env.DB_NAME = 'mcp_server_test';
-process.env.DB_USER = 'test_user';
-process.env.DB_PASSWORD = 'test_password';
+
+// Global test configuration
+beforeEach(() => {
+  // Clear all mocks before each test
+  jest.clearAllMocks();
+});
+
+afterEach(() => {
+  // Clean up after each test
+  jest.restoreAllMocks();
+});
+
+// Global test utilities
+declare global {
+  namespace jest {
+    interface Matchers<R> {
+      // Custom Jest matchers can be added here if needed
+    }
+  }
+}
+
+export {};

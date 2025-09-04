@@ -1,6 +1,6 @@
 /**
  * Logging utility for the MCP server
- * 
+ *
  * Provides structured logging with configurable levels and formats
  */
 
@@ -13,7 +13,7 @@ import { config } from '@/config/index.js';
 class ConsoleLogger implements Logger {
   private readonly level: LogLevel;
   private readonly format: 'json' | 'pretty';
-  
+
   private readonly levels: Record<LogLevel, number> = {
     error: 0,
     warn: 1,
@@ -48,8 +48,8 @@ class ConsoleLogger implements Logger {
   }
 
   private log(
-    level: LogLevel, 
-    message: string, 
+    level: LogLevel,
+    message: string,
     context?: Record<string, unknown> | Error
   ): void {
     if (this.levels[level] > this.levels[this.level]) {
@@ -60,10 +60,9 @@ class ConsoleLogger implements Logger {
       timestamp: new Date().toISOString(),
       level,
       message,
-      ...(context instanceof Error 
+      ...(context instanceof Error
         ? { error: context, context: undefined }
-        : { context, error: undefined }
-      ),
+        : { context, error: undefined }),
     };
 
     if (this.format === 'json') {
@@ -74,16 +73,16 @@ class ConsoleLogger implements Logger {
   }
 
   private prettyLog(entry: LogEntry): void {
-    const timestamp = entry.timestamp;
+    const { timestamp } = entry;
     const level = entry.level.toUpperCase().padEnd(5);
-    const message = entry.message;
-    
+    const { message } = entry;
+
     console.log(`${timestamp} ${level} ${message}`);
-    
+
     if (entry.context && Object.keys(entry.context).length > 0) {
       console.log('  Context:', JSON.stringify(entry.context, null, 2));
     }
-    
+
     if (entry.error) {
       console.log('  Error:', entry.error.stack || entry.error.message);
     }
