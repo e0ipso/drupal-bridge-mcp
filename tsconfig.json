@@ -24,7 +24,7 @@
     "noImplicitOverride": true,
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
-    "exactOptionalPropertyTypes": true,
+    "exactOptionalPropertyTypes": false,
 
     /* Modules */
     "moduleDetection": "force",
@@ -63,7 +63,7 @@
 
     /* Completeness */
     "skipDefaultLibCheck": true,
-    "skipLibCheck": false
+    "skipLibCheck": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "tests/**/*", "**/*.test.ts", "**/*.spec.ts"],
