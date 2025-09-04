@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm test)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
+    ],
+    "deny": []
+  }
+}

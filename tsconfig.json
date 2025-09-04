@@ -1,0 +1,82 @@
+{
+  "compilerOptions": {
+    /* Language and Environment */
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+
+    /* Type Checking */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    "exactOptionalPropertyTypes": true,
+
+    /* Modules */
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+
+    /* Emit */
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "removeComments": true,
+    "importHelpers": true,
+    "downlevelIteration": true,
+    "newLine": "lf",
+
+    /* Interop Constraints */
+    "allowImportingTsExtensions": false,
+    "allowArbitraryExtensions": false,
+
+    /* Type Acquisition */
+    "typeRoots": ["./node_modules/@types", "./src/@types"],
+
+    /* Path Mapping */
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["./*"],
+      "@/types/*": ["./types/*"],
+      "@/utils/*": ["./utils/*"],
+      "@/services/*": ["./services/*"],
+      "@/mcp/*": ["./mcp/*"],
+      "@/auth/*": ["./auth/*"],
+      "@/drupal/*": ["./drupal/*"],
+      "@/database/*": ["./database/*"],
+      "@/config/*": ["./config/*"]
+    },
+
+    /* Completeness */
+    "skipDefaultLibCheck": true,
+    "skipLibCheck": false
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests/**/*",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ],
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  }
+}
