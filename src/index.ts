@@ -9,6 +9,7 @@
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createServer } from '@/mcp/server.js';
+import { startHealthServer } from '@/health/server.js';
 import { logger } from '@/utils/logger.js';
 import { config } from '@/config/index.js';
 
@@ -18,13 +19,16 @@ import { config } from '@/config/index.js';
 async function main(): Promise<void> {
   try {
     logger.info('Starting Drupalize.me MCP Server...', {
-      version: process.env.npm_package_version || '1.0.0',
+      version: process.env.npm_package_version ?? '1.0.0',
       nodeVersion: process.version,
       environment: config.environment,
     });
 
+    // Start health check server first (needed for container health checks)
+    await startHealthServer();
+
     // Create MCP server instance
-    const server: Server = await createServer();
+    const server: Server = createServer();
 
     // Set up transport (stdio for MCP communication)
     const transport = new StdioServerTransport();
@@ -37,16 +41,18 @@ async function main(): Promise<void> {
     );
 
     // Handle graceful shutdown
-    process.on('SIGINT', async () => {
+    process.on('SIGINT', () => {
       logger.info('Received SIGINT, shutting down gracefully...');
-      await server.close();
-      process.exit(0);
+      void server.close().then(() => {
+        process.exit(0);
+      });
     });
 
-    process.on('SIGTERM', async () => {
+    process.on('SIGTERM', () => {
       logger.info('Received SIGTERM, shutting down gracefully...');
-      await server.close();
-      process.exit(0);
+      void server.close().then(() => {
+        process.exit(0);
+      });
     });
   } catch (error) {
     logger.error(

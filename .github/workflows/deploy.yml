@@ -1,0 +1,132 @@
+name: Deploy to Railway
+
+on:
+  workflow_run:
+    workflows: ['CI - Test, Build & Quality Checks']
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch'
+    environment:
+      name: production
+      url: https://mcp-server.railway.app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: ./
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Setup Node.js (for fresh builds)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies and build (for manual deploy)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          npm ci
+          npm run build:prod
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Wait for deployment
+        run: sleep 60
+
+      - name: Run comprehensive health checks
+        run: |
+          echo "Running health checks..."
+
+          # Health endpoint
+          if ! curl -f --max-time 30 https://mcp-server.railway.app/health; then
+            echo "Health check failed"
+            exit 1
+          fi
+
+          # MCP SSE endpoint (should respond with 200 or appropriate status)
+          if ! curl -f --max-time 30 -H "Accept: text/event-stream" https://mcp-server.railway.app/mcp/sse; then
+            echo "MCP SSE endpoint check failed"
+            exit 1
+          fi
+
+          # OAuth callback endpoint (should return method not allowed for GET)
+          curl -I --max-time 30 https://mcp-server.railway.app/oauth/callback || true
+
+          echo "Health checks completed successfully"
+
+      - name: Create deployment record
+        run: |
+          echo "Deployment successful at $(date)"
+          echo "Commit: ${{ github.sha }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Run ID: ${{ github.run_id }}"
+
+  rollback:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    if: failure() && (github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch')
+    needs: [deploy-production]
+
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Rollback to previous deployment
+        run: railway rollback
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Verify rollback
+        run: |
+          sleep 30
+          if ! curl -f --max-time 30 https://mcp-server.railway.app/health; then
+            echo "Rollback verification failed"
+            exit 1
+          fi
+          echo "Rollback verified successfully"
+
+      - name: Create incident issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Production Deployment Failed - Rollback Executed',
+              body: `Production deployment failed and automatic rollback was executed.
+              
+              **Details:**
+              - Commit: ${{ github.sha }}
+              - Workflow: ${{ github.workflow }}
+              - Run: ${{ github.run_number }}
+              - Original workflow run: ${{ github.event.workflow_run.id }}
+              
+              Please investigate the failure and re-deploy when ready.`,
+              labels: ['bug', 'production', 'deployment', 'incident']
+            })

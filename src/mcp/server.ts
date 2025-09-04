@@ -12,12 +12,11 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { logger } from '@/utils/logger.js';
-import { config } from '@/config/index.js';
 
 /**
  * Creates and configures the MCP server instance
  */
-export async function createServer(): Promise<Server> {
+export function createServer(): Server {
   const server = new Server(
     {
       name: 'drupalize-mcp-server',
@@ -34,7 +33,7 @@ export async function createServer(): Promise<Server> {
   );
 
   // Set up tool handlers
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
+  server.setRequestHandler(ListToolsRequestSchema, () => {
     return {
       tools: [
         // Tools will be registered here as we implement them
@@ -63,7 +62,7 @@ export async function createServer(): Promise<Server> {
     };
   });
 
-  server.setRequestHandler(CallToolRequestSchema, async request => {
+  server.setRequestHandler(CallToolRequestSchema, request => {
     const { name, arguments: args } = request.params;
 
     switch (name) {

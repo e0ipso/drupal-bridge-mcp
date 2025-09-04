@@ -39,38 +39,69 @@ export interface ServerConfig {
 }
 
 /**
+ * Parse database configuration from environment variables
+ * Supports both individual env vars and DATABASE_URL
+ */
+function parseDatabaseConfig(): ServerConfig['database'] {
+  const databaseUrl = process.env.DATABASE_URL;
+
+  if (databaseUrl) {
+    try {
+      const url = new URL(databaseUrl);
+      return {
+        host: url.hostname,
+        port: parseInt(url.port || '5432', 10),
+        name: url.pathname.slice(1), // Remove leading slash
+        user: url.username,
+        password: url.password,
+        ssl:
+          url.searchParams.get('sslmode') === 'require' ||
+          process.env.DB_SSL === 'true',
+      };
+    } catch (error) {
+      throw new Error(
+        `Invalid DATABASE_URL: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  // Fall back to individual environment variables
+  return {
+    host: process.env.DB_HOST ?? 'localhost',
+    port: parseInt(process.env.DB_PORT ?? '5432', 10),
+    name: process.env.DB_NAME ?? 'mcp_server',
+    user: process.env.DB_USER ?? 'postgres',
+    password: process.env.DB_PASSWORD ?? '',
+    ssl: process.env.DB_SSL === 'true',
+  };
+}
+
+/**
  * Load and validate configuration from environment variables
  */
 function loadConfig(): ServerConfig {
-  const env = process.env.NODE_ENV || 'development';
+  const env = process.env.NODE_ENV ?? 'development';
 
   return {
     environment: env as 'development' | 'production' | 'test',
-    port: parseInt(process.env.PORT || '3000', 10),
+    port: parseInt(process.env.PORT ?? '3000', 10),
     logging: {
-      level: (process.env.LOG_LEVEL as LogLevel) || 'info',
+      level: (process.env.LOG_LEVEL as LogLevel) ?? 'info',
       format: env === 'production' ? 'json' : 'pretty',
     },
     drupal: {
-      baseUrl: process.env.DRUPAL_BASE_URL || 'https://drupalize.me',
-      jsonRpcEndpoint: process.env.DRUPAL_JSONRPC_ENDPOINT || '/jsonrpc',
-      timeout: parseInt(process.env.DRUPAL_TIMEOUT || '10000', 10),
+      baseUrl: process.env.DRUPAL_BASE_URL ?? 'https://drupalize.me',
+      jsonRpcEndpoint: process.env.DRUPAL_JSONRPC_ENDPOINT ?? '/jsonrpc',
+      timeout: parseInt(process.env.DRUPAL_TIMEOUT ?? '10000', 10),
     },
     oauth: {
-      clientId: process.env.OAUTH_CLIENT_ID || '',
-      clientSecret: process.env.OAUTH_CLIENT_SECRET || '',
-      redirectUri: process.env.OAUTH_REDIRECT_URI || '',
-      authUrl: process.env.OAUTH_AUTH_URL || '',
-      tokenUrl: process.env.OAUTH_TOKEN_URL || '',
+      clientId: process.env.OAUTH_CLIENT_ID ?? '',
+      clientSecret: process.env.OAUTH_CLIENT_SECRET ?? '',
+      redirectUri: process.env.OAUTH_REDIRECT_URI ?? '',
+      authUrl: process.env.OAUTH_AUTH_URL ?? '',
+      tokenUrl: process.env.OAUTH_TOKEN_URL ?? '',
     },
-    database: {
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432', 10),
-      name: process.env.DB_NAME || 'mcp_server',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || '',
-      ssl: process.env.DB_SSL === 'true',
-    },
+    database: parseDatabaseConfig(),
   };
 }
 

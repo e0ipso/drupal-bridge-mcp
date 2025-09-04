@@ -66,6 +66,7 @@ class ConsoleLogger implements Logger {
     };
 
     if (this.format === 'json') {
+      // eslint-disable-next-line no-console
       console.log(JSON.stringify(entry));
     } else {
       this.prettyLog(entry);
@@ -77,14 +78,17 @@ class ConsoleLogger implements Logger {
     const level = entry.level.toUpperCase().padEnd(5);
     const { message } = entry;
 
+    // eslint-disable-next-line no-console
     console.log(`${timestamp} ${level} ${message}`);
 
     if (entry.context && Object.keys(entry.context).length > 0) {
+      // eslint-disable-next-line no-console
       console.log('  Context:', JSON.stringify(entry.context, null, 2));
     }
 
     if (entry.error) {
-      console.log('  Error:', entry.error.stack || entry.error.message);
+      // eslint-disable-next-line no-console
+      console.log('  Error:', entry.error.stack ?? entry.error.message);
     }
   }
 }
