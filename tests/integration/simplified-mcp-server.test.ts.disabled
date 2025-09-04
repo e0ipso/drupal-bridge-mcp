@@ -13,20 +13,20 @@ import {
   afterEach,
   jest,
 } from '@jest/globals';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { SimplifiedMCPServer } from '../../src/mcp/server.js';
-import { JsonRpcClient } from '../../src/drupal/json-rpc-client.js';
-import { TokenExtractor } from '../../src/mcp/token-extractor.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index';
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types';
+import { SimplifiedMCPServer } from '../../src/mcp/server';
+import { JsonRpcClient } from '../../src/drupal/json-rpc-client';
+import { TokenExtractor } from '../../src/mcp/token-extractor';
 
 // Mock the Drupal client
-jest.mock('../../src/drupal/json-rpc-client.js');
+jest.mock('../../src/drupal/json-rpc-client');
 const MockedJsonRpcClient = JsonRpcClient as jest.MockedClass<
   typeof JsonRpcClient
 >;
 
 // Mock the logger
-jest.mock('../../src/utils/logger.js', () => ({
+jest.mock('../../src/utils/logger', () => ({
   logger: {
     info: jest.fn(),
     debug: jest.fn(),

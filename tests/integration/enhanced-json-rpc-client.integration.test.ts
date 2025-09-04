@@ -10,11 +10,11 @@ import {
   ConnectionPoolUtils,
   RequestCorrelationUtils,
   HealthMonitoringUtils,
-} from '../../src/drupal/enhanced-json-rpc-client.js';
+} from '../../src/drupal/enhanced-json-rpc-client';
 import type {
   EnhancedJsonRpcClientConfig,
   JsonRpcBatchRequest,
-} from '../../src/drupal/enhanced-json-rpc-client.js';
+} from '../../src/drupal/enhanced-json-rpc-client';
 
 describe('Enhanced JSON-RPC Client Integration', () => {
   let client: ReturnType<typeof createEnhancedJsonRpcClient>;
