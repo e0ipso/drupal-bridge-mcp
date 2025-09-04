@@ -14,7 +14,17 @@ export interface PerformanceMetric {
 
 export interface OAuthMetric {
   readonly timestamp: number;
-  readonly operation: 'refresh' | 'auth' | 'validate';
+  readonly operation:
+    | 'refresh'
+    | 'auth'
+    | 'validate'
+    | 'init_auth'
+    | 'handle_callback'
+    | 'token_refresh'
+    | 'token_introspect'
+    | 'token_refresh_check'
+    | 'token_validate'
+    | 'health_check';
   readonly success: boolean;
   readonly error?: string;
   readonly responseTime?: number;
@@ -22,7 +32,13 @@ export interface OAuthMetric {
 
 export interface DatabaseMetric {
   readonly timestamp: number;
-  readonly operation: 'query' | 'connect' | 'health_check';
+  readonly operation:
+    | 'query'
+    | 'connect'
+    | 'health_check'
+    | 'token_store'
+    | 'token_validate'
+    | 'token_cleanup';
   readonly success: boolean;
   readonly responseTime: number;
   readonly error?: string;

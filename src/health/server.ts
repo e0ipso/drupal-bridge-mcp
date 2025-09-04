@@ -11,6 +11,7 @@ import { config } from '@/config/index.js';
 import {
   checkDatabaseConnection,
   getDatabasePoolHealth,
+  getSharedPool,
 } from '@/database/session-store.js';
 import { OAuthClient } from '@/auth/oauth-client.js';
 import { metricsCollector } from '@/monitoring/metrics.js';
@@ -24,7 +25,8 @@ import {
  */
 export function createHealthServer(): express.Application {
   const app = express();
-  const oauthClient = new OAuthClient();
+  const dbPool = getSharedPool();
+  const oauthClient = new OAuthClient(dbPool);
 
   // Basic middleware
   app.use(express.json({ limit: '1mb' }));

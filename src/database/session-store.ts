@@ -106,6 +106,114 @@ export function getDatabasePoolHealth(): {
   };
 }
 
+/**
+ * Get or create shared database pool instance
+ */
+export function getSharedPool(): Pool {
+  return getPool();
+}
+
+/**
+ * Execute database cleanup tasks
+ */
+export async function executeCleanupTasks(): Promise<void> {
+  const dbPool = getPool();
+  const client = await dbPool.connect();
+
+  try {
+    // Clean up expired sessions using the database function
+    await client.query('SELECT cleanup_expired_sessions()');
+
+    logger.info('Database cleanup tasks completed');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.warn('Database cleanup failed', { error: errorMessage });
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Session store implementation with OAuth integration
+ */
 export class SessionStore {
-  // Implementation placeholder
+  private readonly pool: Pool;
+
+  constructor(pool: Pool) {
+    this.pool = pool;
+  }
+
+  /**
+   * Get user session by user ID
+   */
+  async getUserSession(userId: string): Promise<any | null> {
+    const client = await this.pool.connect();
+
+    try {
+      const query = `
+        SELECT *
+        FROM user_sessions 
+        WHERE user_id = $1 AND expires_at > NOW()
+      `;
+
+      const result = await client.query(query, [userId]);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      return result.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Clean up expired sessions
+   */
+  async cleanupExpiredSessions(): Promise<number> {
+    const client = await this.pool.connect();
+
+    try {
+      const query = 'DELETE FROM user_sessions WHERE expires_at <= NOW()';
+      const result = await client.query(query);
+
+      logger.info('Cleaned up expired sessions', { count: result.rowCount });
+      return result.rowCount || 0;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get session statistics
+   */
+  async getSessionStats(): Promise<{
+    activeSessions: number;
+    expiredSessions: number;
+    totalSessions: number;
+  }> {
+    const client = await this.pool.connect();
+
+    try {
+      const query = `
+        SELECT 
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE expires_at > NOW()) as active,
+          COUNT(*) FILTER (WHERE expires_at <= NOW()) as expired
+        FROM user_sessions
+      `;
+
+      const result = await client.query(query);
+      const row = result.rows[0];
+
+      return {
+        totalSessions: parseInt(row.total, 10),
+        activeSessions: parseInt(row.active, 10),
+        expiredSessions: parseInt(row.expired, 10),
+      };
+    } finally {
+      client.release();
+    }
+  }
 }

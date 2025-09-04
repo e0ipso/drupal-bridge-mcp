@@ -63,6 +63,14 @@ export interface ServerConfig {
       readonly windowMs: number;
     };
     readonly sessionSecret: string;
+    readonly token: {
+      readonly bcryptSaltRounds: number;
+      readonly encryptionKey: string;
+      readonly refreshThreshold: number; // Percentage of token lifetime
+      readonly maxRefreshRetries: number;
+      readonly refreshRetryDelayMs: number;
+      readonly cleanupIntervalMs: number;
+    };
   };
   readonly health: {
     readonly enabled: boolean;
@@ -232,6 +240,20 @@ function loadConfig(): ServerConfig {
   // Determine HTTPS enforcement
   const httpsOnly = env === 'production' || process.env.HTTPS_ONLY === 'true';
 
+  // Parse token security configuration
+  const tokenEncryptionKey =
+    process.env.TOKEN_ENCRYPTION_KEY ??
+    (env === 'development' ? 'dev-encryption-key-32-chars-long!!' : '');
+
+  if (
+    env === 'production' &&
+    (!tokenEncryptionKey || tokenEncryptionKey.length < 32)
+  ) {
+    throw new Error(
+      'TOKEN_ENCRYPTION_KEY must be at least 32 characters in production'
+    );
+  }
+
   const config: ServerConfig = {
     environment: env as 'development' | 'production' | 'test' | 'staging',
     port: parseInt(process.env.PORT ?? '3000', 10),
@@ -272,6 +294,25 @@ function loadConfig(): ServerConfig {
         windowMs: parseInt(process.env.RATE_LIMIT_WINDOW ?? '900000', 10), // 15 minutes
       },
       sessionSecret,
+      token: {
+        bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS ?? '12', 10),
+        encryptionKey: tokenEncryptionKey,
+        refreshThreshold: parseFloat(
+          process.env.TOKEN_REFRESH_THRESHOLD ?? '0.9'
+        ), // 90% of lifetime
+        maxRefreshRetries: parseInt(
+          process.env.TOKEN_REFRESH_MAX_RETRIES ?? '3',
+          10
+        ),
+        refreshRetryDelayMs: parseInt(
+          process.env.TOKEN_REFRESH_RETRY_DELAY ?? '5000',
+          10
+        ), // 5 seconds
+        cleanupIntervalMs: parseInt(
+          process.env.TOKEN_CLEANUP_INTERVAL ?? '300000',
+          10
+        ), // 5 minutes
+      },
     },
     health: {
       enabled: process.env.HEALTH_CHECK_ENABLED !== 'false',
