@@ -2,7 +2,7 @@
 id: 3
 group: 'cloud-deployment'
 dependencies: [1, 2]
-status: 'pending'
+status: 'completed'
 created: '2025-09-04'
 skills: ['deployment', 'railway']
 ---

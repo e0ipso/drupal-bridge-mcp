@@ -59,6 +59,11 @@ jobs:
       - name: Wait for deployment
         run: sleep 60
 
+      - name: Run database migrations
+        run: railway run npm run migrate
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
       - name: Run comprehensive health checks
         run: |
           echo "Running health checks..."

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "dockerfile",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "sleepApplication": false,
+    "restartPolicyType": "on-failure",
+    "restartPolicyMaxRetries": 10
+  },
+  "environments": {
+    "production": {
+      "variables": {
+        "NODE_ENV": "production",
+        "LOG_LEVEL": "info",
+        "MCP_TRANSPORT": "sse",
+        "HEALTH_CHECK_ENABLED": "true",
+        "HEALTH_CHECK_PATH": "/health",
+        "REQUEST_TIMEOUT": "30000",
+        "RATE_LIMIT_ENABLED": "true",
+        "RATE_LIMIT_MAX": "1000",
+        "RATE_LIMIT_WINDOW": "900000",
+        "OAUTH_TOKEN_REFRESH_BUFFER": "300",
+        "DATABASE_POOL_MIN": "2",
+        "DATABASE_POOL_MAX": "20",
+        "DATABASE_CONNECTION_TIMEOUT": "10000",
+        "DATABASE_IDLE_TIMEOUT": "30000"
+      }
+    },
+    "staging": {
+      "variables": {
+        "NODE_ENV": "staging",
+        "LOG_LEVEL": "debug",
+        "MCP_TRANSPORT": "sse",
+        "HEALTH_CHECK_ENABLED": "true",
+        "HEALTH_CHECK_PATH": "/health",
+        "REQUEST_TIMEOUT": "30000",
+        "RATE_LIMIT_ENABLED": "true",
+        "RATE_LIMIT_MAX": "500",
+        "RATE_LIMIT_WINDOW": "900000",
+        "OAUTH_TOKEN_REFRESH_BUFFER": "300",
+        "DATABASE_POOL_MIN": "1",
+        "DATABASE_POOL_MAX": "10",
+        "DATABASE_CONNECTION_TIMEOUT": "10000",
+        "DATABASE_IDLE_TIMEOUT": "30000"
+      }
+    }
+  },
+  "healthcheck": {
+    "path": "/health",
+    "timeout": 10,
+    "interval": 30
+  }
+}
