@@ -1,0 +1,127 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for the MCP server
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please fill out the information below to help us understand your request.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Please describe the problem you're trying to solve.
+      placeholder: I'm frustrated when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see implemented.
+      placeholder: I would like...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions or features you've considered.
+      placeholder: I have considered...
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component would this feature primarily affect?
+      options:
+        - Authentication (OAuth)
+        - Content Retrieval
+        - MCP Protocol Implementation
+        - Database/Caching
+        - Configuration
+        - Logging/Monitoring
+        - Documentation
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Low - Nice to have
+        - Medium - Would improve my workflow
+        - High - Essential for my use case
+        - Critical - Blocking my adoption
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe your specific use case and how this feature would help.
+      placeholder: In my scenario, I need to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: api-design
+    attributes:
+      label: API Design (Optional)
+      description: If you have ideas about how the API should work, please share them.
+      placeholder: |
+        // Example API design
+        {
+          "tool": "new_feature",
+          "arguments": {
+            "parameter": "value"
+          }
+        }
+      render: json
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: What would need to be true for this feature to be considered complete?
+      placeholder: |
+        - [ ] Feature works as described
+        - [ ] Documentation is updated
+        - [ ] Tests are added
+        - [ ] ...
+
+  - type: checkboxes
+    id: willing-to-contribute
+    attributes:
+      label: Contribution
+      description: Are you willing to contribute to implementing this feature?
+      options:
+        - label: I'm willing to submit a pull request for this feature
+        - label: I can help with testing
+        - label: I can help with documentation
+        - label: I can help with design/planning
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, mockups, or examples about the feature request here.
+      placeholder: Any additional information that might be helpful...
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

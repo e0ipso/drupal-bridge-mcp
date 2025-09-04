@@ -80,9 +80,32 @@ temp/
 
 # Editor directories and files
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
+
+# JetBrains IDEs
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Vim
+*.sw?
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
 
 # OS generated files
 .DS_Store
@@ -111,3 +134,57 @@ docker-compose*
 
 # Railway
 .railway/
+
+# MCP Server specific
+*.mcp
+mcp-config/
+user-sessions/
+
+# Testing
+test-results/
+playwright-report/
+.nyc_output/
+
+# Cache directories
+.cache/
+.parcel-cache/
+.jest-cache/
+
+# TypeScript specific
+*.d.ts.map
+*.js.map
+.tscache/
+
+# Linting/Formatting
+.eslintcache
+.stylelintcache
+
+# Webpack
+webpack-stats.json
+
+# Rollup
+rollup.config.js.map
+
+# Security
+.secrets/
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# Monitoring/Analytics
+.sentry/
+newrelic_agent.log
+
+# Local configuration overrides
+config.local.*
+settings.local.*
+
+# Performance profiling
+*.cpuprofile
+*.heapsnapshot
+
+# Auto-generated files
+generated/
+auto-generated/

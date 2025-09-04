@@ -1,5 +1,5 @@
 {
-  "name": "@drupalize/mcp-server",
+  "name": "@e0ipso/drupalizeme-mcp-server",
   "version": "1.0.0",
   "description": "MCP Server for Drupalize.me Drupal integration with OAuth authentication and content RAG optimization",
   "main": "dist/index.js",
@@ -27,7 +27,9 @@
     "prestart": "npm run build",
     "prestart:dev": "npm run build",
     "prepare": "husky",
-    "dev:watch": "nodemon --exec \"npm run build && npm run start:dev\" --watch src --ext ts"
+    "dev:watch": "nodemon --exec \"npm run build && npm run start:dev\" --watch src --ext ts",
+    "release": "semantic-release",
+    "release:dry": "semantic-release --dry-run"
   },
   "keywords": [
     "mcp",
@@ -41,6 +43,9 @@
   "author": "Drupalize.me",
   "license": "MIT",
   "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.5",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
     "@types/supertest": "^6.0.3",
@@ -56,6 +61,7 @@
     "lint-staged": "^16.1.6",
     "nodemon": "^3.1.10",
     "prettier": "^3.6.2",
+    "semantic-release": "^24.2.7",
     "supertest": "^7.1.4",
     "ts-jest": "^29.0.0",
     "tsc-alias": "^1.8.16",
@@ -83,5 +89,39 @@
     "simple-oauth2": "^5.1.0",
     "uuid": "^11.1.0",
     "winston": "^3.17.0"
+  },
+  "release": {
+    "branches": [
+      "main",
+      {
+        "name": "beta",
+        "prerelease": true
+      },
+      {
+        "name": "alpha",
+        "prerelease": true
+      }
+    ],
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/changelog",
+      "@semantic-release/npm",
+      "@semantic-release/github",
+      [
+        "@semantic-release/git",
+        {
+          "assets": [
+            "CHANGELOG.md",
+            "package.json",
+            "package-lock.json"
+          ],
+          "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+        }
+      ]
+    ]
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
