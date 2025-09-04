@@ -60,14 +60,25 @@ class ConsoleLogger implements Logger {
       timestamp: new Date().toISOString(),
       level,
       message,
+      service: 'mcp-server',
+      environment: process.env.NODE_ENV ?? 'development',
+      pid: process.pid,
       ...(context instanceof Error
-        ? { error: context, context: undefined }
+        ? {
+            error: {
+              name: context.name,
+              message: context.message,
+              stack: context.stack,
+            },
+            context: undefined,
+          }
         : { context, error: undefined }),
     };
 
     if (this.format === 'json') {
+      // Ensure clean JSON output for log aggregation systems
       // eslint-disable-next-line no-console
-      console.log(JSON.stringify(entry));
+      console.log(JSON.stringify(entry, null, 0));
     } else {
       this.prettyLog(entry);
     }

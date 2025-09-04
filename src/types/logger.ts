@@ -8,8 +8,17 @@ export interface LogEntry {
   readonly timestamp: string;
   readonly level: LogLevel;
   readonly message: string;
+  readonly service: string;
+  readonly environment: string;
+  readonly pid: number;
   readonly context?: Record<string, unknown> | undefined;
-  readonly error?: Error | undefined;
+  readonly error?:
+    | {
+        readonly name: string;
+        readonly message: string;
+        readonly stack?: string | undefined;
+      }
+    | undefined;
 }
 
 export interface Logger {

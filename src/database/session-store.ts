@@ -40,22 +40,70 @@ function getPool(): Pool {
  * Check database connection health
  */
 export async function checkDatabaseConnection(): Promise<boolean> {
+  const startTime = Date.now();
+
   try {
     const dbPool = getPool();
     const client = await dbPool.connect();
 
     try {
       await client.query('SELECT 1');
+
+      // Record successful health check
+      const { metricsCollector } = await import('@/monitoring/metrics.js');
+      metricsCollector.recordDatabase({
+        timestamp: startTime,
+        operation: 'health_check',
+        success: true,
+        responseTime: Date.now() - startTime,
+      });
+
       return true;
     } finally {
       client.release();
     }
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Record failed health check
+    const { metricsCollector } = await import('@/monitoring/metrics.js');
+    metricsCollector.recordDatabase({
+      timestamp: startTime,
+      operation: 'health_check',
+      success: false,
+      responseTime: Date.now() - startTime,
+      error: errorMessage,
+    });
+
     logger.warn('Database health check failed', {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage,
+      responseTime: `${Date.now() - startTime}ms`,
     });
     return false;
   }
+}
+
+/**
+ * Get database pool health information
+ */
+export function getDatabasePoolHealth(): {
+  totalCount: number;
+  idleCount: number;
+  waitingCount: number;
+} {
+  if (!pool) {
+    return {
+      totalCount: 0,
+      idleCount: 0,
+      waitingCount: 0,
+    };
+  }
+
+  return {
+    totalCount: pool.totalCount,
+    idleCount: pool.idleCount,
+    waitingCount: pool.waitingCount,
+  };
 }
 
 export class SessionStore {
