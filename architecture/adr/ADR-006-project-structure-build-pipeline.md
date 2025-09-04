@@ -1,11 +1,13 @@
 # ADR-006: Project Structure and Build Pipeline Design
 
 ## Status
+
 **Accepted** - 2025-09-04
 
 ## Context
 
-The Drupalize.me MCP Server requires a well-organized project structure and efficient build pipeline to support:
+The Drupalize.me MCP Server requires a well-organized project structure and efficient build pipeline
+to support:
 
 - **TypeScript Compilation**: Source transformation for production deployment
 - **Development Workflow**: Hot reloading and watch mode for rapid iteration
@@ -15,13 +17,16 @@ The Drupalize.me MCP Server requires a well-organized project structure and effi
 - **Configuration Management**: Environment-specific settings and secrets
 - **Asset Management**: Static files, schemas, and documentation
 
-Building on the [Technology Stack Selection (ADR-004)](./ADR-004-technology-stack-selection.md) and [Development Tooling Choices (ADR-005)](./ADR-005-development-tooling-choices.md), the structure must accommodate Node.js/TypeScript with ESLint, Prettier, and Jest integration.
+Building on the [Technology Stack Selection (ADR-004)](./ADR-004-technology-stack-selection.md) and
+[Development Tooling Choices (ADR-005)](./ADR-005-development-tooling-choices.md), the structure
+must accommodate Node.js/TypeScript with ESLint, Prettier, and Jest integration.
 
 ## Decision
 
 **Project Structure: Domain-Driven Component Organization**
 
 ### Directory Structure
+
 ```
 /
 ├── src/                          # TypeScript source code
@@ -70,15 +75,17 @@ Building on the [Technology Stack Selection (ADR-004)](./ADR-004-technology-stac
 ### Build Pipeline: Multi-Stage Development and Production
 
 **Development Pipeline**
+
 ```bash
 npm run dev
 ├── TypeScript compilation (watch mode)
-├── Nodemon process monitoring  
+├── Nodemon process monitoring
 ├── ESLint real-time checking
 └── Jest test runner (optional watch)
 ```
 
 **Production Pipeline**
+
 ```bash
 npm run build && npm start
 ├── TypeScript compilation (optimized)
@@ -101,7 +108,7 @@ npm run build && npm start
 ### Why Multi-Stage Build Pipeline?
 
 1. **Development Efficiency**: Watch mode enables rapid iteration
-2. **Production Optimization**: Separate optimized builds for deployment  
+2. **Production Optimization**: Separate optimized builds for deployment
 3. **Error Detection**: Multiple stages catch different classes of issues
 4. **Deployment Flexibility**: Different targets (Railway, Docker, local)
 5. **Debugging Support**: Source maps and development tooling integration
@@ -119,6 +126,7 @@ npm run build && npm start
 ### Positive Consequences
 
 **Developer Experience**
+
 - Clear mental model of codebase organization
 - Fast development cycles with hot reloading
 - Predictable file locations for debugging
@@ -126,13 +134,15 @@ npm run build && npm start
 - Easy onboarding for new contributors
 
 **Maintenance Benefits**
-- Isolated changes reduce merge conflicts  
+
+- Isolated changes reduce merge conflicts
 - Clear ownership boundaries for code review
 - Easy to locate bugs within specific domains
 - Safe refactoring with TypeScript compilation checks
 - Modular testing enables focused debugging
 
 **Deployment Advantages**
+
 - Optimized production builds for cloud platforms
 - Environment-specific configuration management
 - Clear separation of build artifacts from source
@@ -142,12 +152,14 @@ npm run build && npm start
 ### Negative Consequences
 
 **Initial Complexity**
+
 - More directories to understand initially
 - Additional configuration for module resolution
 - Build pipeline adds development dependency overhead
 - Multiple entry points for different environments
 
 **Maintenance Overhead**
+
 - Module boundaries need ongoing discipline
 - Import paths require consistent management
 - Build configuration updates affect multiple stages
@@ -164,40 +176,46 @@ npm run build && npm start
 ## Alternatives Considered
 
 ### Alternative 1: Flat File Structure
-**Description**: All source files in single `src/` directory
-**Rejected Because**: 
+
+**Description**: All source files in single `src/` directory **Rejected Because**:
+
 - Becomes unwieldy as MCP server features expand
 - Difficult to maintain module boundaries
 - Testing organization becomes unclear
 - No clear ownership for different domains (auth, MCP, database)
 
 ### Alternative 2: Feature-Based Structure
-**Description**: Organize by features like `search/`, `auth/`, `content/`
-**Rejected Because**:
+
+**Description**: Organize by features like `search/`, `auth/`, `content/` **Rejected Because**:
+
 - MCP protocol spans multiple features creating confusion
 - OAuth authentication is cross-cutting concern
 - Database models serve multiple features
 - Doesn't align well with MCP server architecture patterns
 
 ### Alternative 3: Layered Architecture
+
 **Description**: Organize by technical layers like `controllers/`, `services/`, `repositories/`
 **Rejected Because**:
+
 - MCP server doesn't follow traditional web app patterns
 - Protocol-specific logic doesn't fit layer model well
 - Authentication flows cross multiple layers
 - TypeScript modules work better with domain organization
 
 ### Alternative 4: Monorepo with Packages
-**Description**: Separate npm packages for auth, MCP, database
-**Rejected Because**:
+
+**Description**: Separate npm packages for auth, MCP, database **Rejected Because**:
+
 - Overkill for single MCP server application
 - Adds deployment complexity
 - TypeScript compilation becomes more complex
 - Team size doesn't justify package overhead
 
 ### Alternative 5: Framework-Specific Structure
-**Description**: Follow Express.js or Fastify conventions
-**Rejected Because**:
+
+**Description**: Follow Express.js or Fastify conventions **Rejected Because**:
+
 - MCP protocol is primary concern, not HTTP framework
 - Authentication flows don't fit traditional web app structure
 - Would obscure MCP-specific organization needs
@@ -206,6 +224,7 @@ npm run build && npm start
 ## Implementation Notes
 
 ### TypeScript Path Mapping
+
 ```json
 // tsconfig.json
 {
@@ -225,19 +244,21 @@ npm run build && npm start
 ```
 
 ### Barrel Exports Pattern
+
 ```typescript
 // src/mcp/index.ts
 export { MCPServer } from './server';
 export { SearchTool } from './tools/search';
 export * from './types';
 
-// src/auth/index.ts  
+// src/auth/index.ts
 export { OAuthManager } from './manager';
 export { authMiddleware } from './middleware';
 export * from './types';
 ```
 
 ### Build Scripts Configuration
+
 ```json
 {
   "scripts": {
@@ -255,28 +276,30 @@ export * from './types';
 ```
 
 ### Environment Configuration Structure
+
 ```typescript
 // src/config/environment.ts
 export const config = {
   server: {
     port: Number(process.env.PORT) || 3000,
-    host: process.env.HOST || '0.0.0.0'
+    host: process.env.HOST || '0.0.0.0',
   },
   database: {
-    url: process.env.DATABASE_URL || 'postgresql://localhost:5432/mcp'
+    url: process.env.DATABASE_URL || 'postgresql://localhost:5432/mcp',
   },
   oauth: {
     clientId: process.env.OAUTH_CLIENT_ID!,
     clientSecret: process.env.OAUTH_CLIENT_SECRET!,
-    redirectUri: process.env.OAUTH_REDIRECT_URI!
+    redirectUri: process.env.OAUTH_REDIRECT_URI!,
   },
   drupal: {
-    baseUrl: process.env.DRUPAL_BASE_URL || 'https://drupalize.me'
-  }
+    baseUrl: process.env.DRUPAL_BASE_URL || 'https://drupalize.me',
+  },
 };
 ```
 
 ### Test Structure Alignment
+
 ```
 tests/
 ├── unit/
@@ -295,7 +318,12 @@ tests/
 ```
 
 ## Related ADRs
-- [ADR-004: Technology Stack Selection](./ADR-004-technology-stack-selection.md) - TypeScript/Node.js foundation
-- [ADR-005: Development Tooling Choices](./ADR-005-development-tooling-choices.md) - Build tool integration
-- [ADR-001: LLM-Free Server Architecture](./ADR-001-llm-free-server-architecture.md) - Influences module organization
-- [ADR-003: OAuth 2.0 Authentication Strategy](./ADR-003-oauth-authentication-strategy.md) - Authentication module structure
+
+- [ADR-004: Technology Stack Selection](./ADR-004-technology-stack-selection.md) -
+  TypeScript/Node.js foundation
+- [ADR-005: Development Tooling Choices](./ADR-005-development-tooling-choices.md) - Build tool
+  integration
+- [ADR-001: LLM-Free Server Architecture](./ADR-001-llm-free-server-architecture.md) - Influences
+  module organization
+- [ADR-003: OAuth 2.0 Authentication Strategy](./ADR-003-oauth-authentication-strategy.md) -
+  Authentication module structure

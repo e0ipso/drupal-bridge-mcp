@@ -1,11 +1,14 @@
 # ADR-004: Technology Stack Selection
 
 ## Status
+
 **Accepted** - 2025-09-04
 
 ## Context
 
-The Drupalize.me MCP Server requires a robust technology stack that can handle real-time communication, OAuth authentication flows, and integration with Drupal's JSON-RPC API. The technology choices must align with the project's core requirements:
+The Drupalize.me MCP Server requires a robust technology stack that can handle real-time
+communication, OAuth authentication flows, and integration with Drupal's JSON-RPC API. The
+technology choices must align with the project's core requirements:
 
 - Server-Sent Events (SSE) transport for MCP protocol communication
 - OAuth 2.0 Authorization Code Grant flow implementation
@@ -14,25 +17,31 @@ The Drupalize.me MCP Server requires a robust technology stack that can handle r
 - Strong type safety for maintainable code
 - Active ecosystem support for MCP development
 
-The architectural decision for an [LLM-Free Server Architecture (ADR-001)](./ADR-001-llm-free-server-architecture.md) eliminates the need for additional LLM SDK integrations, simplifying the technology requirements.
+The architectural decision for an
+[LLM-Free Server Architecture (ADR-001)](./ADR-001-llm-free-server-architecture.md) eliminates the
+need for additional LLM SDK integrations, simplifying the technology requirements.
 
 ## Decision
 
 **Primary Stack: Node.js with TypeScript**
 
-The MCP server will be built using Node.js runtime with TypeScript for type safety and enhanced developer experience.
+The MCP server will be built using Node.js runtime with TypeScript for type safety and enhanced
+developer experience.
 
 ### Core Runtime & Language
+
 - **Node.js**: JavaScript runtime environment
 - **TypeScript**: Typed superset of JavaScript for enhanced reliability
 
 ### Framework & Protocol Support
+
 - **Express.js**: Web framework for HTTP server and OAuth callback handling
 - **@anthropic/server-sdk**: Official MCP SDK for protocol implementation
 - **eventsource**: Server-Sent Events implementation
 - **node-jsonrpc-client**: JSON-RPC 2.0 client for Drupal communication
 
 ### Database & Authentication
+
 - **pg**: PostgreSQL client for session storage
 - **jose**: JWT and OAuth token handling
 - **bcrypt**: Secure token hashing
@@ -64,18 +73,21 @@ The MCP server will be built using Node.js runtime with TypeScript for type safe
 ### Positive Consequences
 
 **Development Velocity**
+
 - Rapid prototyping with familiar JavaScript ecosystem
 - Rich package ecosystem for all integration needs
 - Hot reloading and fast development cycles
 - Extensive tooling support for debugging and testing
 
 **Runtime Performance**
+
 - Efficient I/O handling for concurrent OAuth flows
 - Low memory footprint suitable for cloud deployment
 - Fast JSON processing for API communication
 - Non-blocking operations for real-time MCP communication
 
 **Maintenance & Operations**
+
 - Single language across entire server codebase
 - Familiar deployment patterns for Node.js applications
 - Strong community support and documentation
@@ -84,11 +96,13 @@ The MCP server will be built using Node.js runtime with TypeScript for type safe
 ### Negative Consequences
 
 **Language Limitations**
+
 - JavaScript's dynamic nature requires careful type checking
 - Single-threaded execution (mitigated by async/await patterns)
 - Dependency management complexity with npm/yarn
 
 **Performance Considerations**
+
 - CPU-intensive operations may require worker threads
 - Memory usage can grow with poor coding practices
 - Garbage collection pauses (minimal for typical MCP workloads)
@@ -104,8 +118,9 @@ The MCP server will be built using Node.js runtime with TypeScript for type safe
 ## Alternatives Considered
 
 ### Alternative 1: Python with FastAPI
-**Description**: Python-based server using FastAPI framework
-**Rejected Because**: 
+
+**Description**: Python-based server using FastAPI framework **Rejected Because**:
+
 - Limited MCP SDK support compared to Node.js ecosystem
 - SSE implementation less mature than Node.js
 - OAuth client libraries not as robust for complex flows
@@ -113,8 +128,9 @@ The MCP server will be built using Node.js runtime with TypeScript for type safe
 - Team expertise strongly favors Node.js/TypeScript stack
 
 ### Alternative 2: Go
-**Description**: Go-based server with Gin or native HTTP server
-**Rejected Because**:
+
+**Description**: Go-based server with Gin or native HTTP server **Rejected Because**:
+
 - MCP SDK ecosystem primarily focuses on Node.js and Python
 - Additional development time required for JSON-RPC client implementation
 - Less flexibility for rapid iteration during MVP development
@@ -122,8 +138,9 @@ The MCP server will be built using Node.js runtime with TypeScript for type safe
 - OAuth library ecosystem less mature than Node.js
 
 ### Alternative 3: Java with Spring Boot
-**Description**: Java-based server using Spring Boot framework
-**Rejected Because**:
+
+**Description**: Java-based server using Spring Boot framework **Rejected Because**:
+
 - Significantly higher resource usage for simple MCP server
 - Longer development cycles not suitable for MVP approach
 - No official MCP SDK support for Java ecosystem
@@ -131,8 +148,9 @@ The MCP server will be built using Node.js runtime with TypeScript for type safe
 - Overkill for the scope of required functionality
 
 ### Alternative 4: Deno/TypeScript
-**Description**: Deno runtime with native TypeScript support
-**Rejected Because**:
+
+**Description**: Deno runtime with native TypeScript support **Rejected Because**:
+
 - MCP SDK primarily targets Node.js ecosystem
 - Less mature package ecosystem for OAuth and database clients
 - Deployment complexity higher than standard Node.js
@@ -142,6 +160,7 @@ The MCP server will be built using Node.js runtime with TypeScript for type safe
 ## Implementation Notes
 
 ### Development Environment
+
 ```bash
 # Required versions
 node: >=18.0.0
@@ -150,6 +169,7 @@ typescript: ^5.0.0
 ```
 
 ### Key Dependencies Structure
+
 ```json
 {
   "dependencies": {
@@ -169,6 +189,7 @@ typescript: ^5.0.0
 ```
 
 ### Build Configuration
+
 ```typescript
 // tsconfig.json targeting Node.js environment
 {
@@ -187,7 +208,12 @@ typescript: ^5.0.0
 ```
 
 ## Related ADRs
-- [ADR-001: LLM-Free Server Architecture](./ADR-001-llm-free-server-architecture.md) - Eliminated need for LLM SDK dependencies
-- [ADR-002: JSON-RPC Direct Markdown Transformation](./ADR-002-json-rpc-markdown-transformation.md) - Requires robust JSON-RPC client
-- [ADR-003: OAuth 2.0 Authentication Strategy](./ADR-003-oauth-authentication-strategy.md) - Requires OAuth 2.0 client libraries
-- [ADR-005: Development Tooling Choices](./ADR-005-development-tooling-choices.md) - Tooling stack built around Node.js/TypeScript
+
+- [ADR-001: LLM-Free Server Architecture](./ADR-001-llm-free-server-architecture.md) - Eliminated
+  need for LLM SDK dependencies
+- [ADR-002: JSON-RPC Direct Markdown Transformation](./ADR-002-json-rpc-markdown-transformation.md) -
+  Requires robust JSON-RPC client
+- [ADR-003: OAuth 2.0 Authentication Strategy](./ADR-003-oauth-authentication-strategy.md) -
+  Requires OAuth 2.0 client libraries
+- [ADR-005: Development Tooling Choices](./ADR-005-development-tooling-choices.md) - Tooling stack
+  built around Node.js/TypeScript

@@ -5,42 +5,53 @@
 Follow this order to understand the complete architecture:
 
 ### 🎯 Start Here: Core Overview
-1. **[Project Summary](./project-summary.md)** - Complete project overview with 10-week roadmap
-2. **[Simplified MVP Architecture](./simplified-mvp-architecture.md)** - Clean MVP design without complexity
 
-### 🏗️ Technical Implementation  
-3. **[Final Technical Specifications](./final-technical-specifications.md)** - Complete implementation guide with code examples
+1. **[Project Summary](./project-summary.md)** - Complete project overview with 10-week roadmap
+2. **[Simplified MVP Architecture](./simplified-mvp-architecture.md)** - Clean MVP design without
+   complexity
+
+### 🏗️ Technical Implementation
+
+3. **[Final Technical Specifications](./final-technical-specifications.md)** - Complete
+   implementation guide with code examples
 4. **[Component Diagrams](./component-diagrams.md)** - Detailed system interaction flows
 
 ### 🔍 Deep Dive Analysis
+
 5. **[Authentication Analysis](./authentication-analysis.md)** - OAuth 2.0 integration deep dive
-6. **[Content Transformation Options](./content-transformation-options.md)** - Why Drupal handles transformation
-7. **[Critical Integration Challenges](./critical-integration-challenges.md)** - Technical challenges and solutions
+6. **[Content Transformation Options](./content-transformation-options.md)** - Why Drupal handles
+   transformation
+7. **[Critical Integration Challenges](./critical-integration-challenges.md)** - Technical
+   challenges and solutions
 
 ### 📈 Implementation Planning
+
 8. **[MVP Feature Priorities](./mvp-feature-priorities.md)** - 4-week focused delivery plan
-9. **[Debug Mode Architecture](./debug-mode-architecture.md)** - Development vs production error handling
+9. **[Debug Mode Architecture](./debug-mode-architecture.md)** - Development vs production error
+   handling
 
 ### 📚 Decision Documentation
+
 10. **[Architecture Decision Records (ADRs)](./adr/)** - Formal architecture decisions
 
 ---
 
 ## 🚀 Quick Start for Developers
 
-**For Implementers**: Read items 1-4 above
-**For Drupal Developers**: Focus on items 3, 5, and 6
+**For Implementers**: Read items 1-4 above **For Drupal Developers**: Focus on items 3, 5, and 6
 **For DevOps/Deployment**: Focus on items 1, 3, and 9
 
 ## 🎯 Key Architecture Decisions
 
 ### MVP Approach (4 weeks)
+
 - **No Caching**: Direct API calls to establish performance baseline
 - **LLM-Free**: Leverage connected LLM via MCP protocol
 - **Drupal Processing**: JSON-RPC methods return pre-formatted Markdown
 - **Per-User OAuth**: Individual Authorization Code Grant flow
 
 ### Technology Stack
+
 - **Transport**: Server-Sent Events (SSE) over HTTP
 - **Authentication**: Simple OAuth 5.x module with Authorization Code Grant
 - **Content**: JSON-RPC 2.x method (`content.search`)
@@ -72,10 +83,11 @@ Follow this order to understand the complete architecture:
 
 ## 📝 Document Status
 
-| Document | Status | Last Updated |
-|----------|--------|--------------|
+| Document           | Status     | Last Updated                     |
+| ------------------ | ---------- | -------------------------------- |
 | All Core Documents | ✅ Current | Reflects all user clarifications |
-| All ADRs | ✅ Current | MVP-focused decisions |
-| Technical Specs | ✅ Current | No stale caching references |
+| All ADRs           | ✅ Current | MVP-focused decisions            |
+| Technical Specs    | ✅ Current | No stale caching references      |
 
-**Ready for Implementation**: All documents reflect the simplified MVP approach with per-user OAuth and Drupal-side content processing.
+**Ready for Implementation**: All documents reflect the simplified MVP approach with per-user OAuth
+and Drupal-side content processing.

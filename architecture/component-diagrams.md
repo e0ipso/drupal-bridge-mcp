@@ -50,22 +50,22 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     Start([MCP Server Startup]) --> Discovery[Method Discovery Service]
-    
+
     Discovery --> Cache{Methods Cached?}
     Cache -->|No/Expired| Fetch[GET /jsonrpc/methods]
     Cache -->|Yes| Registry[Tool Registry]
-    
+
     Fetch --> Auth[Apply OAuth Token]
     Auth --> Request[HTTP Request to Drupal]
     Request --> Response[JSON-RPC Methods List]
-    
+
     Response --> Filter[Security Filter]
     Filter --> Transform[Schema Translation]
     Transform --> Registry[Tool Registry]
-    
+
     Registry --> MCPTools[MCP Tool Definitions]
     MCPTools --> Client[Notify MCP Client]
-    
+
     Client --> Monitor[Change Monitor]
     Monitor -->|Module Changes| Discovery
 ```
@@ -75,24 +75,24 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant Client as MCP Client
-    participant MCP as MCP Server  
+    participant MCP as MCP Server
     participant LLM as Query Parser LLM
     participant JSONRPC as JSON-RPC Endpoint
     participant Solr as Solr Search Index
 
     Client->>MCP: search_content("How to create custom blocks?")
-    
+
     Note over MCP,LLM: Query Intelligence Layer
     MCP->>LLM: Parse query context and extract keywords
     LLM->>MCP: Structured search parameters
-    
+
     Note over MCP,Solr: Search Execution
     MCP->>JSONRPC: content.search(keywords, filters)
     JSONRPC->>Solr: Execute search query
     Solr->>JSONRPC: Search results with scores
     JSONRPC->>MCP: JSON response with content IDs
-    
-    Note over MCP,Client: Response Processing  
+
+    Note over MCP,Client: Response Processing
     MCP->>MCP: Rank and filter results
     MCP->>Client: Relevant content list
 ```
@@ -105,28 +105,28 @@ flowchart LR
         A[Content IDs] --> B[JSON:API Request]
         B --> C[Drupal Content Response]
     end
-    
+
     subgraph "Transformation Engine"
         C --> D[JSON Structure Parser]
         D --> E[Content Type Analyzer]
         E --> F[Semantic Processor]
         F --> G[Markdown Generator]
     end
-    
+
     subgraph "Output Processing"
         G --> H[Content Chunking]
         H --> I[Metadata Extraction]
         I --> J[Formatted Output]
     end
-    
+
     subgraph "Complex Content Handling"
         K[Code Examples] --> L[Syntax Highlighting]
         M[Media Files] --> N[Reference Links]
         O[Embedded Content] --> P[Structured Blocks]
     end
-    
+
     E --> K
-    E --> M  
+    E --> M
     E --> O
     L --> G
     N --> G
@@ -167,33 +167,34 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     Error[Error Occurs] --> Type{Error Type?}
-    
+
     Type -->|Auth| Auth[Authentication Error]
-    Type -->|Network| Network[Network Error] 
+    Type -->|Network| Network[Network Error]
     Type -->|Validation| Validation[Parameter Error]
     Type -->|System| System[System Error]
-    
+
     Auth --> TokenRefresh[Attempt Token Refresh]
     TokenRefresh --> Retry[Retry Operation]
-    
+
     Network --> Backoff[Exponential Backoff]
     Backoff --> Retry
-    
+
     Validation --> Sanitize[Sanitize Parameters]
     Sanitize --> Retry
-    
+
     System --> Fallback[Use Cached Data]
     Fallback --> Notify[Notify Client of Degradation]
-    
+
     Retry --> Success{Success?}
     Success -->|Yes| Complete[Operation Complete]
     Success -->|No| Limit{Max Retries?}
-    
+
     Limit -->|Reached| Fail[Operation Failed]
     Limit -->|Continue| Retry
-    
+
     Fail --> Log[Log Error Details]
     Log --> ClientError[Return Error to Client]
 ```
 
-These focused diagrams make the architecture much clearer by separating concerns and showing specific interaction patterns within each component.
+These focused diagrams make the architecture much clearer by separating concerns and showing
+specific interaction patterns within each component.

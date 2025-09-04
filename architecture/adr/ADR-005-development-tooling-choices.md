@@ -1,11 +1,14 @@
 # ADR-005: Development Tooling Choices
 
 ## Status
+
 **Accepted** - 2025-09-04
 
 ## Context
 
-The Drupalize.me MCP Server requires a comprehensive development tooling stack to ensure code quality, consistency, and maintainability across the development lifecycle. Key requirements include:
+The Drupalize.me MCP Server requires a comprehensive development tooling stack to ensure code
+quality, consistency, and maintainability across the development lifecycle. Key requirements
+include:
 
 - **Code Quality**: Static analysis and formatting for TypeScript/Node.js codebase
 - **Git Workflow**: Pre-commit hooks to prevent broken code from entering repository
@@ -14,31 +17,37 @@ The Drupalize.me MCP Server requires a comprehensive development tooling stack t
 - **Security**: Dependency vulnerability scanning and secret detection
 - **Team Collaboration**: Consistent code style and automated formatting
 
-The project follows the [Technology Stack Selection (ADR-004)](./ADR-004-technology-stack-selection.md) using Node.js/TypeScript, requiring tooling optimized for this environment.
+The project follows the
+[Technology Stack Selection (ADR-004)](./ADR-004-technology-stack-selection.md) using
+Node.js/TypeScript, requiring tooling optimized for this environment.
 
 ## Decision
 
 **Core Development Tooling Stack**
 
 ### Code Quality & Formatting
+
 - **ESLint**: TypeScript linting with @typescript-eslint ruleset
 - **Prettier**: Code formatting with consistent style rules
 - **@typescript-eslint/eslint-plugin**: TypeScript-specific linting rules
 - **eslint-config-prettier**: Prettier integration with ESLint
 
 ### Git Workflow Automation
+
 - **Husky**: Git hooks management for pre-commit automation
 - **lint-staged**: Run linters only on staged files for performance
 - **commitizen**: Standardized commit message format
 - **@commitlint/config-conventional**: Conventional commit validation
 
 ### Testing Framework
+
 - **Jest**: Testing framework with TypeScript support
 - **@types/jest**: TypeScript definitions for Jest
 - **ts-jest**: TypeScript preprocessor for Jest
 - **supertest**: HTTP assertion testing for MCP endpoints
 
 ### Build & Development
+
 - **tsx**: TypeScript execution for development (replaces ts-node)
 - **nodemon**: File watching for automatic restarts
 - **concurrently**: Run multiple npm scripts in parallel
@@ -66,7 +75,7 @@ The project follows the [Technology Stack Selection (ADR-004)](./ADR-004-technol
 
 1. **Quality Gate**: Prevents broken code from entering repository
 2. **Performance**: Only processes changed files for speed
-3. **Automation**: Reduces manual steps in development workflow  
+3. **Automation**: Reduces manual steps in development workflow
 4. **Security**: Pre-commit secret scanning and vulnerability checks
 5. **Team Compliance**: Ensures all contributors follow quality standards
 
@@ -84,18 +93,21 @@ The project follows the [Technology Stack Selection (ADR-004)](./ADR-004-technol
 ### Positive Consequences
 
 **Code Quality Improvements**
+
 - Consistent code style across entire codebase
 - Early detection of TypeScript type errors
 - Automated security vulnerability scanning
 - Standardized commit message format for better changelog generation
 
 **Development Velocity**
+
 - Automatic code formatting eliminates manual styling
 - Pre-commit automation catches issues before CI/CD
 - Hot reload during development with tsx and nodemon
 - Parallel script execution speeds up build processes
 
 **Team Collaboration**
+
 - Reduced code review time on style-related issues
 - Consistent development environment across contributors
 - Automated enforcement of project standards
@@ -104,12 +116,14 @@ The project follows the [Technology Stack Selection (ADR-004)](./ADR-004-technol
 ### Negative Consequences
 
 **Initial Setup Complexity**
+
 - Multiple configuration files to maintain
 - Learning curve for contributors unfamiliar with tools
 - Potential conflicts between ESLint and Prettier rules
 - Pre-commit hook failures can block quick fixes
 
 **Development Overhead**
+
 - Pre-commit hooks add time to commit process
 - Linting errors can interrupt development flow
 - Additional dependencies increase project complexity
@@ -126,48 +140,54 @@ The project follows the [Technology Stack Selection (ADR-004)](./ADR-004-technol
 ## Alternatives Considered
 
 ### Alternative 1: Standard.js
-**Description**: Zero-configuration JavaScript/TypeScript linting
-**Rejected Because**: 
+
+**Description**: Zero-configuration JavaScript/TypeScript linting **Rejected Because**:
+
 - Less flexibility for project-specific rules needed for MCP protocol
 - Limited TypeScript support compared to @typescript-eslint
 - Cannot customize rules for OAuth security requirements
 - Team preference for explicit configuration over conventions
 
 ### Alternative 2: Biome
-**Description**: All-in-one formatter and linter
-**Rejected Because**:
+
+**Description**: All-in-one formatter and linter **Rejected Because**:
+
 - Less mature ecosystem compared to ESLint + Prettier combination
 - Limited plugin ecosystem for specialized MCP/OAuth linting
 - TypeScript support still evolving
 - Team familiarity with ESLint/Prettier provides better velocity
 
 ### Alternative 3: TSLint (Deprecated)
-**Description**: TypeScript-specific linter (now deprecated)
-**Rejected Because**:
+
+**Description**: TypeScript-specific linter (now deprecated) **Rejected Because**:
+
 - Officially deprecated in favor of ESLint + @typescript-eslint
 - No longer maintained or updated
 - Migration path leads to current chosen solution
 - Security and compatibility concerns with unmaintained tools
 
 ### Alternative 4: Mocha + Chai
-**Description**: Alternative testing framework combination
-**Rejected Because**:
+
+**Description**: Alternative testing framework combination **Rejected Because**:
+
 - More configuration required compared to Jest's batteries-included approach
 - Less integrated TypeScript support
 - Additional assertion library dependency (Chai)
 - Jest's mocking capabilities better suited for MCP protocol testing
 
 ### Alternative 5: Simple Git Hooks
-**Description**: Basic pre-commit hooks without Husky
-**Rejected Because**:
+
+**Description**: Basic pre-commit hooks without Husky **Rejected Because**:
+
 - Manual setup required for each contributor
-- No cross-platform compatibility guarantees  
+- No cross-platform compatibility guarantees
 - Difficult to maintain and update across team
 - Missing integration with package.json workflow
 
 ## Implementation Notes
 
 ### ESLint Configuration
+
 ```json
 {
   "extends": [
@@ -190,6 +210,7 @@ The project follows the [Technology Stack Selection (ADR-004)](./ADR-004-technol
 ```
 
 ### Prettier Configuration
+
 ```json
 {
   "semi": true,
@@ -202,38 +223,30 @@ The project follows the [Technology Stack Selection (ADR-004)](./ADR-004-technol
 ```
 
 ### Husky + lint-staged Setup
+
 ```json
 {
   "lint-staged": {
-    "*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{json,md}": [
-      "prettier --write"
-    ]
+    "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
+    "*.{json,md}": ["prettier --write"]
   }
 }
 ```
 
 ### Jest Configuration
+
 ```json
 {
   "preset": "ts-jest",
   "testEnvironment": "node",
   "roots": ["<rootDir>/src", "<rootDir>/tests"],
-  "testMatch": [
-    "**/__tests__/**/*.ts",
-    "**/?(*.)+(spec|test).ts"
-  ],
-  "collectCoverageFrom": [
-    "src/**/*.ts",
-    "!src/**/*.d.ts"
-  ]
+  "testMatch": ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"],
+  "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.d.ts"]
 }
 ```
 
 ### Package.json Scripts
+
 ```json
 {
   "scripts": {
@@ -251,6 +264,10 @@ The project follows the [Technology Stack Selection (ADR-004)](./ADR-004-technol
 ```
 
 ## Related ADRs
-- [ADR-004: Technology Stack Selection](./ADR-004-technology-stack-selection.md) - Provides Node.js/TypeScript foundation
-- [ADR-006: Project Structure and Build Pipeline Design](./ADR-006-project-structure-build-pipeline.md) - Build process integration
-- [ADR-001: LLM-Free Server Architecture](./ADR-001-llm-free-server-architecture.md) - Influences testing strategies for protocol interactions
+
+- [ADR-004: Technology Stack Selection](./ADR-004-technology-stack-selection.md) - Provides
+  Node.js/TypeScript foundation
+- [ADR-006: Project Structure and Build Pipeline Design](./ADR-006-project-structure-build-pipeline.md) -
+  Build process integration
+- [ADR-001: LLM-Free Server Architecture](./ADR-001-llm-free-server-architecture.md) - Influences
+  testing strategies for protocol interactions

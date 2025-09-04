@@ -1,16 +1,20 @@
 # Contributing to Drupalize.me MCP Server
 
-Thank you for your interest in contributing to the Drupalize.me MCP Server! This document provides comprehensive guidelines for contributing to the project.
+Thank you for your interest in contributing to the Drupalize.me MCP Server! This document provides
+comprehensive guidelines for contributing to the project.
 
 ## Code of Conduct
 
-This project adheres to a Code of Conduct that all contributors are expected to follow. By participating, you are expected to uphold this code. Please report unacceptable behavior to the project maintainers.
+This project adheres to a Code of Conduct that all contributors are expected to follow. By
+participating, you are expected to uphold this code. Please report unacceptable behavior to the
+project maintainers.
 
 ## Getting Started
 
 ### Prerequisites
 
 Before contributing, ensure you have:
+
 - **Node.js** 18.0.0 or higher
 - **npm** (comes with Node.js)
 - **Git** for version control
@@ -21,28 +25,33 @@ Before contributing, ensure you have:
 
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally:
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/mcp-server.git
    cd mcp-server
    ```
 
 3. **Add upstream remote**:
+
    ```bash
    git remote add upstream https://github.com/drupalize/mcp-server.git
    ```
 
 4. **Install dependencies**:
+
    ```bash
    npm install
    ```
 
 5. **Set up environment**:
+
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
 6. **Run tests** to ensure everything works:
+
    ```bash
    npm test
    ```
@@ -57,6 +66,7 @@ Before contributing, ensure you have:
 ### Branch Naming
 
 Use descriptive branch names with prefixes:
+
 - `feature/` - New features
 - `fix/` - Bug fixes
 - `docs/` - Documentation updates
@@ -65,6 +75,7 @@ Use descriptive branch names with prefixes:
 - `chore/` - Maintenance tasks
 
 Examples:
+
 - `feature/oauth-token-refresh`
 - `fix/authentication-error-handling`
 - `docs/api-examples`
@@ -191,6 +202,7 @@ npm run test:coverage
 ### Bug Reports
 
 When reporting bugs:
+
 1. Use the bug report template
 2. Include reproduction steps
 3. Provide environment details
@@ -200,6 +212,7 @@ When reporting bugs:
 ### Feature Requests
 
 When requesting features:
+
 1. Use the feature request template
 2. Explain the problem you're solving
 3. Describe your proposed solution
@@ -211,6 +224,7 @@ When requesting features:
 #### Small Changes
 
 For small changes (typos, minor fixes):
+
 1. Fork and create a branch
 2. Make your changes
 3. Submit a pull request
@@ -218,6 +232,7 @@ For small changes (typos, minor fixes):
 #### Larger Changes
 
 For significant changes:
+
 1. Open an issue to discuss the change
 2. Get feedback from maintainers
 3. Fork and create a feature branch
@@ -227,12 +242,14 @@ For significant changes:
 ### Pull Request Process
 
 1. **Update your fork**:
+
    ```bash
    git fetch upstream
    git rebase upstream/main
    ```
 
 2. **Create a feature branch**:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -243,12 +260,14 @@ For significant changes:
    - Update documentation as needed
 
 4. **Commit your changes**:
+
    ```bash
    git add .
    git commit -m "feat: add your feature"
    ```
 
 5. **Push to your fork**:
+
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -315,6 +334,7 @@ src/
 ### Reporting Security Issues
 
 For security vulnerabilities:
+
 1. **DO NOT** open a public issue
 2. Use GitHub's security advisory feature
 3. Contact maintainers directly
@@ -379,8 +399,10 @@ The project uses automated releases with semantic-release:
 ## Recognition
 
 Contributors will be recognized in:
+
 - CHANGELOG.md for significant contributions
 - GitHub contributors list
 - Release notes for major features
 
-Thank you for contributing to the Drupalize.me MCP Server! Your contributions help make educational content more accessible through AI integration.
+Thank you for contributing to the Drupalize.me MCP Server! Your contributions help make educational
+content more accessible through AI integration.

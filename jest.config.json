@@ -3,13 +3,16 @@
   "preset": "ts-jest/presets/default-esm",
   "extensionsToTreatAsEsm": [".ts"],
   "transform": {
-    "^.+\\.ts$": ["ts-jest", {
-      "useESM": true,
-      "tsconfig": {
-        "module": "ES2022",
-        "target": "ES2022"
+    "^.+\\.ts$": [
+      "ts-jest",
+      {
+        "useESM": true,
+        "tsconfig": {
+          "module": "ES2022",
+          "target": "ES2022"
+        }
       }
-    }]
+    ]
   },
   "moduleNameMapper": {
     "^@/(.*)$": "<rootDir>/src/$1",
@@ -30,28 +33,12 @@
     "**/*.test.ts",
     "**/*.spec.ts"
   ],
-  "testPathIgnorePatterns": [
-    "/node_modules/",
-    "/dist/",
-    "/coverage/"
-  ],
+  "testPathIgnorePatterns": ["/node_modules/", "/dist/", "/coverage/"],
   "setupFilesAfterEnv": ["<rootDir>/tests/setup.ts"],
   "collectCoverage": false,
   "coverageDirectory": "coverage",
-  "collectCoverageFrom": [
-    "src/**/*.ts",
-    "!src/**/*.d.ts",
-    "!src/**/*.test.ts",
-    "!src/**/*.spec.ts",
-    "!src/index.ts"
-  ],
-  "coverageReporters": [
-    "text",
-    "text-summary",
-    "html",
-    "lcov",
-    "json"
-  ],
+  "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.d.ts", "!src/**/*.test.ts", "!src/**/*.spec.ts", "!src/index.ts"],
+  "coverageReporters": ["text", "text-summary", "html", "lcov", "json"],
   "coverageThreshold": {
     "global": {
       "branches": 80,

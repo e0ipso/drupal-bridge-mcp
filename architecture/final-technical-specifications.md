@@ -8,13 +8,13 @@ graph TB
         User[Developer]
         Claude[Claude Code/LLM Client]
     end
-    
+
     subgraph "MCP Server (SSE)"
         Auth[OAuth Manager]
         Tools[Tool Handler]
         Protocol[MCP Protocol Handler]
     end
-    
+
     subgraph "Drupalize.me Drupal"
         OAuth[Simple OAuth 5.x]
         JSONRPC[JSON-RPC 2.x Methods]
@@ -23,13 +23,13 @@ graph TB
 
     User -->|Asks questions| Claude
     Claude <-->|SSE HTTP| Protocol
-    
+
     Protocol --> Auth
     Protocol --> Tools
-    
+
     Auth <-->|Authorization Code Grant| OAuth
     Tools <-->|content.search| JSONRPC
-    
+
     JSONRPC --> Content
     Content -->|Pre-formatted Markdown| JSONRPC
 
@@ -47,6 +47,7 @@ graph TB
 ### 1. MCP Server (Node.js/TypeScript)
 
 #### Transport & Protocol
+
 ```typescript
 // SSE-based MCP server
 interface MCPServerConfig {
@@ -67,49 +68,50 @@ const mcpTool = {
     type: 'object',
     properties: {
       query: { type: 'string', description: 'Search terms' },
-      drupal_version: { 
-        type: 'string', 
-        enum: ['9', '10', '11'], 
-        description: 'Filter by Drupal version' 
+      drupal_version: {
+        type: 'string',
+        enum: ['9', '10', '11'],
+        description: 'Filter by Drupal version',
       },
-      tags: { 
-        type: 'array', 
+      tags: {
+        type: 'array',
         items: { type: 'string' },
-        description: 'Filter by content tags'
-      }
+        description: 'Filter by content tags',
+      },
     },
-    required: ['query']
-  }
+    required: ['query'],
+  },
 };
 ```
 
 #### OAuth Flow Implementation
+
 ```typescript
 // Authorization Code Grant flow
 class OAuthManager {
   async initializeUserAuth(userId: string): Promise<string> {
     const state = this.generateSecureState();
     const authUrl = this.buildAuthorizationUrl(state);
-    
+
     await this.storeAuthState(userId, state);
     return authUrl; // Return URL for user to visit
   }
-  
+
   async handleCallback(code: string, state: string): Promise<TokenSet> {
     const tokenResponse = await this.exchangeCodeForTokens(code);
     await this.storeUserTokens(tokenResponse);
     return tokenResponse;
   }
-  
+
   private buildAuthorizationUrl(state: string): string {
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       scope: 'content:read content:search',
-      state: state
+      state: state,
     });
-    
+
     return `${this.drupalBaseUrl}/oauth/authorize?${params.toString()}`;
   }
 }
@@ -118,6 +120,7 @@ class OAuthManager {
 ### 2. Drupal-Side Implementation
 
 #### Custom JSON-RPC Methods
+
 ```php
 <?php
 // src/Plugin/jsonrpc/Method/ContentSearch.php
@@ -140,7 +143,7 @@ class ContentSearch extends JsonRpcMethodBase {
     $query = $params->get('query');
     $version_filter = $params->get('drupal_version');
     $tag_filter = $params->get('tags', []);
-    
+
     // Execute search using Drupal's search capabilities
     $results = $this->searchService->search([
       'query' => $query,
@@ -151,11 +154,11 @@ class ContentSearch extends JsonRpcMethodBase {
         'access_check' => TRUE // Respects user permissions
       ]
     ]);
-    
+
     // Format results for RAG consumption
     return array_map([$this, 'formatTutorialResult'], $results);
   }
-  
+
   private function formatTutorialResult($node) {
     return [
       'id' => $node->id(),
@@ -171,21 +174,22 @@ class ContentSearch extends JsonRpcMethodBase {
       ]
     ];
   }
-  
+
   private function convertToRagMarkdown($node) {
     // Use custom text format for RAG optimization
     $build = $node->body->view([
       'type' => 'text_default',
       'settings' => ['format' => 'rag_markdown']
     ]);
-    
+
     return $this->renderer->renderPlain($build);
   }
 }
 ```
 
 #### Custom Text Format for RAG
-```php
+
+````php
 <?php
 // src/Plugin/Filter/RagMarkdownFilter.php
 
@@ -198,12 +202,12 @@ class ContentSearch extends JsonRpcMethodBase {
  * )
  */
 class RagMarkdownFilter extends FilterBase {
-  
+
   public function process($text, $langcode) {
     $markdown = $this->htmlToRagMarkdown($text);
     return new FilterProcessResult($markdown);
   }
-  
+
   private function htmlToRagMarkdown($html) {
     $converter = new HtmlToMarkdownConverter([
       'header_style' => 'atx', // # headers
@@ -212,18 +216,18 @@ class RagMarkdownFilter extends FilterBase {
       'list_item_style' => '-', // - list items
       'preserve_comments' => FALSE, // Remove HTML comments
       'strip_tags' => ['script', 'style'], // Remove unwanted tags
-      
+
       // RAG-specific optimizations
       'optimize_code_blocks' => TRUE,
       'preserve_drupal_snippets' => TRUE,
       'convert_media_to_urls' => TRUE,
       'add_heading_anchors' => FALSE
     ]);
-    
+
     return $converter->convert($html);
   }
 }
-```
+````
 
 ### 3. PostgreSQL Database Schema
 
@@ -259,7 +263,7 @@ CREATE INDEX idx_user_sessions_expires ON user_sessions(expires_at);
 CREATE INDEX idx_request_logs_user_created ON request_logs(user_id, created_at);
 
 -- Cleanup function for expired sessions
-CREATE OR REPLACE FUNCTION cleanup_expired_sessions() 
+CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
 RETURNS void AS $$
 BEGIN
   DELETE FROM user_sessions WHERE expires_at < NOW();
@@ -274,44 +278,43 @@ $$ LANGUAGE plpgsql;
 ```typescript
 // Complete OAuth flow for individual users
 class UserAuthFlow {
-  
   // Step 1: MCP client requests user authorization
   async initiateAuth(userId: string) {
     const authUrl = await this.oauthManager.initializeUserAuth(userId);
-    
+
     return {
       type: 'authorization_required',
       message: 'Please authorize access to your Drupalize.me account',
       authorization_url: authUrl,
       instructions: [
         '1. Visit the authorization URL',
-        '2. Sign in to your Drupalize.me account', 
+        '2. Sign in to your Drupalize.me account',
         '3. Grant permissions to the MCP server',
-        '4. You will be redirected back automatically'
-      ]
+        '4. You will be redirected back automatically',
+      ],
     };
   }
-  
+
   // Step 2: Handle OAuth callback
   async handleAuthCallback(code: string, state: string) {
     const tokens = await this.oauthManager.handleCallback(code, state);
     const userInfo = await this.fetchUserInfo(tokens.access_token);
-    
+
     await this.storeUserSession({
       user_id: userInfo.id,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       expires_at: new Date(Date.now() + tokens.expires_in * 1000),
-      subscription_level: userInfo.subscription_level
+      subscription_level: userInfo.subscription_level,
     });
-    
+
     return {
       type: 'authorization_complete',
       message: 'Successfully connected to Drupalize.me',
       user: {
         name: userInfo.name,
-        subscription: userInfo.subscription_level
-      }
+        subscription: userInfo.subscription_level,
+      },
     };
   }
 }
@@ -320,6 +323,7 @@ class UserAuthFlow {
 ## Performance Considerations (MVP)
 
 ### Direct API Approach
+
 The MVP uses direct API calls to establish baseline performance:
 
 ```typescript
@@ -327,15 +331,19 @@ class SimpleMCPServer {
   async handleSearchRequest(query: string, filters: any) {
     // Direct pass-through to Drupal - no caching
     const token = await this.auth.getValidToken(this.currentUser);
-    
-    const response = await this.drupalClient.call('content.search', {
-      query,
-      drupal_version: filters.drupal_version,
-      tags: filters.tags
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    
+
+    const response = await this.drupalClient.call(
+      'content.search',
+      {
+        query,
+        drupal_version: filters.drupal_version,
+        tags: filters.tags,
+      },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
     // Returns complete tutorial content as RAG-optimized Markdown
     return response;
   }
@@ -343,15 +351,18 @@ class SimpleMCPServer {
 ```
 
 ### Performance Monitoring
+
 Track these metrics for future optimization decisions:
+
 - OAuth token exchange: Expected ~100-200ms
-- Drupal search requests: Expected ~200-800ms  
+- Drupal search requests: Expected ~200-800ms
 - Content retrieval: Expected ~150-400ms
 - Total response time: Expected ~300-1000ms
 
 ## Deployment Configuration
 
 ### Railway Configuration
+
 ```toml
 # railway.toml
 [build]
@@ -366,11 +377,12 @@ startCommand = "npm start"
 [environments.production]
 variables = { NODE_ENV = "production" }
 
-[environments.staging]  
+[environments.staging]
 variables = { NODE_ENV = "staging", MCP_DEBUG_MODE = "true" }
 ```
 
 ### Environment Variables
+
 ```bash
 # Core configuration
 NODE_ENV=production

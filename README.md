@@ -1,10 +1,14 @@
 # Drupalize.me MCP Server
 
-A Model Context Protocol (MCP) server that connects to Drupalize.me's Drupal installation, providing AI systems with secure, authenticated access to educational content through a standardized RAG (Retrieval Augmented Generation) interface.
+A Model Context Protocol (MCP) server that connects to Drupalize.me's Drupal installation, providing
+AI systems with secure, authenticated access to educational content through a standardized RAG
+(Retrieval Augmented Generation) interface.
 
 ## Overview
 
-This MCP server enables AI systems to access Drupalize.me's comprehensive Drupal educational content through OAuth 2.0 authentication. The server transforms Drupal content into RAG-optimized formats and provides structured access to tutorials, documentation, and learning resources.
+This MCP server enables AI systems to access Drupalize.me's comprehensive Drupal educational content
+through OAuth 2.0 authentication. The server transforms Drupal content into RAG-optimized formats
+and provides structured access to tutorials, documentation, and learning resources.
 
 ### Key Features
 
@@ -38,23 +42,27 @@ For detailed architecture documentation, see the [`/architecture/`](./architectu
 ## Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/drupalize/mcp-server.git
    cd mcp-server
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Configure environment variables**
+
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
 4. **Set up the database**
+
    ```bash
    npm run db:setup
    ```
@@ -165,12 +173,14 @@ npm run quality:fix
 The server provides the following MCP tools dynamically discovered from Drupal:
 
 #### Content Access Tools
+
 - `search_content`: Search Drupal content with filters
 - `get_tutorial`: Retrieve specific tutorial content
 - `list_courses`: Get available course listings
 - `get_user_progress`: Access user's learning progress
 
 #### Authentication Tools
+
 - `authenticate_user`: Initiate OAuth 2.0 flow
 - `refresh_token`: Refresh expired access tokens
 - `get_user_profile`: Retrieve authenticated user information
@@ -178,21 +188,27 @@ The server provides the following MCP tools dynamically discovered from Drupal:
 ### HTTP Endpoints
 
 #### Health Check
+
 ```http
 GET /health
 ```
+
 Returns server health status and version information.
 
 #### OAuth Callback
+
 ```http
 GET /auth/callback?code=...&state=...
 ```
+
 Handles OAuth 2.0 authorization code callback.
 
 #### MCP Transport
+
 ```http
 GET /mcp/sse
 ```
+
 Server-Sent Events endpoint for MCP protocol communication.
 
 ## Development
@@ -202,7 +218,7 @@ Server-Sent Events endpoint for MCP protocol communication.
 ```
 src/
 ├── auth/           # OAuth 2.0 authentication
-├── config/         # Configuration management  
+├── config/         # Configuration management
 ├── database/       # Database models and migrations
 ├── handlers/       # MCP request handlers
 ├── services/       # Business logic services
@@ -222,8 +238,9 @@ architecture/      # Architecture documentation
 ### Code Quality
 
 This project uses:
+
 - **TypeScript** for type safety
-- **ESLint** for code linting  
+- **ESLint** for code linting
 - **Prettier** for code formatting
 - **Jest** for testing
 - **Husky** for pre-commit hooks
@@ -256,19 +273,22 @@ logger.error('Database connection failed', { error: err.message });
 ### Health Checks
 
 Monitor server health via:
+
 ```bash
 curl http://localhost:3000/health
 ```
 
 Response includes:
+
 - Server version and uptime
-- Database connectivity status  
+- Database connectivity status
 - Drupal API connectivity status
 - Memory and CPU usage metrics
 
 ### Debug Mode
 
 Enable debug mode for verbose logging:
+
 ```bash
 DEBUG=mcp:* NODE_ENV=development npm start
 ```
@@ -307,16 +327,19 @@ docker-compose up -d
 ### Common Issues
 
 **Authentication failures**:
+
 - Verify OAuth 2.0 client credentials
 - Check Drupal module configurations
 - Ensure redirect URI matches exactly
 
 **Database connection errors**:
+
 - Verify DATABASE_URL format
 - Check PostgreSQL service status
 - Confirm user permissions
 
 **Content access issues**:
+
 - Verify user subscription status
 - Check Drupal permissions
 - Review content transformation logs

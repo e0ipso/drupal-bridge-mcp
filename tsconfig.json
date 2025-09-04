@@ -65,16 +65,8 @@
     "skipDefaultLibCheck": true,
     "skipLibCheck": false
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "tests/**/*",
-    "**/*.test.ts",
-    "**/*.spec.ts"
-  ],
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "tests/**/*", "**/*.test.ts", "**/*.spec.ts"],
   "ts-node": {
     "esm": true,
     "experimentalSpecifierResolution": "node"
