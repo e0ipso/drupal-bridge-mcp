@@ -90,3 +90,47 @@ export interface McpError {
   readonly message: string;
   readonly data?: unknown;
 }
+
+/**
+ * Search tutorials tool input parameters
+ */
+export interface SearchToolParams {
+  readonly query: string;
+  readonly drupal_version?: '9' | '10' | '11';
+  readonly tags?: string[];
+}
+
+/**
+ * Processed search parameters after validation
+ */
+export interface ProcessedSearchParams {
+  readonly query: string;
+  readonly drupal_version: string | null;
+  readonly tags: string[];
+}
+
+/**
+ * Tutorial search result item
+ */
+export interface TutorialSearchResult {
+  readonly id: string;
+  readonly title: string;
+  readonly url: string;
+  readonly description?: string;
+  readonly drupal_version?: string[];
+  readonly tags?: string[];
+  readonly difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  readonly created: string;
+  readonly updated?: string;
+}
+
+/**
+ * Search tutorials response
+ */
+export interface SearchTutorialsResponse {
+  readonly results: TutorialSearchResult[];
+  readonly total: number;
+  readonly page: number;
+  readonly limit: number;
+  readonly query: ProcessedSearchParams;
+}
