@@ -361,3 +361,5 @@ See [CHANGELOG.md](./CHANGELOG.md) for version history and release notes.
 ---
 
 Built with ❤️ by the Drupalize.me team
+
+# Testing commit-msg hook
