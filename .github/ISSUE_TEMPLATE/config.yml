@@ -3,9 +3,6 @@ contact_links:
   - name: Question or Discussion
     url: https://github.com/drupalize/mcp-server/discussions
     about: Ask questions or start discussions about the MCP server
-  - name: Drupalize.me Support
-    url: https://drupalize.me/contact
-    about: Get help with Drupalize.me platform and subscription issues
   - name: Security Vulnerability
     url: https://github.com/drupalize/mcp-server/security/advisories/new
     about: Report security vulnerabilities privately

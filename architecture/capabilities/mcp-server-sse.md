@@ -164,20 +164,6 @@ return result; // That's it!
 
 ## Dependencies
 
-### Internal Dependencies
-- **[Basic Search](./basic-search.md)**: Tool handler integration for search functionality and content retrieval
-- **[Authentication Flow](./authentication-flow.md)**: OAuth token validation and per-user session management
-- **[Error Handling](./error-handling.md)**: Consistent error response formatting and protocol-level error management
-
-### Cross-Capability Integration
-
-The MCP Server serves as the central coordination point for all other capabilities:
-
-- **Authentication Integration**: Validates OAuth tokens before processing tool requests, delegating to the Authentication Flow capability for token refresh and user session management
-- **Search Tool Routing**: Routes `search_tutorials` tool calls to the Basic Search capability, ensuring proper authentication context
-- **Error Management**: Utilizes the Error Handling capability to provide consistent error responses across all tool interactions
-- **Transport Layer**: Provides the SSE transport foundation that enables real-time communication for all other capabilities
-
 ## Success Criteria
 
 - ✅ SSE endpoint `/mcp/sse` operational

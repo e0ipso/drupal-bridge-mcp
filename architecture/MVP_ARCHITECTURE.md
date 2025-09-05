@@ -183,7 +183,7 @@ return result; // That's it!
 
 ### Core Infrastructure
 
-- [ ] Node.js project setup, with JS
+- [ ] Node.js project setup, with TS
 - [ ] MCP server with SSE transport
 - [ ] OAuth Authorization Code Grant flow
 - [ ] Debug mode configuration

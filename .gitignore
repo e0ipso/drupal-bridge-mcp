@@ -188,5 +188,5 @@ settings.local.*
 # Auto-generated files
 auto-generated/
 
-/.ai/task-manager/worktrees/
+/.ai/task-manager/
 .idea
