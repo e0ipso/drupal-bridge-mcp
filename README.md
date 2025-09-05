@@ -25,9 +25,6 @@ The server implements a simplified MVP architecture without caching complexity:
 
 ```
 AI System → MCP Protocol → MCP Server → OAuth 2.0 → Drupal JSON-RPC API
-                ↓
-           PostgreSQL
-         (User Sessions)
 ```
 
 For detailed architecture documentation, see the [`/architecture/`](./architecture/) directory.
