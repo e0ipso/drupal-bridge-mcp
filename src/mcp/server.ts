@@ -24,6 +24,13 @@ import type {
 } from '@/types/index.js';
 import { DrupalClient, DrupalClientError } from '@/services/drupal-client.js';
 import { validateSearchToolParams, ValidationError } from '@/utils/index.js';
+import {
+  IntegrationError,
+  IntegrationErrorType,
+  normalizeError,
+  formatMcpErrorResponse,
+  formatErrorForLogging,
+} from '@/utils/error-handler.js';
 
 /**
  * MCP server for Drupal integration
@@ -31,6 +38,7 @@ import { validateSearchToolParams, ValidationError } from '@/utils/index.js';
 export class DrupalMcpServer {
   private readonly server: Server;
   private readonly drupalClient: DrupalClient;
+  private requestCounter = 0;
 
   constructor(private readonly config: AppConfig) {
     this.server = new Server(
@@ -45,6 +53,13 @@ export class DrupalMcpServer {
 
     this.drupalClient = new DrupalClient(config.drupal);
     this.setupHandlers();
+  }
+
+  /**
+   * Generate unique request ID for tracing
+   */
+  private generateRequestId(): string {
+    return `mcp-req-${Date.now()}-${++this.requestCounter}`;
   }
 
   /**
@@ -127,7 +142,15 @@ export class DrupalMcpServer {
           break;
           
         default:
-          throw new Error(`Unknown resource URI: ${uri}`);
+          throw new IntegrationError(
+            IntegrationErrorType.VALIDATION_ERROR,
+            `Unknown resource URI: ${uri}`,
+            undefined,
+            'uri',
+            { validUris: ['drupal://nodes', 'drupal://entities'] },
+            undefined,
+            false
+          );
       }
 
       return {
@@ -140,16 +163,30 @@ export class DrupalMcpServer {
         ],
       };
     } catch (error) {
-      const message = error instanceof DrupalClientError 
-        ? error.message 
-        : `Failed to read resource: ${String(error)}`;
+      const integrationError = error instanceof IntegrationError
+        ? error
+        : normalizeError(error, `Reading resource: ${uri}`);
+
+      // Log the error for debugging
+      const logData = formatErrorForLogging(integrationError, { uri });
+      console[logData.level](logData.message, logData.meta);
       
       return {
         contents: [
           {
             uri,
             mimeType: 'application/json',
-            text: JSON.stringify({ error: message }, null, 2),
+            text: JSON.stringify({
+              error: {
+                type: integrationError.errorType,
+                message: integrationError.getUserFriendlyMessage(),
+                details: {
+                  technical_message: integrationError.message,
+                  timestamp: new Date().toISOString(),
+                  retryable: integrationError.retryable,
+                },
+              },
+            }, null, 2),
           },
         ],
       };
@@ -268,6 +305,8 @@ export class DrupalMcpServer {
    * Execute a tool
    */
   private async executeTool(name: string, args: unknown): Promise<{ content: Array<{ type: string; text: string }> }> {
+    const requestId = this.generateRequestId();
+    
     try {
       let result: unknown;
       
@@ -293,7 +332,18 @@ export class DrupalMcpServer {
           break;
           
         default:
-          throw new Error(`Unknown tool: ${name}`);
+          throw new IntegrationError(
+            IntegrationErrorType.VALIDATION_ERROR,
+            `Unknown tool: ${name}`,
+            undefined,
+            'name',
+            { 
+              validTools: ['load_node', 'create_node', 'search_nodes', 'test_connection', 'search_tutorials'],
+              requestedTool: name,
+            },
+            undefined,
+            false
+          );
       }
 
       return {
@@ -305,24 +355,15 @@ export class DrupalMcpServer {
         ],
       };
     } catch (error) {
-      let message: string;
+      const integrationError = error instanceof IntegrationError
+        ? error
+        : normalizeError(error, `Executing tool: ${name}`, requestId);
+
+      // Log the error for debugging
+      const logData = formatErrorForLogging(integrationError, { tool: name, args });
+      console[logData.level](logData.message, logData.meta);
       
-      if (error instanceof ValidationError) {
-        message = `Parameter validation failed: ${error.message}`;
-      } else if (error instanceof DrupalClientError) {
-        message = error.message;
-      } else {
-        message = `Tool execution failed: ${String(error)}`;
-      }
-      
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({ error: message }, null, 2),
-          },
-        ],
-      };
+      return formatMcpErrorResponse(integrationError, requestId);
     }
   }
 
@@ -382,7 +423,7 @@ export class DrupalMcpServer {
    * Execute search tutorials tool
    */
   private async executeSearchTutorials(args: unknown): Promise<SearchTutorialsResponse> {
-    // Validate and process input parameters
+    // Validate and process input parameters - this will throw ValidationError if invalid
     const processedParams = validateSearchToolParams(args);
     
     // In test environment or when Drupal is unavailable, return mock data
@@ -421,18 +462,40 @@ export class DrupalMcpServer {
         query: processedParams,
       };
     } catch (error) {
-      // Handle network errors, API errors, and malformed responses
-      const errorMessage = error instanceof DrupalClientError 
-        ? error.message 
-        : `Search failed: ${String(error)}`;
+      // Convert any validation errors to IntegrationError
+      if (error instanceof ValidationError) {
+        throw new IntegrationError(
+          IntegrationErrorType.VALIDATION_ERROR,
+          error.message,
+          undefined,
+          error.field,
+          { processedParams },
+          error,
+          false
+        );
+      }
+
+      // Handle IntegrationErrors from the DrupalClient
+      if (error instanceof IntegrationError) {
+        // In production, re-throw the error; in development, log and return mock data for certain error types
+        if (this.config.environment === 'production' || !error.retryable) {
+          throw error;
+        }
         
-      // In production, re-throw the error; in development, log and return mock data
+        // Fallback to mock data if the real endpoint is unavailable and error is retryable
+        console.warn(`API unavailable (${error.errorType}), returning mock data: ${error.message}`);
+        return this.getMockSearchResults(processedParams);
+      }
+
+      // Handle any other unexpected errors
+      const integrationError = normalizeError(error, 'Tutorial search');
+      
+      // In production, re-throw; in development, return mock data for network-related errors
       if (this.config.environment === 'production') {
-        throw new Error(`Tutorial search failed: ${errorMessage}`);
+        throw integrationError;
       }
       
-      // Fallback to mock data if the real endpoint is unavailable
-      console.warn(`Real API unavailable, returning mock data: ${errorMessage}`);
+      console.warn(`Unexpected error, returning mock data: ${integrationError.message}`);
       return this.getMockSearchResults(processedParams);
     }
   }

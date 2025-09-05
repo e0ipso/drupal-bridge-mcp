@@ -230,19 +230,27 @@ describe('Search Tutorials MCP Tool', () => {
 
       const result = await (mcpServer as any).executeTool('search_tutorials', invalidParams);
 
-      expect(result.content[0].text).toContain('Parameter validation failed');
+      const errorResponse = JSON.parse(result.content[0].text);
+      expect(errorResponse.error.type).toBe('VALIDATION_ERROR');
+      expect(errorResponse.error.details.field).toBe('query');
+      expect(errorResponse.error.message).toContain('query parameter');
     });
 
     it('should handle missing parameters through executeTool', async () => {
       const result = await (mcpServer as any).executeTool('search_tutorials', {});
 
-      expect(result.content[0].text).toContain('Parameter validation failed');
+      const errorResponse = JSON.parse(result.content[0].text);
+      expect(errorResponse.error.type).toBe('VALIDATION_ERROR');
+      expect(errorResponse.error.details.field).toBe('query');
+      expect(errorResponse.error.message).toContain('query parameter');
     });
 
     it('should handle invalid argument types through executeTool', async () => {
       const result = await (mcpServer as any).executeTool('search_tutorials', 'invalid');
 
-      expect(result.content[0].text).toContain('Parameter validation failed');
+      const errorResponse = JSON.parse(result.content[0].text);
+      expect(errorResponse.error.type).toBe('VALIDATION_ERROR');
+      expect(errorResponse.error.message).toContain('Invalid request parameters');
     });
   });
 

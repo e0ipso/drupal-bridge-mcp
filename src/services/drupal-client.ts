@@ -11,8 +11,15 @@ import {
   type NodeCreateParams,
   type DrupalNode,
   type JsonRpcResponse,
+  type JsonRpcErrorResponse,
   isJsonRpcErrorResponse,
 } from '@/types/index.js';
+import {
+  IntegrationError,
+  IntegrationErrorType,
+  normalizeError,
+  parseJsonRpcError,
+} from '@/utils/error-handler.js';
 
 /**
  * Custom error for Drupal client operations
@@ -37,6 +44,7 @@ export class DrupalClient {
   private readonly timeout: number;
   private readonly retries: number;
   private readonly headers: Record<string, string>;
+  private requestCounter = 0;
 
   constructor(private readonly config: DrupalClientConfig) {
     this.baseUrl = new URL(config.endpoint, config.baseUrl).toString();
@@ -60,8 +68,9 @@ export class DrupalClient {
   private async makeHttpRequest(jsonRPCRequest: unknown): Promise<void> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    const requestId = this.generateRequestId();
 
-    let lastError: Error | undefined;
+    let lastError: IntegrationError | undefined;
 
     for (let attempt = 1; attempt <= this.retries; attempt++) {
       try {
@@ -77,43 +86,103 @@ export class DrupalClient {
         if (response.status === 200) {
           const contentType = response.headers.get('content-type');
           if (!contentType || !contentType.includes('application/json')) {
-            throw new DrupalClientError(
+            throw new IntegrationError(
+              IntegrationErrorType.MALFORMED_RESPONSE,
               `Invalid content-type: expected application/json, got ${contentType}`,
-              response.status
+              response.status,
+              undefined,
+              { expected: 'application/json', received: contentType },
+              undefined,
+              false
             );
           }
           
-          const jsonRPCResponse = await response.json();
+          let jsonRPCResponse: unknown;
+          try {
+            jsonRPCResponse = await response.json();
+          } catch (parseError) {
+            throw new IntegrationError(
+              IntegrationErrorType.PARSE_ERROR,
+              'Failed to parse JSON response',
+              response.status,
+              undefined,
+              { parseError: String(parseError) },
+              parseError,
+              false
+            );
+          }
           
           // Validate JSON-RPC response format
-          if (!jsonRPCResponse.jsonrpc || jsonRPCResponse.jsonrpc !== '2.0') {
-            throw new DrupalClientError(
-              `Invalid JSON-RPC response: missing or invalid jsonrpc field`,
+          if (!jsonRPCResponse || typeof jsonRPCResponse !== 'object' || !('jsonrpc' in jsonRPCResponse)) {
+            throw new IntegrationError(
+              IntegrationErrorType.MALFORMED_RESPONSE,
+              'Invalid JSON-RPC response: missing jsonrpc field',
               undefined,
-              jsonRPCResponse
+              undefined,
+              { response: jsonRPCResponse },
+              undefined,
+              false
             );
           }
+
+          const rpcResponse = jsonRPCResponse as JsonRpcResponse;
+          if (rpcResponse.jsonrpc !== '2.0') {
+            throw new IntegrationError(
+              IntegrationErrorType.MALFORMED_RESPONSE,
+              `Invalid JSON-RPC version: expected "2.0", got "${rpcResponse.jsonrpc}"`,
+              undefined,
+              undefined,
+              { expected: '2.0', received: rpcResponse.jsonrpc },
+              undefined,
+              false
+            );
+          }
+
+          // Check for JSON-RPC errors in the response
+          if (isJsonRpcErrorResponse(rpcResponse)) {
+            throw parseJsonRpcError(rpcResponse, requestId);
+          }
           
-          this.client.receive(jsonRPCResponse);
+          this.client.receive(jsonRPCResponse as any);
           return;
-        } else if (response.status >= 400) {
-          const errorText = await response.text();
-          throw new DrupalClientError(
-            `HTTP ${response.status}: ${response.statusText}. Response: ${errorText}`,
+        } else {
+          // Handle HTTP error responses
+          let errorText = '';
+          try {
+            errorText = await response.text();
+          } catch {
+            errorText = 'Unable to read error response';
+          }
+
+          const errorType = response.status >= 500 
+            ? IntegrationErrorType.SERVER_UNAVAILABLE 
+            : response.status === 429 
+              ? IntegrationErrorType.RATE_LIMIT_ERROR
+              : response.status === 401 || response.status === 403
+                ? IntegrationErrorType.AUTHENTICATION_ERROR
+                : IntegrationErrorType.VALIDATION_ERROR;
+
+          throw new IntegrationError(
+            errorType,
+            `HTTP ${response.status}: ${response.statusText}`,
             response.status,
-            errorText
+            undefined,
+            { statusText: response.statusText, responseBody: errorText },
+            undefined,
+            response.status >= 500 || response.status === 429
           );
         }
       } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
+        // Normalize the error to IntegrationError
+        if (error instanceof IntegrationError) {
+          lastError = error;
+        } else {
+          lastError = normalizeError(error, `HTTP request attempt ${attempt}/${this.retries}`, requestId);
+        }
         
-        // Don't retry on timeout/abort errors
-        if (lastError.name === 'AbortError') {
-          throw new DrupalClientError(
-            `Request timed out after ${this.timeout}ms`,
-            undefined,
-            lastError
-          );
+        // Don't retry on timeout/abort errors or non-retryable errors
+        if (lastError.errorType === IntegrationErrorType.TIMEOUT_ERROR || !lastError.retryable) {
+          throw lastError;
         }
         
         if (attempt === this.retries) {
@@ -129,12 +198,24 @@ export class DrupalClient {
     clearTimeout(timeoutId);
     
     if (lastError) {
-      throw new DrupalClientError(
+      // Wrap the final error with retry context
+      throw new IntegrationError(
+        lastError.errorType,
         `Failed after ${this.retries} attempts: ${lastError.message}`,
-        undefined,
-        lastError
+        lastError.code,
+        lastError.field,
+        { ...lastError.details, attempts: this.retries, originalError: lastError },
+        lastError,
+        false // No more retries available
       );
     }
+  }
+
+  /**
+   * Generate unique request ID for tracing
+   */
+  private generateRequestId(): string {
+    return `req-${Date.now()}-${++this.requestCounter}`;
   }
 
   /**
@@ -144,22 +225,37 @@ export class DrupalClient {
     method: DrupalJsonRpcMethod | string,
     params?: unknown
   ): Promise<TResult> {
+    const requestId = this.generateRequestId();
+    
     try {
       const result = await this.client.request(method, params);
       return result as TResult;
     } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) {
-        throw new DrupalClientError(
-          String(error),
-          error.code as number,
-          error
-        );
+      // The error has already been processed by makeHttpRequest, so we just need to normalize it
+      if (error instanceof IntegrationError) {
+        throw error;
       }
-      throw new DrupalClientError(
-        `JSON-RPC request failed: ${String(error)}`,
-        undefined,
-        error
-      );
+      
+      // Handle any unexpected errors from the JSON-RPC client itself
+      const normalizedError = normalizeError(error, `JSON-RPC method: ${method}`, requestId);
+      
+      // Check if this error contains JSON-RPC error information
+      if (error && typeof error === 'object' && 'code' in error && 'message' in error) {
+        const rpcError = error as { code: number; message: string; data?: unknown };
+        const jsonRpcErrorResponse = {
+          jsonrpc: '2.0' as const,
+          error: {
+            code: rpcError.code,
+            message: rpcError.message,
+            data: rpcError.data,
+          },
+          id: null,
+        };
+        
+        throw parseJsonRpcError(jsonRpcErrorResponse, requestId);
+      }
+      
+      throw normalizedError;
     }
   }
 

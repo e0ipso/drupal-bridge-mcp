@@ -1,0 +1,27 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`Performance Baseline Measurements Performance Regression Detection should establish baseline metrics for future comparison 1`] = `
+{
+  "basicSearch": {
+    "avgTime": Any<Number>,
+    "memoryPerOp": Any<Number>,
+    "throughput": Any<Number>,
+  },
+  "errorHandling": {
+    "avgTime": Any<Number>,
+    "throughput": Any<Number>,
+  },
+  "filteredSearch": {
+    "avgTime": Any<Number>,
+    "throughput": Any<Number>,
+  },
+  "mcpToolExecution": {
+    "avgTime": Any<Number>,
+    "throughput": Any<Number>,
+  },
+  "validation": {
+    "avgTime": Any<Number>,
+    "throughput": Any<Number>,
+  },
+}
+`;
