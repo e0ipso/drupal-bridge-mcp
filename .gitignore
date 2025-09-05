@@ -186,5 +186,7 @@ settings.local.*
 *.heapsnapshot
 
 # Auto-generated files
-generated/
 auto-generated/
+
+/.ai/task-manager/worktrees/
+.idea

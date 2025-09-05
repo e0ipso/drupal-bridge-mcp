@@ -26,7 +26,7 @@ immediately and show an error to the user.
 ### Phase Pre-Execution
 
 Before starting execution check if you are in the `main` branch. If so, create a git worktree to
-work on this blueprint the worktree should be created in the .ai/task-manager/worktrees folder.
+work on this blueprint the worktree should be created in the `/worktrees` folder.
 
 ### Phase Execution Workflow
 
