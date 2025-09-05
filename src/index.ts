@@ -1,12 +1,9 @@
 /**
- * Main module for the MCP server
+ * Library exports for the Drupal MCP Server
  */
 
-export function greet(name: string): string {
-  return `Hello, ${name}!`;
-}
-
-export const config = {
-  name: '@e0ipso/drupalizeme-mcp-server',
-  version: '1.0.0',
-} as const;
+// Export main classes and functions for external use
+export { DrupalMcpServer } from '@/mcp/server.js';
+export { DrupalClient, DrupalClientError } from '@/services/drupal-client.js';
+export { loadConfig, getDrupalJsonRpcUrl } from '@/config/index.js';
+export * from '@/types/index.js';

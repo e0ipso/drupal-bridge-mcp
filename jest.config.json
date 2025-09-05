@@ -16,15 +16,9 @@
     ]
   },
   "moduleNameMapper": {
+    "^@/(.*)\\.(js|ts)$": "<rootDir>/src/$1",
     "^@/(.*)$": "<rootDir>/src/$1",
-    "^@/types/(.*)$": "<rootDir>/src/types/$1",
-    "^@/utils/(.*)$": "<rootDir>/src/utils/$1",
-    "^@/services/(.*)$": "<rootDir>/src/services/$1",
-    "^@/mcp/(.*)$": "<rootDir>/src/mcp/$1",
-    "^@/auth/(.*)$": "<rootDir>/src/auth/$1",
-    "^@/drupal/(.*)$": "<rootDir>/src/drupal/$1",
-    "^@/database/(.*)$": "<rootDir>/src/database/$1",
-    "^@/config/(.*)$": "<rootDir>/src/config/$1"
+    "^(.*)\\.js$": "$1"
   },
   "testMatch": [
     "**/__tests__/**/*.test.ts",
@@ -36,6 +30,11 @@
   ],
   "testPathIgnorePatterns": ["/node_modules/", "/dist/", "/coverage/"],
   "transformIgnorePatterns": ["node_modules/(?!(@modelcontextprotocol/sdk)/)"],
+  "globals": {
+    "ts-jest": {
+      "useESM": true
+    }
+  },
   "setupFilesAfterEnv": ["<rootDir>/tests/setup.ts"],
   "collectCoverage": false,
   "coverageDirectory": "coverage",

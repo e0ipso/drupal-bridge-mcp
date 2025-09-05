@@ -48,17 +48,9 @@
     "typeRoots": ["./node_modules/@types", "./src/@types"],
 
     /* Path Mapping */
-    "baseUrl": "./src",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "@/types/*": ["./types/*"],
-      "@/utils/*": ["./utils/*"],
-      "@/services/*": ["./services/*"],
-      "@/mcp/*": ["./mcp/*"],
-      "@/auth/*": ["./auth/*"],
-      "@/drupal/*": ["./drupal/*"],
-      "@/database/*": ["./database/*"],
-      "@/config/*": ["./config/*"]
+      "@/*": ["./src/*"]
     },
 
     /* Completeness */
