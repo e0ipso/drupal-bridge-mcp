@@ -37,7 +37,8 @@
         "com.anthropic.code.plugin",
         "IdeaVIM",
         "org.jetbrains.IdeaVim-EasyMotion",
-        "org.jetbrains.plugins.github"
+        "org.jetbrains.plugins.github",
+        "zielu.gitworktree"
       ]
     }
   },
