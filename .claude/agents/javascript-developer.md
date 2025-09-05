@@ -1,8 +1,6 @@
 ---
 name: javascript-developer
-description:
-  JavaScript expert for modern ES6+, async patterns, and Node.js. Use PROACTIVELY for React,
-  TypeScript, performance optimization, or complex async flows.
+description: JavaScript expert for modern ES6+, async patterns, and Node.js. Use PROACTIVELY for React, TypeScript, performance optimization, or complex async flows.
 category: language-specialists
 ---
 
