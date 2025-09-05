@@ -40,9 +40,13 @@ export class DrupalClient {
 
   constructor(private readonly config: DrupalClientConfig) {
     this.baseUrl = new URL(config.endpoint, config.baseUrl).toString();
-    this.timeout = config.timeout ?? 10000;
+    this.timeout = config.timeout ?? 30000; // 30 second timeout for Drupal response times
     this.retries = config.retries ?? 3;
-    this.headers = { ...config.headers };
+    this.headers = { 
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...config.headers 
+    };
 
     // Initialize JSON-RPC client with HTTP transport
     this.client = new JSONRPCClient(async (jsonRPCRequest) => {
@@ -71,13 +75,31 @@ export class DrupalClient {
         clearTimeout(timeoutId);
 
         if (response.status === 200) {
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            throw new DrupalClientError(
+              `Invalid content-type: expected application/json, got ${contentType}`,
+              response.status
+            );
+          }
+          
           const jsonRPCResponse = await response.json();
+          
+          // Validate JSON-RPC response format
+          if (!jsonRPCResponse.jsonrpc || jsonRPCResponse.jsonrpc !== '2.0') {
+            throw new DrupalClientError(
+              `Invalid JSON-RPC response: missing or invalid jsonrpc field`,
+              undefined,
+              jsonRPCResponse
+            );
+          }
+          
           this.client.receive(jsonRPCResponse);
           return;
         } else if (response.status >= 400) {
           const errorText = await response.text();
           throw new DrupalClientError(
-            `HTTP ${response.status}: ${response.statusText}`,
+            `HTTP ${response.status}: ${response.statusText}. Response: ${errorText}`,
             response.status,
             errorText
           );
@@ -85,11 +107,20 @@ export class DrupalClient {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         
+        // Don't retry on timeout/abort errors
+        if (lastError.name === 'AbortError') {
+          throw new DrupalClientError(
+            `Request timed out after ${this.timeout}ms`,
+            undefined,
+            lastError
+          );
+        }
+        
         if (attempt === this.retries) {
           break;
         }
 
-        // Exponential backoff
+        // Exponential backoff for retryable errors
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
@@ -235,6 +266,57 @@ export class DrupalClient {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Search tutorials using JSON-RPC content.search method
+   */
+  async searchTutorials(params: {
+    query: string;
+    drupal_version?: string | null;
+    tags?: string[];
+    limit?: number;
+    page?: number;
+  }): Promise<{
+    tutorials: Array<{
+      id: string;
+      title: string;
+      content: string;
+      tags: string[];
+      drupal_version: string[];
+      url: string;
+      description?: string;
+      difficulty?: string;
+      created: string;
+      updated?: string;
+    }>;
+    total: number;
+    page: number;
+  }> {
+    const requestParams = {
+      query: params.query,
+      ...(params.drupal_version && { drupal_version: params.drupal_version }),
+      ...(params.tags && params.tags.length > 0 && { tags: params.tags }),
+      limit: params.limit || 10,
+      page: params.page || 1,
+    };
+
+    return this.request<{
+      tutorials: Array<{
+        id: string;
+        title: string;
+        content: string;
+        tags: string[];
+        drupal_version: string[];
+        url: string;
+        description?: string;
+        difficulty?: string;
+        created: string;
+        updated?: string;
+      }>;
+      total: number;
+      page: number;
+    }>('content.search', requestParams);
   }
 
   /**

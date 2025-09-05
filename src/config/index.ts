@@ -17,6 +17,7 @@ export interface AppConfig {
   readonly logging: {
     readonly level: 'error' | 'warn' | 'info' | 'debug';
   };
+  readonly environment: 'development' | 'test' | 'production';
 }
 
 /**
@@ -61,6 +62,7 @@ const getEnvConfig = (): AppConfig => {
     logging: {
       level: (process.env.LOG_LEVEL as AppConfig['logging']['level']) ?? 'info',
     },
+    environment: (process.env.NODE_ENV as AppConfig['environment']) ?? 'development',
   };
 };
 

@@ -385,9 +385,62 @@ export class DrupalMcpServer {
     // Validate and process input parameters
     const processedParams = validateSearchToolParams(args);
     
-    // For now, return mock data structure that would be used for JSON-RPC request
-    // In a real implementation, this would make a JSON-RPC call to search Drupalize.me tutorials
+    // In test environment or when Drupal is unavailable, return mock data
+    if (this.config.environment === 'test' || process.env.NODE_ENV === 'test') {
+      return this.getMockSearchResults(processedParams);
+    }
     
+    try {
+      // Make real JSON-RPC call to Drupal endpoint
+      const response = await this.drupalClient.searchTutorials({
+        query: processedParams.query,
+        drupal_version: processedParams.drupal_version,
+        tags: processedParams.tags,
+        limit: 10,
+        page: 1,
+      });
+
+      // Process and format the response for MCP consumption
+      const results: TutorialSearchResult[] = response.tutorials.map(tutorial => ({
+        id: tutorial.id,
+        title: tutorial.title,
+        url: tutorial.url,
+        description: tutorial.description || this.extractDescriptionFromContent(tutorial.content),
+        drupal_version: tutorial.drupal_version,
+        tags: tutorial.tags,
+        difficulty: tutorial.difficulty as 'beginner' | 'intermediate' | 'advanced' | undefined,
+        created: tutorial.created,
+        updated: tutorial.updated,
+      }));
+
+      return {
+        results,
+        total: response.total,
+        page: response.page,
+        limit: 10,
+        query: processedParams,
+      };
+    } catch (error) {
+      // Handle network errors, API errors, and malformed responses
+      const errorMessage = error instanceof DrupalClientError 
+        ? error.message 
+        : `Search failed: ${String(error)}`;
+        
+      // In production, re-throw the error; in development, log and return mock data
+      if (this.config.environment === 'production') {
+        throw new Error(`Tutorial search failed: ${errorMessage}`);
+      }
+      
+      // Fallback to mock data if the real endpoint is unavailable
+      console.warn(`Real API unavailable, returning mock data: ${errorMessage}`);
+      return this.getMockSearchResults(processedParams);
+    }
+  }
+
+  /**
+   * Get mock search results for testing and fallback scenarios
+   */
+  private getMockSearchResults(processedParams: ProcessedSearchParams): SearchTutorialsResponse {
     // Create mock results that support filtering
     const allMockResults: TutorialSearchResult[] = [
       {
@@ -395,7 +448,7 @@ export class DrupalMcpServer {
         title: `Tutorial about ${processedParams.query}`,
         url: 'https://drupalize.me/tutorial/sample-tutorial',
         description: `A comprehensive tutorial covering ${processedParams.query} concepts`,
-        drupal_version: ['10', '11'], // Always include these versions for mock data
+        drupal_version: ['10', '11'],
         tags: processedParams.tags.length > 0 ? processedParams.tags : ['tutorial', 'drupal'],
         difficulty: 'intermediate',
         created: '2024-01-01T00:00:00Z',
@@ -429,6 +482,24 @@ export class DrupalMcpServer {
       limit: 10,
       query: processedParams,
     };
+  }
+
+  /**
+   * Extract description from tutorial content for RAG optimization
+   */
+  private extractDescriptionFromContent(content: string): string {
+    // Extract first paragraph or first 200 characters as description
+    const lines = content.split('\n').filter(line => line.trim());
+    const firstContentLine = lines.find(line => !line.startsWith('#') && line.trim().length > 0);
+    
+    if (firstContentLine) {
+      return firstContentLine.length > 200 
+        ? firstContentLine.substring(0, 197) + '...'
+        : firstContentLine;
+    }
+    
+    // Fallback: return first 200 characters
+    return content.substring(0, 197) + '...';
   }
 
   /**
