@@ -1,362 +1,176 @@
 # Drupalize.me MCP Server
 
-A Model Context Protocol (MCP) server that connects to Drupalize.me's Drupal installation, providing
-AI systems with secure, authenticated access to educational content through a standardized RAG
-(Retrieval Augmented Generation) interface.
+> A Model Context Protocol (MCP) server that provides AI systems with secure access to Drupalize.me's Drupal educational content through OAuth 2.0 authentication.
 
-## Overview
+## ✨ Features
 
-This MCP server enables AI systems to access Drupalize.me's comprehensive Drupal educational content
-through OAuth 2.0 authentication. The server transforms Drupal content into RAG-optimized formats
-and provides structured access to tutorials, documentation, and learning resources.
+- 🔐 **OAuth 2.0 Authentication** - Secure per-user authentication
+- 📚 **Content Access** - Search tutorials, courses, and documentation  
+- 🔄 **RAG-Optimized** - Content transformed for AI consumption
+- 🛡️ **Type-Safe** - Full TypeScript implementation
+- 🎯 **Subscription-Aware** - Respects user access levels
 
-### Key Features
+## 🚀 Quick Start
 
-- **OAuth 2.0 Authentication**: Secure per-user authentication with Drupal's Simple OAuth module
-- **Content Transformation**: Automatic conversion of Drupal content to RAG-optimized Markdown
-- **Dynamic Tool Discovery**: JSON-RPC endpoints automatically discovered from Drupal configuration
-- **Subscription-Aware**: Respects user subscription levels for content access
-- **TypeScript**: Full type safety with comprehensive error handling
-- **Production Ready**: Includes monitoring, logging, and health checks
+### Prerequisites
 
-## Architecture
+- Node.js 20+
+- Drupal instance with Simple OAuth and JSON-RPC modules
 
-The server implements a simplified MVP architecture without caching complexity:
+### Installation
 
-```
-AI System → MCP Protocol → MCP Server → OAuth 2.0 → Drupal JSON-RPC API
+```bash
+npm install @e0ipso/drupalizeme-mcp-server
 ```
 
-For detailed architecture documentation, see the [`/architecture/`](./architecture/) directory.
+### Configuration
 
-## Prerequisites
-
-- **Node.js** 18.0.0 or higher
-- **PostgreSQL** 12 or higher
-- **Drupal Instance** with Simple OAuth and JSON-RPC modules configured
-- **OAuth 2.0 Credentials** from your Drupal installation
-
-## Installation
-
-1. **Clone the repository**
-
-   ```bash
-   git clone https://github.com/drupalize/mcp-server.git
-   cd mcp-server
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   npm install
-   ```
-
-3. **Configure environment variables**
-
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-4. **Set up the database**
-
-   ```bash
-   npm run db:setup
-   ```
-
-5. **Build the project**
-   ```bash
-   npm run build
-   ```
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file with the following variables:
+Create a `.env` file:
 
 ```env
-# Server Configuration
-PORT=3000
-NODE_ENV=development
-
-# Database Configuration
-DATABASE_URL=postgresql://username:password@localhost:5432/mcp_server
-
 # Drupal OAuth Configuration
 DRUPAL_BASE_URL=https://your-drupal-site.com
 OAUTH_CLIENT_ID=your-client-id
 OAUTH_CLIENT_SECRET=your-client-secret
-OAUTH_REDIRECT_URI=http://localhost:3000/auth/callback
 
-# MCP Configuration
-MCP_TRANSPORT=sse
-DEBUG_MODE=true
-
-# Security
-JWT_SECRET=your-secure-jwt-secret
-ENCRYPTION_KEY=your-32-character-encryption-key
-
-# Logging
-LOG_LEVEL=info
-LOG_FORMAT=combined
+# Optional
+NODE_ENV=development
+DEBUG=mcp:*
 ```
 
-### OAuth 2.0 Setup
+### Usage
 
-1. **Enable modules in Drupal**:
-   - Simple OAuth
-   - JSON-RPC
-   - Custom content transformation modules
+#### As MCP Server
 
-2. **Create OAuth 2.0 application**:
-   - Navigate to `/admin/config/services/consumer`
-   - Create new consumer with Authorization Code Grant
-   - Copy client ID and secret to your `.env` file
+Add to your MCP client configuration:
 
-3. **Configure permissions**:
-   - Grant appropriate API access to authenticated users
-   - Set up subscription-based content access rules
+```json
+{
+  "mcpServers": {
+    "drupalize": {
+      "command": "npx",
+      "args": ["@e0ipso/drupalizeme-mcp-server"]
+    }
+  }
+}
+```
 
-## Usage
-
-### Development
+#### Direct Usage
 
 ```bash
-# Start development server with hot reload
+npx @e0ipso/drupalizeme-mcp-server
+```
+
+## 🛠️ Development
+
+### Local Setup
+
+```bash
+# Clone repository
+git clone https://github.com/e0ipso/drupalizeme-mcp-server.git
+cd drupalizeme-mcp-server
+
+# Install dependencies
+npm install
+
+# Copy and configure environment
+cp .env.example .env
+# Edit .env with your Drupal configuration
+
+# Start development server
 npm run dev
 
-# Run with debug logging
-DEBUG=mcp:* npm run dev
-
-# Watch mode with automatic rebuilding
-npm run dev:watch
-```
-
-### Production
-
-```bash
-# Build for production
-npm run build:prod
-
-# Start production server
-npm start
-
-# Run with PM2 (recommended)
-pm2 start dist/index.js --name mcp-server
-```
-
-### Testing
-
-```bash
-# Run all tests
+# Run tests
 npm test
 
-# Run tests in watch mode
-npm run test:watch
-
-# Run with coverage
-npm run test:coverage
-
-# Lint and format code
-npm run quality:check
-npm run quality:fix
+# Build for production  
+npm run build
 ```
 
-## API Documentation
+### Local MCP Server Configuration
 
-### MCP Tools
+#### With Claude Desktop
 
-The server provides the following MCP tools dynamically discovered from Drupal:
+Add to your `claude_desktop_config.json`:
 
-#### Content Access Tools
-
-- `search_content`: Search Drupal content with filters
-- `get_tutorial`: Retrieve specific tutorial content
-- `list_courses`: Get available course listings
-- `get_user_progress`: Access user's learning progress
-
-#### Authentication Tools
-
-- `authenticate_user`: Initiate OAuth 2.0 flow
-- `refresh_token`: Refresh expired access tokens
-- `get_user_profile`: Retrieve authenticated user information
-
-### HTTP Endpoints
-
-#### Health Check
-
-```http
-GET /health
+```json
+{
+  "mcpServers": {
+    "drupalize-local": {
+      "command": "node",
+      "args": ["/path/to/your/project/dist/main.js"],
+      "env": {
+        "DRUPAL_BASE_URL": "http://localhost/drupal",
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
 ```
 
-Returns server health status and version information.
+#### With Development Server
 
-#### OAuth Callback
+For live reloading during development:
 
-```http
-GET /auth/callback?code=...&state=...
+```json
+{
+  "mcpServers": {
+    "drupalize-dev": {
+      "command": "npm",
+      "args": ["run", "dev"],
+      "cwd": "/path/to/your/project",
+      "env": {
+        "DRUPAL_BASE_URL": "http://localhost/drupal",
+        "NODE_ENV": "development"
+      }
+    }
+  }
+}
 ```
 
-Handles OAuth 2.0 authorization code callback.
+### Environment Configuration
 
-#### MCP Transport
+Create `.env` file with your local Drupal setup:
 
-```http
-GET /mcp/sse
+```env
+# Your local Drupal instance
+DRUPAL_BASE_URL=http://localhost/drupal
+DRUPAL_JSON_RPC_ENDPOINT=/jsonrpc
+
+# Development settings
+NODE_ENV=development
+LOG_LEVEL=debug
+
+# OAuth (when available)
+# OAUTH_CLIENT_ID=your-client-id
+# OAUTH_CLIENT_SECRET=your-client-secret
 ```
 
-Server-Sent Events endpoint for MCP protocol communication.
-
-## Development
-
-### Project Structure
-
-```
-src/
-├── auth/           # OAuth 2.0 authentication
-├── config/         # Configuration management
-├── database/       # Database models and migrations
-├── handlers/       # MCP request handlers
-├── services/       # Business logic services
-├── transport/      # MCP transport implementations
-├── types/          # TypeScript type definitions
-└── utils/          # Utility functions
-
-tests/
-├── integration/    # Integration tests
-├── unit/          # Unit tests
-└── fixtures/      # Test fixtures and mocks
-
-architecture/      # Architecture documentation
-.github/           # GitHub workflows and templates
-```
-
-### Code Quality
-
-This project uses:
-
-- **TypeScript** for type safety
-- **ESLint** for code linting
-- **Prettier** for code formatting
-- **Jest** for testing
-- **Husky** for pre-commit hooks
-- **Conventional Commits** for standardized commit messages
-
-### Contributing Workflow
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes with tests
-4. Run quality checks: `npm run quality:check`
-5. Commit using conventional format: `git commit -m "feat: add amazing feature"`
-6. Push to your fork and create a Pull Request
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines.
-
-## Monitoring and Debugging
-
-### Logging
-
-The server uses Winston for structured logging:
-
-```javascript
-import { logger } from './utils/logger';
-
-logger.info('Server started', { port: 3000 });
-logger.error('Database connection failed', { error: err.message });
-```
-
-### Health Checks
-
-Monitor server health via:
+### Testing with MCP Client
 
 ```bash
-curl http://localhost:3000/health
+# Start the MCP server directly
+npm run dev
+
+# In another terminal, test with an MCP client
+# The server listens on stdio by default
 ```
 
-Response includes:
+## 🔧 Available Tools
 
-- Server version and uptime
-- Database connectivity status
-- Drupal API connectivity status
-- Memory and CPU usage metrics
+The server exposes these MCP tools:
 
-### Debug Mode
+- `search_tutorials` - Search Drupalize.me tutorials
+- `get_tutorial` - Retrieve specific tutorial content
+- `list_courses` - Get available courses
+- `authenticate_user` - OAuth authentication flow
 
-Enable debug mode for verbose logging:
+## 📝 Scripts
 
-```bash
-DEBUG=mcp:* NODE_ENV=development npm start
-```
-
-## Deployment
-
-### Docker
-
-```bash
-# Build Docker image
-docker build -t drupalize/mcp-server .
-
-# Run with Docker Compose
-docker-compose up -d
-```
-
-### Production Deployment
-
-1. **Environment Setup**:
-   - Configure production environment variables
-   - Set up PostgreSQL database
-   - Configure reverse proxy (nginx/Apache)
-
-2. **Security**:
-   - Use HTTPS for all communications
-   - Implement proper firewall rules
-   - Regular security updates
-
-3. **Monitoring**:
-   - Set up application monitoring (New Relic, DataDog)
-   - Configure log aggregation
-   - Implement alerting for critical errors
-
-## Troubleshooting
-
-### Common Issues
-
-**Authentication failures**:
-
-- Verify OAuth 2.0 client credentials
-- Check Drupal module configurations
-- Ensure redirect URI matches exactly
-
-**Database connection errors**:
-
-- Verify DATABASE_URL format
-- Check PostgreSQL service status
-- Confirm user permissions
-
-**Content access issues**:
-
-- Verify user subscription status
-- Check Drupal permissions
-- Review content transformation logs
-
-### Support
-
-- **Issues**: [GitHub Issues](https://github.com/drupalize/mcp-server/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/drupalize/mcp-server/discussions)
-- **Documentation**: [Architecture Docs](./architecture/)
-
-## License
-
-MIT License - see [LICENSE](./LICENSE) file for details.
-
-## Changelog
-
-See [CHANGELOG.md](./CHANGELOG.md) for version history and release notes.
-
----
-
-Built with ❤️ by the Drupalize.me team
-
-# Testing commit-msg hook
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm test` | Run test suite |
+| `npm run lint` | Lint code |
+| `npm run format` | Format code |
