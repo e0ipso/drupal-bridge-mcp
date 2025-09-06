@@ -1,10 +1,10 @@
 {
-  "name": "@e0ipso/drupalizeme-mcp-server",
+  "name": "@e0ipso/drupal-bridge-mcp",
   "version": "1.0.0",
-  "description": "MCP Server for Drupalize.me Drupal integration with OAuth authentication and content RAG optimization",
+  "description": "MCP Server for Drupal integration with OAuth authentication and content RAG optimization",
   "main": "dist/index.js",
   "bin": {
-    "drupalizeme-mcp-server": "dist/main.js"
+    "drupal-bridge-mcp": "dist/main.js"
   },
   "type": "module",
   "engines": {
@@ -40,11 +40,11 @@
     "content-api",
     "json-rpc"
   ],
-  "author": "Drupalize.me",
-  "license": "MIT",
+  "author": "Mateu Aguil� Bosch (e0ipso) <mateu@mateuaguilo.com>",
+  "license": "proprietary",
   "repository": {
     "type": "git",
-    "url": "https://github.com/e0ipso/drupalizeme-mcp-server.git"
+    "url": "https://github.com/e0ipso/drupal-bridge-mcp.git"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
