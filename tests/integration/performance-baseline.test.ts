@@ -3,7 +3,14 @@
  * These tests establish performance metrics for future optimization reference
  */
 
-import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  afterEach,
+  jest,
+} from '@jest/globals';
 import { DrupalMcpServer } from '@/mcp/server.js';
 import { DrupalClient } from '@/services/drupal-client.js';
 import { loadConfig } from '@/config/index.js';
@@ -38,14 +45,54 @@ describe('Performance Baseline Measurements', () => {
   let drupalClient: DrupalClient;
 
   beforeEach(async () => {
-    config = await loadConfig();
-    config.environment = 'test'; // Use test environment for consistent performance
-    
+    config = {
+      drupal: {
+        baseUrl: 'http://localhost/drupal',
+        endpoint: '/jsonrpc',
+        timeout: 10000,
+        retries: 3,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+      },
+      oauth: {
+        clientId: 'test-client-id',
+        authorizationEndpoint: 'http://localhost/drupal/oauth/authorize',
+        tokenEndpoint: 'http://localhost/drupal/oauth/token',
+        redirectUri: 'http://127.0.0.1:3000/callback',
+        scopes: ['tutorial:read', 'user:profile'],
+      },
+      auth: {
+        enabled: false, // Disable auth for performance tests
+        requiredScopes: ['tutorial:read'],
+        skipAuth: true,
+      },
+      mcp: {
+        name: 'test-drupalizeme-mcp-server',
+        version: '1.0.0-test',
+        protocolVersion: '2024-11-05',
+        capabilities: {
+          resources: { subscribe: true, listChanged: true },
+          tools: { listChanged: true },
+          prompts: { listChanged: true },
+        },
+      },
+      server: {
+        port: 3000,
+        host: '0.0.0.0',
+      },
+      logging: {
+        level: 'error' as const,
+      },
+      environment: 'test' as const,
+    };
+
     mcpServer = new DrupalMcpServer(config);
     drupalClient = new DrupalClient(config.drupal);
-    
+
     jest.clearAllMocks();
-    
+
     // Force garbage collection if available for more accurate memory measurements
     if (global.gc) {
       global.gc();
@@ -76,12 +123,12 @@ describe('Performance Baseline Measurements', () => {
 
     const initialMemory = process.memoryUsage();
     const startTime = process.hrtime.bigint();
-    
+
     let result: T;
     for (let i = 0; i < measureRuns; i++) {
       result = await operation();
     }
-    
+
     const endTime = process.hrtime.bigint();
     const finalMemory = process.memoryUsage();
 
@@ -111,28 +158,28 @@ describe('Performance Baseline Measurements', () => {
   ): Promise<BenchmarkResult> {
     const times: number[] = [];
     const initialMemory = process.memoryUsage().heapUsed;
-    
+
     console.log(`Starting benchmark: ${name} (${iterations} iterations)`);
-    
+
     const startTime = Date.now();
-    
+
     for (let i = 0; i < iterations; i++) {
       const iterationStart = process.hrtime.bigint();
       await operation();
       const iterationEnd = process.hrtime.bigint();
-      
+
       times.push(Number(iterationEnd - iterationStart) / 1_000_000);
     }
-    
+
     const totalTime = Date.now() - startTime;
     const finalMemory = process.memoryUsage().heapUsed;
-    
+
     const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
     const minTime = Math.min(...times);
     const maxTime = Math.max(...times);
     const memoryDelta = finalMemory - initialMemory;
     const throughput = (iterations * 1000) / totalTime;
-    
+
     const result: BenchmarkResult = {
       operation: name,
       iterations,
@@ -142,7 +189,7 @@ describe('Performance Baseline Measurements', () => {
       memoryDelta,
       throughput,
     };
-    
+
     console.log(`Benchmark ${name} completed:`);
     console.log(`  Average time: ${avgTime.toFixed(2)}ms`);
     console.log(`  Min time: ${minTime.toFixed(2)}ms`);
@@ -150,7 +197,7 @@ describe('Performance Baseline Measurements', () => {
     console.log(`  Memory delta: ${Math.round(memoryDelta / 1024)}KB`);
     console.log(`  Throughput: ${throughput.toFixed(2)} ops/sec`);
     console.log('');
-    
+
     return result;
   }
 
@@ -202,8 +249,10 @@ describe('Performance Baseline Measurements', () => {
     });
 
     test('should benchmark parameter validation performance', async () => {
-      const { validateSearchToolParams } = await import('@/utils/validation.js');
-      
+      const { validateSearchToolParams } = await import(
+        '@/utils/validation.js'
+      );
+
       const benchmark = await runBenchmark(
         'Parameter Validation',
         async () => {
@@ -267,7 +316,7 @@ describe('Performance Baseline Measurements', () => {
         const searchResult = await (mcpServer as any).executeSearchTutorials({
           query: 'large content test',
         });
-        
+
         // Process and format multiple results
         return Array.from({ length: 100 }, (_, i) => ({
           ...searchResult.results[0],
@@ -279,8 +328,12 @@ describe('Performance Baseline Measurements', () => {
 
       console.log('Large Response Memory Usage:');
       console.log(`  Execution time: ${metrics.executionTime.toFixed(2)}ms`);
-      console.log(`  Heap used delta: ${Math.round(metrics.memoryUsage.heapUsed / 1024)}KB`);
-      console.log(`  External memory delta: ${Math.round(metrics.memoryUsage.external / 1024)}KB`);
+      console.log(
+        `  Heap used delta: ${Math.round(metrics.memoryUsage.heapUsed / 1024)}KB`
+      );
+      console.log(
+        `  External memory delta: ${Math.round(metrics.memoryUsage.external / 1024)}KB`
+      );
 
       expect(result).toHaveLength(100);
       expect(metrics.executionTime).toBeLessThan(50); // Should handle large content quickly
@@ -289,20 +342,24 @@ describe('Performance Baseline Measurements', () => {
 
     test('should measure memory usage for concurrent operations', async () => {
       const concurrentOperations = 10;
-      
+
       const { result, metrics } = await measurePerformance(async () => {
         const promises = Array.from({ length: concurrentOperations }, (_, i) =>
           (mcpServer as any).executeSearchTutorials({
             query: `concurrent test ${i}`,
           })
         );
-        
+
         return await Promise.all(promises);
       });
 
-      console.log(`Concurrent Operations Memory Usage (${concurrentOperations} operations):`);
+      console.log(
+        `Concurrent Operations Memory Usage (${concurrentOperations} operations):`
+      );
       console.log(`  Execution time: ${metrics.executionTime.toFixed(2)}ms`);
-      console.log(`  Memory delta: ${Math.round(metrics.memoryUsage.heapUsed / 1024)}KB`);
+      console.log(
+        `  Memory delta: ${Math.round(metrics.memoryUsage.heapUsed / 1024)}KB`
+      );
 
       expect(result).toHaveLength(concurrentOperations);
       expect(metrics.executionTime).toBeLessThan(100);
@@ -312,10 +369,11 @@ describe('Performance Baseline Measurements', () => {
   describe('Error Scenario Performance', () => {
     test('should benchmark network timeout handling', async () => {
       // Mock network timeout
-      mockFetch.mockImplementation(() => 
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('timeout')), 10);
-        })
+      mockFetch.mockImplementation(
+        () =>
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('timeout')), 10);
+          })
       );
 
       const benchmark = await runBenchmark(
@@ -328,7 +386,7 @@ describe('Performance Baseline Measurements', () => {
               timeout: 50, // 50ms timeout
               retries: 1, // Only 1 retry for faster testing
             });
-            
+
             return await testClient.testConnection();
           } catch (error) {
             return { error: true };
@@ -346,15 +404,16 @@ describe('Performance Baseline Measurements', () => {
       mockFetch.mockResolvedValue({
         status: 200,
         headers: new Map([['content-type', 'application/json']]),
-        json: () => Promise.resolve({
-          jsonrpc: '2.0',
-          error: {
-            code: -32602,
-            message: 'Invalid parameters for testing',
-            data: { field: 'query', type: 'VALIDATION_ERROR' },
-          },
-          id: 'test-error',
-        }),
+        json: () =>
+          Promise.resolve({
+            jsonrpc: '2.0',
+            error: {
+              code: -32602,
+              message: 'Invalid parameters for testing',
+              data: { field: 'query', type: 'VALIDATION_ERROR' },
+            },
+            id: 'test-error',
+          }),
       });
 
       const benchmark = await runBenchmark(
@@ -379,7 +438,7 @@ describe('Performance Baseline Measurements', () => {
     test('should establish baseline metrics for future comparison', () => {
       // This test documents the expected performance characteristics
       // Future test runs can compare against these baselines
-      
+
       const performanceBaselines = {
         basicSearch: {
           avgTime: 10, // ms

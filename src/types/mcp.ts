@@ -80,7 +80,7 @@ export const McpErrorType = {
   INTERNAL_ERROR: 'InternalError',
 } as const;
 
-export type McpErrorType = typeof McpErrorType[keyof typeof McpErrorType];
+export type McpErrorType = (typeof McpErrorType)[keyof typeof McpErrorType];
 
 /**
  * MCP error structure

@@ -2,7 +2,10 @@
 
 ## Overview
 
-The Basic Search capability provides a simple keyword search interface for Drupalize.me tutorials through the MCP (Model Context Protocol) server. This capability implements a direct pass-through approach to Drupal's JSON-RPC 2.x API without caching, focusing on establishing a reliable integration baseline.
+The Basic Search capability provides a simple keyword search interface for Drupalize.me tutorials
+through the MCP (Model Context Protocol) server. This capability implements a direct pass-through
+approach to Drupal's JSON-RPC 2.x API without caching, focusing on establishing a reliable
+integration baseline.
 
 ## Core Functionality
 
@@ -12,7 +15,8 @@ The Basic Search capability provides a simple keyword search interface for Drupa
 - **Version Filtering**: Filter results by Drupal version (9, 10, 11)
 - **Tag-based Filtering**: Filter results by tutorial tags
 - **Direct API Integration**: Real-time searches with no caching layer
-- **Markdown Content Delivery**: Pre-formatted tutorial content optimized for RAG (Retrieval Augmented Generation)
+- **Markdown Content Delivery**: Pre-formatted tutorial content optimized for RAG (Retrieval
+  Augmented Generation)
 
 ### Search Parameters
 
@@ -32,19 +36,19 @@ const searchTool = {
   inputSchema: {
     type: 'object',
     properties: {
-      query: { 
+      query: {
         type: 'string',
-        description: 'Search keywords or phrase'
+        description: 'Search keywords or phrase',
       },
-      drupal_version: { 
-        type: 'string', 
+      drupal_version: {
+        type: 'string',
         enum: ['9', '10', '11'],
-        description: 'Filter by Drupal version'
+        description: 'Filter by Drupal version',
       },
-      tags: { 
-        type: 'array', 
+      tags: {
+        type: 'array',
         items: { type: 'string' },
-        description: 'Filter by tutorial tags'
+        description: 'Filter by tutorial tags',
       },
     },
     required: ['query'],
@@ -66,6 +70,7 @@ The Basic Search capability integrates with Drupal's JSON-RPC 2.x module, which 
 ### API Endpoint Configuration
 
 **Primary Endpoint**: `/jsonrpc`
+
 - **Protocol**: JSON-RPC 2.0
 - **Methods**: POST (primary), GET (URL-encoded JSON)
 - **Authentication**: Bearer token via OAuth 2.0
@@ -196,23 +201,20 @@ if (!token) {
 }
 
 // Include token in JSON-RPC request
-const response = await this.drupalClient.call(
-  'content.search',
-  searchParams,
-  {
-    headers: { 
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-  }
-);
+const response = await this.drupalClient.call('content.search', searchParams, {
+  headers: {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  },
+});
 ```
 
 ## Error Handling Integration
 
 ### Search-Specific Error Scenarios
 
-The Basic Search capability handles errors in coordination with the [Error Handling](./error-handling.md) capability:
+The Basic Search capability handles errors in coordination with the
+[Error Handling](./error-handling.md) capability:
 
 - **Authentication Failures**: Delegated to Authentication Flow for token refresh attempts
 - **Search Validation Errors**: Query parameter validation and user-friendly messaging
@@ -239,7 +241,8 @@ Search errors utilize the standardized error format defined in the Error Handlin
 }
 ```
 
-See [Error Handling](./error-handling.md) for complete error response specifications and cross-capability error patterns.
+See [Error Handling](./error-handling.md) for complete error response specifications and
+cross-capability error patterns.
 
 ## Content Format Specifications
 
@@ -255,26 +258,32 @@ Search results return tutorial content as RAG-optimized Markdown:
 
 ### Content Structure Example
 
-```markdown
+````markdown
 # Creating Custom Blocks in Drupal 10
 
 ## Overview
+
 This tutorial covers the basics of creating custom blocks...
 
 ## Prerequisites
+
 - Drupal 10 installation
 - Basic PHP knowledge
 
 ## Step 1: Create Block Plugin
+
 ```php
 <?php
 // Block plugin code here
 ```
+````
 
 ## Resources
+
 - [Official Documentation](https://drupal.org/docs)
 - Tags: theming, development, blocks
 - Version: Drupal 10
+
 ```
 
 ## Performance Considerations
@@ -359,3 +368,4 @@ The Basic Search capability integrates with other capabilities as follows:
 - **Load Balancing**: Support multiple Drupal instances
 - **Monitoring**: Add comprehensive logging and metrics
 - **API Versioning**: Support multiple API versions simultaneously
+```

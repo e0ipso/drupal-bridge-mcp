@@ -7,7 +7,7 @@ import { loadConfig, DrupalClient } from './index.js';
 describe('Main module', () => {
   test('config loads with defaults', async () => {
     const config = await loadConfig();
-    
+
     expect(config.mcp.name).toBe('drupalizeme-mcp-server');
     expect(config.mcp.version).toBe('1.0.0');
     expect(config.drupal.baseUrl).toBe('http://localhost/drupal');
@@ -31,10 +31,10 @@ describe('Main module', () => {
   test('environment variable override works', async () => {
     const originalEnv = process.env.DRUPAL_BASE_URL;
     process.env.DRUPAL_BASE_URL = 'https://example.com/drupal';
-    
+
     const config = await loadConfig();
     expect(config.drupal.baseUrl).toBe('https://example.com/drupal');
-    
+
     if (originalEnv !== undefined) {
       process.env.DRUPAL_BASE_URL = originalEnv;
     } else {

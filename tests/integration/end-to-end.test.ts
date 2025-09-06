@@ -2,7 +2,14 @@
  * End-to-end integration tests for the complete JSON-RPC Drupal search workflow
  */
 
-import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  afterEach,
+  jest,
+} from '@jest/globals';
 import { DrupalMcpServer } from '@/mcp/server.js';
 import { DrupalClient } from '@/services/drupal-client.js';
 import { loadConfig } from '@/config/index.js';
@@ -18,13 +25,52 @@ describe('End-to-End Integration Tests', () => {
   let drupalClient: DrupalClient;
 
   beforeEach(async () => {
-    config = await loadConfig();
-    // Force test environment to use mock data when appropriate
-    config.environment = 'test';
-    
+    config = {
+      drupal: {
+        baseUrl: 'http://localhost/drupal',
+        endpoint: '/jsonrpc',
+        timeout: 10000,
+        retries: 3,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+      },
+      oauth: {
+        clientId: 'test-client-id',
+        authorizationEndpoint: 'http://localhost/drupal/oauth/authorize',
+        tokenEndpoint: 'http://localhost/drupal/oauth/token',
+        redirectUri: 'http://127.0.0.1:3000/callback',
+        scopes: ['tutorial:read', 'user:profile'],
+      },
+      auth: {
+        enabled: false, // Disable auth for end-to-end tests
+        requiredScopes: ['tutorial:read'],
+        skipAuth: true,
+      },
+      mcp: {
+        name: 'test-drupalizeme-mcp-server',
+        version: '1.0.0-test',
+        protocolVersion: '2024-11-05',
+        capabilities: {
+          resources: { subscribe: true, listChanged: true },
+          tools: { listChanged: true },
+          prompts: { listChanged: true },
+        },
+      },
+      server: {
+        port: 3000,
+        host: '0.0.0.0',
+      },
+      logging: {
+        level: 'error' as const,
+      },
+      environment: 'test' as const,
+    };
+
     mcpServer = new DrupalMcpServer(config);
     drupalClient = new DrupalClient(config.drupal);
-    
+
     jest.clearAllMocks();
   });
 
@@ -42,7 +88,9 @@ describe('End-to-End Integration Tests', () => {
       };
 
       // Execute the search through the MCP tool interface
-      const result = await (mcpServer as any).executeSearchTutorials(searchArgs);
+      const result = await (mcpServer as any).executeSearchTutorials(
+        searchArgs
+      );
 
       // Verify the response structure
       expect(result).toHaveProperty('results');
@@ -76,7 +124,9 @@ describe('End-to-End Integration Tests', () => {
         query: 'forms',
       };
 
-      const result = await (mcpServer as any).executeSearchTutorials(searchArgs);
+      const result = await (mcpServer as any).executeSearchTutorials(
+        searchArgs
+      );
 
       expect(result.results).toBeDefined();
       expect(result.query.query).toBe('forms');
@@ -90,10 +140,14 @@ describe('End-to-End Integration Tests', () => {
         drupal_version: '9',
       };
 
-      const result = await (mcpServer as any).executeSearchTutorials(searchArgs);
+      const result = await (mcpServer as any).executeSearchTutorials(
+        searchArgs
+      );
 
       // In test mode, mock data should include version filtering
-      const drupal9Results = result.results.filter(r => r.drupal_version?.includes('9'));
+      const drupal9Results = result.results.filter(r =>
+        r.drupal_version?.includes('9')
+      );
       expect(drupal9Results.length).toBeGreaterThan(0);
     });
   });
@@ -105,7 +159,10 @@ describe('End-to-End Integration Tests', () => {
         drupal_version: '11',
       };
 
-      const toolResponse = await (mcpServer as any).executeTool('search_tutorials', args);
+      const toolResponse = await (mcpServer as any).executeTool(
+        'search_tutorials',
+        args
+      );
 
       expect(toolResponse).toHaveProperty('content');
       expect(Array.isArray(toolResponse.content)).toBe(true);
@@ -122,10 +179,13 @@ describe('End-to-End Integration Tests', () => {
         query: 'x', // Too short
       };
 
-      const toolResponse = await (mcpServer as any).executeTool('search_tutorials', invalidArgs);
+      const toolResponse = await (mcpServer as any).executeTool(
+        'search_tutorials',
+        invalidArgs
+      );
 
       expect(toolResponse.content[0]).toHaveProperty('type', 'text');
-      
+
       const errorResponse = JSON.parse(toolResponse.content[0].text);
       expect(errorResponse).toHaveProperty('error');
       expect(errorResponse.error.type).toBe('VALIDATION_ERROR');
@@ -134,7 +194,10 @@ describe('End-to-End Integration Tests', () => {
     });
 
     test('should handle unknown tool names', async () => {
-      const toolResponse = await (mcpServer as any).executeTool('unknown_tool', {});
+      const toolResponse = await (mcpServer as any).executeTool(
+        'unknown_tool',
+        {}
+      );
 
       const errorResponse = JSON.parse(toolResponse.content[0].text);
       expect(errorResponse.error.type).toBe('VALIDATION_ERROR');
@@ -149,7 +212,7 @@ describe('End-to-End Integration Tests', () => {
 
       expect(Array.isArray(resources)).toBe(true);
       expect(resources.length).toBeGreaterThan(0);
-      
+
       const nodeResource = resources.find(r => r.uri === 'drupal://nodes');
       expect(nodeResource).toBeDefined();
       expect(nodeResource.name).toBe('Drupal Nodes');
@@ -162,9 +225,9 @@ describe('End-to-End Integration Tests', () => {
 
       expect(result).toHaveProperty('contents');
       expect(Array.isArray(result.contents)).toBe(true);
-      
+
       const content = JSON.parse(result.contents[0].text);
-      
+
       // In test environment, this might return error or mock data
       if (content.error) {
         expect(content.error).toHaveProperty('type');
@@ -195,7 +258,7 @@ describe('End-to-End Integration Tests', () => {
       const startTime = Date.now();
 
       // Execute multiple searches to test memory efficiency
-      const promises = Array.from({ length: 10 }, (_, i) => 
+      const promises = Array.from({ length: 10 }, (_, i) =>
         (mcpServer as any).executeSearchTutorials({
           query: `test query ${i}`,
           drupal_version: i % 2 === 0 ? '10' : '11',
@@ -203,7 +266,7 @@ describe('End-to-End Integration Tests', () => {
       );
 
       const results = await Promise.all(promises);
-      
+
       const endTime = Date.now();
       const endMemory = process.memoryUsage().heapUsed;
 
@@ -229,10 +292,12 @@ describe('End-to-End Integration Tests', () => {
 
     test('should handle concurrent search requests', async () => {
       const concurrentSearches = 5;
-      const searchPromises = Array.from({ length: concurrentSearches }, (_, i) => 
-        (mcpServer as any).executeTool('search_tutorials', {
-          query: `concurrent search ${i}`,
-        })
+      const searchPromises = Array.from(
+        { length: concurrentSearches },
+        (_, i) =>
+          (mcpServer as any).executeTool('search_tutorials', {
+            query: `concurrent search ${i}`,
+          })
       );
 
       const startTime = Date.now();
@@ -247,7 +312,9 @@ describe('End-to-End Integration Tests', () => {
         expect(data.results).toBeDefined();
       });
 
-      console.log(`Concurrent Baseline - ${concurrentSearches} searches: ${endTime - startTime}ms`);
+      console.log(
+        `Concurrent Baseline - ${concurrentSearches} searches: ${endTime - startTime}ms`
+      );
     });
   });
 
@@ -255,7 +322,7 @@ describe('End-to-End Integration Tests', () => {
     test('should fall back to mock data when API is unavailable in development', async () => {
       // Simulate network failure
       mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
-      
+
       // Set to development environment to trigger fallback
       const devConfig = { ...config, environment: 'development' };
       const devServer = new DrupalMcpServer(devConfig);
@@ -273,11 +340,11 @@ describe('End-to-End Integration Tests', () => {
     test('should propagate errors in production environment', async () => {
       // Simulate network failure
       mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
-      
+
       // Set to production environment AND ensure it's not test mode
-      const prodConfig = { 
-        ...config, 
-        environment: 'production' 
+      const prodConfig = {
+        ...config,
+        environment: 'production',
       };
       const prodServer = new DrupalMcpServer(prodConfig);
 

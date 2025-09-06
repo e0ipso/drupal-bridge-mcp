@@ -25,6 +25,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:integration": "jest --config jest.integration.config.js",
+    "test:integration:watch": "jest --config jest.integration.config.js --watch",
+    "test:integration:coverage": "jest --config jest.integration.config.js --coverage",
     "prepare": "husky install",
     "semantic-release": "semantic-release"
   },
@@ -75,7 +78,14 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.5",
+    "@types/crypto-js": "^4.2.2",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node-fetch": "^2.6.13",
+    "crypto-js": "^4.2.0",
     "json-rpc-2.0": "^1.7.1",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^3.3.2",
+    "open": "^10.2.0",
     "tslib": "^2.8.1"
   }
 }

@@ -42,7 +42,7 @@ export interface JsonRpcErrorResponse {
 /**
  * Union type for JSON-RPC 2.0 responses
  */
-export type JsonRpcResponse<TResult = unknown> = 
+export type JsonRpcResponse<TResult = unknown> =
   | JsonRpcSuccessResponse<TResult>
   | JsonRpcErrorResponse;
 
@@ -76,4 +76,5 @@ export const JsonRpcErrorCode = {
   SERVER_ERROR: -32000, // to -32099 reserved for server errors
 } as const;
 
-export type JsonRpcErrorCode = typeof JsonRpcErrorCode[keyof typeof JsonRpcErrorCode];
+export type JsonRpcErrorCode =
+  (typeof JsonRpcErrorCode)[keyof typeof JsonRpcErrorCode];

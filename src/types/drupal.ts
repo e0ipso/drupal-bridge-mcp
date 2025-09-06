@@ -52,25 +52,26 @@ export const DrupalJsonRpcMethod = {
   ENTITY_UPDATE: 'entity.update',
   ENTITY_DELETE: 'entity.delete',
   ENTITY_QUERY: 'entity.query',
-  
+
   // Node operations
   NODE_LOAD: 'node.load',
   NODE_CREATE: 'node.create',
   NODE_UPDATE: 'node.update',
   NODE_DELETE: 'node.delete',
   NODE_INDEX: 'node.index',
-  
+
   // User operations
   USER_LOAD: 'user.load',
   USER_LOGIN: 'user.login',
   USER_LOGOUT: 'user.logout',
-  
+
   // System operations
   SYSTEM_CONNECT: 'system.connect',
   SYSTEM_GET_VARIABLE: 'system.get_variable',
 } as const;
 
-export type DrupalJsonRpcMethod = typeof DrupalJsonRpcMethod[keyof typeof DrupalJsonRpcMethod];
+export type DrupalJsonRpcMethod =
+  (typeof DrupalJsonRpcMethod)[keyof typeof DrupalJsonRpcMethod];
 
 /**
  * Parameters for entity load operations

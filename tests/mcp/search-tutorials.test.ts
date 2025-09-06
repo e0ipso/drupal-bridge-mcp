@@ -3,9 +3,15 @@
  */
 
 import { DrupalMcpServer } from '@/mcp/server.js';
-import { validateSearchToolParams, ValidationError } from '@/utils/validation.js';
+import {
+  validateSearchToolParams,
+  ValidationError,
+} from '@/utils/validation.js';
 import type { AppConfig } from '@/config/index.js';
-import type { SearchTutorialsResponse, ProcessedSearchParams } from '@/types/index.js';
+import type {
+  SearchTutorialsResponse,
+  ProcessedSearchParams,
+} from '@/types/index.js';
 
 // Mock configuration for testing
 const mockConfig: AppConfig = {
@@ -70,35 +76,49 @@ describe('Search Tutorials MCP Tool', () => {
 
       it('should throw ValidationError for missing query', () => {
         expect(() => validateSearchToolParams({})).toThrow(ValidationError);
-        expect(() => validateSearchToolParams({ query: '' })).toThrow(ValidationError);
+        expect(() => validateSearchToolParams({ query: '' })).toThrow(
+          ValidationError
+        );
       });
 
       it('should throw ValidationError for invalid query type', () => {
-        expect(() => validateSearchToolParams({ query: 123 })).toThrow(ValidationError);
-        expect(() => validateSearchToolParams({ query: null })).toThrow(ValidationError);
+        expect(() => validateSearchToolParams({ query: 123 })).toThrow(
+          ValidationError
+        );
+        expect(() => validateSearchToolParams({ query: null })).toThrow(
+          ValidationError
+        );
       });
 
       it('should throw ValidationError for query too short', () => {
-        expect(() => validateSearchToolParams({ query: 'a' })).toThrow(ValidationError);
+        expect(() => validateSearchToolParams({ query: 'a' })).toThrow(
+          ValidationError
+        );
       });
 
       it('should throw ValidationError for invalid drupal_version', () => {
-        expect(() => validateSearchToolParams({
-          query: 'test',
-          drupal_version: '8',
-        })).toThrow(ValidationError);
+        expect(() =>
+          validateSearchToolParams({
+            query: 'test',
+            drupal_version: '8',
+          })
+        ).toThrow(ValidationError);
 
-        expect(() => validateSearchToolParams({
-          query: 'test',
-          drupal_version: 123,
-        })).toThrow(ValidationError);
+        expect(() =>
+          validateSearchToolParams({
+            query: 'test',
+            drupal_version: 123,
+          })
+        ).toThrow(ValidationError);
       });
 
       it('should throw ValidationError for invalid tags type', () => {
-        expect(() => validateSearchToolParams({
-          query: 'test',
-          tags: 'not-array',
-        })).toThrow(ValidationError);
+        expect(() =>
+          validateSearchToolParams({
+            query: 'test',
+            tags: 'not-array',
+          })
+        ).toThrow(ValidationError);
       });
 
       it('should filter and normalize tags', () => {
@@ -126,14 +146,20 @@ describe('Search Tutorials MCP Tool', () => {
       const server = mcpServer.getServer();
       const tools = (mcpServer as any).getTools();
 
-      const searchTutorialsTool = tools.find((tool: any) => tool.name === 'search_tutorials');
+      const searchTutorialsTool = tools.find(
+        (tool: any) => tool.name === 'search_tutorials'
+      );
       expect(searchTutorialsTool).toBeDefined();
-      expect(searchTutorialsTool.description).toContain('Search Drupalize.me tutorials');
+      expect(searchTutorialsTool.description).toContain(
+        'Search Drupalize.me tutorials'
+      );
     });
 
     it('should have correct tool schema', () => {
       const tools = (mcpServer as any).getTools();
-      const searchTutorialsTool = tools.find((tool: any) => tool.name === 'search_tutorials');
+      const searchTutorialsTool = tools.find(
+        (tool: any) => tool.name === 'search_tutorials'
+      );
 
       expect(searchTutorialsTool.inputSchema).toEqual({
         type: 'object',
@@ -228,7 +254,10 @@ describe('Search Tutorials MCP Tool', () => {
     it('should handle validation errors gracefully through executeTool', async () => {
       const invalidParams = { query: 'x' }; // Too short
 
-      const result = await (mcpServer as any).executeTool('search_tutorials', invalidParams);
+      const result = await (mcpServer as any).executeTool(
+        'search_tutorials',
+        invalidParams
+      );
 
       const errorResponse = JSON.parse(result.content[0].text);
       expect(errorResponse.error.type).toBe('VALIDATION_ERROR');
@@ -237,7 +266,10 @@ describe('Search Tutorials MCP Tool', () => {
     });
 
     it('should handle missing parameters through executeTool', async () => {
-      const result = await (mcpServer as any).executeTool('search_tutorials', {});
+      const result = await (mcpServer as any).executeTool(
+        'search_tutorials',
+        {}
+      );
 
       const errorResponse = JSON.parse(result.content[0].text);
       expect(errorResponse.error.type).toBe('VALIDATION_ERROR');
@@ -246,18 +278,26 @@ describe('Search Tutorials MCP Tool', () => {
     });
 
     it('should handle invalid argument types through executeTool', async () => {
-      const result = await (mcpServer as any).executeTool('search_tutorials', 'invalid');
+      const result = await (mcpServer as any).executeTool(
+        'search_tutorials',
+        'invalid'
+      );
 
       const errorResponse = JSON.parse(result.content[0].text);
       expect(errorResponse.error.type).toBe('VALIDATION_ERROR');
-      expect(errorResponse.error.message).toContain('Invalid request parameters');
+      expect(errorResponse.error.message).toContain(
+        'Invalid request parameters'
+      );
     });
   });
 
   describe('Response Format', () => {
     it('should return response in correct MCP tool format', async () => {
       const params = { query: 'drupal basics' };
-      const result = await (mcpServer as any).executeTool('search_tutorials', params);
+      const result = await (mcpServer as any).executeTool(
+        'search_tutorials',
+        params
+      );
 
       expect(result).toHaveProperty('content');
       expect(result.content).toHaveLength(1);
@@ -322,7 +362,7 @@ describe('Integration with MCP Server', () => {
     });
 
     expect(result.content[0].type).toBe('text');
-    
+
     const responseData = JSON.parse(result.content[0].text);
     expect(responseData.query.query).toBe('drupal testing');
     expect(responseData.query.drupal_version).toBe('11');

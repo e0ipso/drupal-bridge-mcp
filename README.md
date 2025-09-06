@@ -1,11 +1,12 @@
 # Drupalize.me MCP Server
 
-> A Model Context Protocol (MCP) server that provides AI systems with secure access to Drupalize.me's Drupal educational content through OAuth 2.0 authentication.
+> A Model Context Protocol (MCP) server that provides AI systems with secure access to
+> Drupalize.me's Drupal educational content through OAuth 2.0 authentication.
 
 ## ✨ Features
 
 - 🔐 **OAuth 2.0 Authentication** - Secure per-user authentication
-- 📚 **Content Access** - Search tutorials, courses, and documentation  
+- 📚 **Content Access** - Search tutorials, courses, and documentation
 - 🔄 **RAG-Optimized** - Content transformed for AI consumption
 - 🛡️ **Type-Safe** - Full TypeScript implementation
 - 🎯 **Subscription-Aware** - Respects user access levels
@@ -28,10 +29,12 @@ npm install @e0ipso/drupalizeme-mcp-server
 Create a `.env` file:
 
 ```env
-# Drupal OAuth Configuration
+# Drupal Site
 DRUPAL_BASE_URL=https://your-drupal-site.com
+
+# OAuth 2.0 (Required for authentication)
 OAUTH_CLIENT_ID=your-client-id
-OAUTH_CLIENT_SECRET=your-client-secret
+AUTH_ENABLED=true  # Set to false to skip authentication
 
 # Optional
 NODE_ENV=development
@@ -83,7 +86,7 @@ npm run dev
 # Run tests
 npm test
 
-# Build for production  
+# Build for production
 npm run build
 ```
 
@@ -146,6 +149,29 @@ LOG_LEVEL=debug
 # OAUTH_CLIENT_SECRET=your-client-secret
 ```
 
+### OAuth Setup in Drupal
+
+1. **Install Simple OAuth in Drupal**:
+   ```bash
+   composer require drupal/simple_oauth:^5
+   drush en simple_oauth
+   ```
+
+2. **Create OAuth Client**:
+    - Navigate to `/admin/config/services/consumer/add`
+    - Configure:
+        - Label: "MCP Server"
+        - Client ID: (auto-generated or custom)
+        - Scopes: `tutorial:read`, `user:profile`
+        - Grant type: "Authorization Code"
+        - Redirect URI: `http://127.0.0.1:3000/callback`
+
+3. **First Authentication**:
+    - On first use, the MCP server will open your browser
+    - Log into Drupal and authorize the application
+    - Tokens are encrypted and stored locally
+    - Subsequent requests use refresh tokens automatically
+
 ### Testing with MCP Client
 
 ```bash
@@ -167,10 +193,10 @@ The server exposes these MCP tools:
 
 ## 📝 Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Build for production |
-| `npm test` | Run test suite |
-| `npm run lint` | Lint code |
-| `npm run format` | Format code |
+| Command          | Description              |
+| ---------------- | ------------------------ |
+| `npm run dev`    | Start development server |
+| `npm run build`  | Build for production     |
+| `npm test`       | Run test suite           |
+| `npm run lint`   | Lint code                |
+| `npm run format` | Format code              |

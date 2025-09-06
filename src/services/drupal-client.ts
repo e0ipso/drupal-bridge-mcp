@@ -50,16 +50,30 @@ export class DrupalClient {
     this.baseUrl = new URL(config.endpoint, config.baseUrl).toString();
     this.timeout = config.timeout ?? 30000; // 30 second timeout for Drupal response times
     this.retries = config.retries ?? 3;
-    this.headers = { 
+    this.headers = {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...config.headers 
+      Accept: 'application/json',
+      ...config.headers,
     };
 
     // Initialize JSON-RPC client with HTTP transport
-    this.client = new JSONRPCClient(async (jsonRPCRequest) => {
+    this.client = new JSONRPCClient(async jsonRPCRequest => {
       return this.makeHttpRequest(jsonRPCRequest);
     });
+  }
+
+  /**
+   * Set access token for authenticated requests
+   */
+  setAccessToken(token: string): void {
+    this.headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  /**
+   * Clear access token
+   */
+  clearAccessToken(): void {
+    delete this.headers['Authorization'];
   }
 
   /**
@@ -96,7 +110,7 @@ export class DrupalClient {
               false
             );
           }
-          
+
           let jsonRPCResponse: unknown;
           try {
             jsonRPCResponse = await response.json();
@@ -111,9 +125,13 @@ export class DrupalClient {
               false
             );
           }
-          
+
           // Validate JSON-RPC response format
-          if (!jsonRPCResponse || typeof jsonRPCResponse !== 'object' || !('jsonrpc' in jsonRPCResponse)) {
+          if (
+            !jsonRPCResponse ||
+            typeof jsonRPCResponse !== 'object' ||
+            !('jsonrpc' in jsonRPCResponse)
+          ) {
             throw new IntegrationError(
               IntegrationErrorType.MALFORMED_RESPONSE,
               'Invalid JSON-RPC response: missing jsonrpc field',
@@ -142,7 +160,7 @@ export class DrupalClient {
           if (isJsonRpcErrorResponse(rpcResponse)) {
             throw parseJsonRpcError(rpcResponse, requestId);
           }
-          
+
           this.client.receive(jsonRPCResponse as any);
           return;
         } else {
@@ -154,13 +172,14 @@ export class DrupalClient {
             errorText = 'Unable to read error response';
           }
 
-          const errorType = response.status >= 500 
-            ? IntegrationErrorType.SERVER_UNAVAILABLE 
-            : response.status === 429 
-              ? IntegrationErrorType.RATE_LIMIT_ERROR
-              : response.status === 401 || response.status === 403
-                ? IntegrationErrorType.AUTHENTICATION_ERROR
-                : IntegrationErrorType.VALIDATION_ERROR;
+          const errorType =
+            response.status >= 500
+              ? IntegrationErrorType.SERVER_UNAVAILABLE
+              : response.status === 429
+                ? IntegrationErrorType.RATE_LIMIT_ERROR
+                : response.status === 401 || response.status === 403
+                  ? IntegrationErrorType.AUTHENTICATION_ERROR
+                  : IntegrationErrorType.VALIDATION_ERROR;
 
           throw new IntegrationError(
             errorType,
@@ -177,14 +196,21 @@ export class DrupalClient {
         if (error instanceof IntegrationError) {
           lastError = error;
         } else {
-          lastError = normalizeError(error, `HTTP request attempt ${attempt}/${this.retries}`, requestId);
+          lastError = normalizeError(
+            error,
+            `HTTP request attempt ${attempt}/${this.retries}`,
+            requestId
+          );
         }
-        
+
         // Don't retry on timeout/abort errors or non-retryable errors
-        if (lastError.errorType === IntegrationErrorType.TIMEOUT_ERROR || !lastError.retryable) {
+        if (
+          lastError.errorType === IntegrationErrorType.TIMEOUT_ERROR ||
+          !lastError.retryable
+        ) {
           throw lastError;
         }
-        
+
         if (attempt === this.retries) {
           break;
         }
@@ -196,7 +222,7 @@ export class DrupalClient {
     }
 
     clearTimeout(timeoutId);
-    
+
     if (lastError) {
       // Wrap the final error with retry context
       throw new IntegrationError(
@@ -204,7 +230,11 @@ export class DrupalClient {
         `Failed after ${this.retries} attempts: ${lastError.message}`,
         lastError.code,
         lastError.field,
-        { ...lastError.details, attempts: this.retries, originalError: lastError },
+        {
+          ...lastError.details,
+          attempts: this.retries,
+          originalError: lastError,
+        },
         lastError,
         false // No more retries available
       );
@@ -226,7 +256,7 @@ export class DrupalClient {
     params?: unknown
   ): Promise<TResult> {
     const requestId = this.generateRequestId();
-    
+
     try {
       const result = await this.client.request(method, params);
       return result as TResult;
@@ -235,13 +265,26 @@ export class DrupalClient {
       if (error instanceof IntegrationError) {
         throw error;
       }
-      
+
       // Handle any unexpected errors from the JSON-RPC client itself
-      const normalizedError = normalizeError(error, `JSON-RPC method: ${method}`, requestId);
-      
+      const normalizedError = normalizeError(
+        error,
+        `JSON-RPC method: ${method}`,
+        requestId
+      );
+
       // Check if this error contains JSON-RPC error information
-      if (error && typeof error === 'object' && 'code' in error && 'message' in error) {
-        const rpcError = error as { code: number; message: string; data?: unknown };
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        'message' in error
+      ) {
+        const rpcError = error as {
+          code: number;
+          message: string;
+          data?: unknown;
+        };
         const jsonRpcErrorResponse = {
           jsonrpc: '2.0' as const,
           error: {
@@ -251,10 +294,10 @@ export class DrupalClient {
           },
           id: null,
         };
-        
+
         throw parseJsonRpcError(jsonRpcErrorResponse, requestId);
       }
-      
+
       throw normalizedError;
     }
   }
@@ -342,7 +385,7 @@ export class DrupalClient {
     offset?: number;
   }): Promise<DrupalNode[]> {
     const conditions: Record<string, unknown> = {};
-    
+
     if (options?.type) conditions.type = options.type;
     if (options?.status !== undefined) conditions.status = options.status;
 

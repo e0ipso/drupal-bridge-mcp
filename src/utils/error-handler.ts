@@ -2,7 +2,11 @@
  * Centralized error handling utilities for the JSON-RPC Drupal integration
  */
 
-import { JsonRpcErrorCode, type JsonRpcError, type JsonRpcErrorResponse } from '@/types/index.js';
+import {
+  JsonRpcErrorCode,
+  type JsonRpcError,
+  type JsonRpcErrorResponse,
+} from '@/types/index.js';
 import { DrupalClientError } from '@/services/drupal-client.js';
 import { ValidationError } from '@/utils/validation.js';
 
@@ -77,33 +81,33 @@ export class IntegrationError extends Error {
   getUserFriendlyMessage(): string {
     switch (this.errorType) {
       case IntegrationErrorType.VALIDATION_ERROR:
-        return this.field 
+        return this.field
           ? `Please check the ${this.field} parameter: ${this.message}`
           : `Invalid request parameters: ${this.message}`;
-      
+
       case IntegrationErrorType.NETWORK_ERROR:
         return 'Unable to connect to the Drupal server. Please check your internet connection and try again.';
-      
+
       case IntegrationErrorType.TIMEOUT_ERROR:
         return 'The request took too long to complete. Please try again later.';
-      
+
       case IntegrationErrorType.SERVER_UNAVAILABLE:
         return 'The Drupal server is currently unavailable. Please try again later.';
-      
+
       case IntegrationErrorType.RATE_LIMIT_ERROR:
         return 'Too many requests. Please wait a moment before trying again.';
-      
+
       case IntegrationErrorType.AUTHENTICATION_ERROR:
         return 'Authentication failed. Please check your credentials and try again.';
-      
+
       case IntegrationErrorType.JSONRPC_ERROR:
       case IntegrationErrorType.DRUPAL_ERROR:
         return `Server error: ${this.message}`;
-      
+
       case IntegrationErrorType.PARSE_ERROR:
       case IntegrationErrorType.MALFORMED_RESPONSE:
         return 'Received invalid data from server. Please try again.';
-      
+
       default:
         return `An error occurred: ${this.message}`;
     }
@@ -113,10 +117,13 @@ export class IntegrationError extends Error {
 /**
  * Parse JSON-RPC error response and convert to IntegrationError
  */
-export function parseJsonRpcError(response: JsonRpcErrorResponse, requestId?: string): IntegrationError {
+export function parseJsonRpcError(
+  response: JsonRpcErrorResponse,
+  requestId?: string
+): IntegrationError {
   const { error } = response;
   const errorType = mapJsonRpcCodeToErrorType(error.code);
-  
+
   // Extract additional details from error data
   const details: Record<string, unknown> = {
     jsonrpc_code: error.code,
@@ -126,7 +133,7 @@ export function parseJsonRpcError(response: JsonRpcErrorResponse, requestId?: st
   // Handle specific error data formats
   if (error.data && typeof error.data === 'object') {
     const errorData = error.data as Record<string, unknown>;
-    
+
     if (errorData.type === 'VALIDATION_ERROR') {
       return new IntegrationError(
         IntegrationErrorType.VALIDATION_ERROR,
@@ -138,7 +145,7 @@ export function parseJsonRpcError(response: JsonRpcErrorResponse, requestId?: st
         false // Validation errors are not retryable
       );
     }
-    
+
     // Add any additional context from error data
     if (errorData.details) {
       details.server_details = errorData.details;
@@ -166,23 +173,23 @@ function mapJsonRpcCodeToErrorType(code: number): IntegrationErrorType {
   switch (code) {
     case JsonRpcErrorCode.PARSE_ERROR:
       return IntegrationErrorType.PARSE_ERROR;
-    
+
     case JsonRpcErrorCode.INVALID_REQUEST:
     case JsonRpcErrorCode.INVALID_PARAMS:
       return IntegrationErrorType.VALIDATION_ERROR;
-    
+
     case JsonRpcErrorCode.METHOD_NOT_FOUND:
       return IntegrationErrorType.DRUPAL_ERROR;
-    
+
     case JsonRpcErrorCode.INTERNAL_ERROR:
       return IntegrationErrorType.SERVER_UNAVAILABLE;
-    
+
     default:
       // Server-defined errors (-32099 to -32000)
       if (code >= -32099 && code <= -32000) {
         return IntegrationErrorType.DRUPAL_ERROR;
       }
-      
+
       return IntegrationErrorType.JSONRPC_ERROR;
   }
 }
@@ -197,10 +204,10 @@ function isRetryableJsonRpcError(code: number): boolean {
     case JsonRpcErrorCode.INVALID_PARAMS:
     case JsonRpcErrorCode.METHOD_NOT_FOUND:
       return false; // Client errors are not retryable
-    
+
     case JsonRpcErrorCode.INTERNAL_ERROR:
       return true; // Server errors may be temporary
-    
+
     default:
       // Server-defined errors may be retryable depending on context
       return code >= -32099 && code <= -32000;
@@ -210,7 +217,11 @@ function isRetryableJsonRpcError(code: number): boolean {
 /**
  * Convert various error types to IntegrationError
  */
-export function normalizeError(error: unknown, context: string, requestId?: string): IntegrationError {
+export function normalizeError(
+  error: unknown,
+  context: string,
+  requestId?: string
+): IntegrationError {
   if (error instanceof IntegrationError) {
     return error;
   }
@@ -231,7 +242,7 @@ export function normalizeError(error: unknown, context: string, requestId?: stri
     // Map HTTP status codes to appropriate error types
     const errorType = mapHttpStatusToErrorType(error.code);
     const retryable = isRetryableHttpError(error.code);
-    
+
     return new IntegrationError(
       errorType,
       error.message,
@@ -251,7 +262,10 @@ export function normalizeError(error: unknown, context: string, requestId?: stri
     // Check for specific error patterns
     if (error.name === 'AbortError' || error.message.includes('timeout')) {
       errorType = IntegrationErrorType.TIMEOUT_ERROR;
-    } else if (error.message.includes('fetch') || error.message.includes('network')) {
+    } else if (
+      error.message.includes('fetch') ||
+      error.message.includes('network')
+    ) {
       errorType = IntegrationErrorType.NETWORK_ERROR;
     } else if (error.name === 'SyntaxError' && error.message.includes('JSON')) {
       errorType = IntegrationErrorType.PARSE_ERROR;
@@ -324,29 +338,36 @@ function isRetryableHttpError(statusCode?: number): boolean {
 /**
  * Format error for MCP tool response
  */
-export function formatMcpErrorResponse(error: IntegrationError, requestId?: string): {
+export function formatMcpErrorResponse(
+  error: IntegrationError,
+  requestId?: string
+): {
   content: Array<{ type: string; text: string }>;
 } {
   const structured = error.toStructured(requestId);
-  
+
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify({
-          error: {
-            type: structured.type,
-            message: structured.userMessage,
-            details: {
-              technical_message: structured.message,
-              code: structured.code,
-              field: structured.field,
-              timestamp: structured.timestamp,
-              request_id: structured.requestId,
-              retryable: structured.retryable,
+        text: JSON.stringify(
+          {
+            error: {
+              type: structured.type,
+              message: structured.userMessage,
+              details: {
+                technical_message: structured.message,
+                code: structured.code,
+                field: structured.field,
+                timestamp: structured.timestamp,
+                request_id: structured.requestId,
+                retryable: structured.retryable,
+              },
             },
           },
-        }, null, 2),
+          null,
+          2
+        ),
       },
     ],
   };
@@ -355,16 +376,19 @@ export function formatMcpErrorResponse(error: IntegrationError, requestId?: stri
 /**
  * Format error for logging
  */
-export function formatErrorForLogging(error: IntegrationError, context?: Record<string, unknown>): {
+export function formatErrorForLogging(
+  error: IntegrationError,
+  context?: Record<string, unknown>
+): {
   level: 'error' | 'warn' | 'info';
   message: string;
   meta: Record<string, unknown>;
 } {
   const structured = error.toStructured();
-  
+
   // Determine log level based on error type
   let level: 'error' | 'warn' | 'info' = 'error';
-  
+
   if (error.errorType === IntegrationErrorType.VALIDATION_ERROR) {
     level = 'warn'; // Client errors are warnings
   } else if (error.retryable) {

@@ -5,9 +5,12 @@
 
 // Set default environment variables for testing
 process.env.NODE_ENV = 'test';
-process.env.DRUPAL_BASE_URL = process.env.DRUPAL_BASE_URL || 'http://localhost/drupal';
-process.env.DRUPAL_JSON_RPC_ENDPOINT = process.env.DRUPAL_JSON_RPC_ENDPOINT || '/jsonrpc';
-process.env.MCP_SERVER_NAME = process.env.MCP_SERVER_NAME || 'drupalizeme-mcp-server';
+process.env.DRUPAL_BASE_URL =
+  process.env.DRUPAL_BASE_URL || 'http://localhost/drupal';
+process.env.DRUPAL_JSON_RPC_ENDPOINT =
+  process.env.DRUPAL_JSON_RPC_ENDPOINT || '/jsonrpc';
+process.env.MCP_SERVER_NAME =
+  process.env.MCP_SERVER_NAME || 'drupalizeme-mcp-server';
 process.env.MCP_SERVER_VERSION = process.env.MCP_SERVER_VERSION || '1.0.0';
 
 // Increase timeout for async operations

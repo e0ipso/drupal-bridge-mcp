@@ -2,7 +2,10 @@
 
 ## Overview
 
-The Authentication Flow capability implements a secure OAuth 2.0 authentication system for per-user access to Drupalize.me tutorials through the MCP (Model Context Protocol) server. This capability provides complete OAuth 2.0 Authorization Code Grant flow with automatic token refresh, integrated with Drupal's Simple OAuth 5.x module for secure, standards-compliant authentication.
+The Authentication Flow capability implements a secure OAuth 2.0 authentication system for per-user
+access to Drupalize.me tutorials through the MCP (Model Context Protocol) server. This capability
+provides complete OAuth 2.0 Authorization Code Grant flow with automatic token refresh, integrated
+with Drupal's Simple OAuth 5.x module for secure, standards-compliant authentication.
 
 ## Core Functionality
 
@@ -29,7 +32,8 @@ The authentication system consists of several key components:
 
 ### Flow Overview
 
-The Authentication Flow implements the OAuth 2.0 Authorization Code Grant as specified in RFC 6749, providing the most secure OAuth flow for server-to-server communication:
+The Authentication Flow implements the OAuth 2.0 Authorization Code Grant as specified in RFC 6749,
+providing the most secure OAuth flow for server-to-server communication:
 
 ```mermaid
 sequenceDiagram
@@ -78,15 +82,15 @@ const tokenResponse = await fetch(`${drupalBaseUrl}/oauth/token`, {
   method: 'POST',
   headers: {
     'Content-Type': 'application/x-www-form-urlencoded',
-    'Accept': 'application/json'
+    Accept: 'application/json',
   },
   body: new URLSearchParams({
     grant_type: 'authorization_code',
     code: authorizationCode,
     client_id: clientId,
     client_secret: clientSecret,
-    redirect_uri: redirectUri
-  })
+    redirect_uri: redirectUri,
+  }),
 });
 
 const tokens = await tokenResponse.json();
@@ -97,7 +101,8 @@ const tokens = await tokenResponse.json();
 
 ### Module Configuration
 
-The Simple OAuth 5.x module provides the OAuth 2.0 server implementation for Drupal. Key configuration requirements:
+The Simple OAuth 5.x module provides the OAuth 2.0 server implementation for Drupal. Key
+configuration requirements:
 
 #### OAuth Client Registration
 
@@ -109,7 +114,7 @@ const oauthClient = {
   client_secret: 'secure-client-secret',
   redirect_uri: 'http://localhost:3000/oauth/callback',
   grant_types: ['authorization_code', 'refresh_token'],
-  scopes: ['tutorial:read', 'user:profile']
+  scopes: ['tutorial:read', 'user:profile'],
 };
 ```
 
@@ -157,14 +162,14 @@ class TokenManager {
     await this.storage.set(`tokens:${userId}`, {
       access_token: encrypted.access_token,
       refresh_token: encrypted.refresh_token,
-      expires_at: Date.now() + (tokens.expires_in * 1000),
-      created_at: Date.now()
+      expires_at: Date.now() + tokens.expires_in * 1000,
+      created_at: Date.now(),
     });
   }
 
   async getValidToken(userId) {
     const tokens = await this.storage.get(`tokens:${userId}`);
-    
+
     if (!tokens) {
       throw new AuthenticationError('No tokens found for user');
     }
@@ -190,14 +195,14 @@ class AuthManager {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json'
+          Accept: 'application/json',
         },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token: refreshToken,
           client_id: this.clientId,
-          client_secret: this.clientSecret
-        })
+          client_secret: this.clientSecret,
+        }),
       });
 
       if (!response.ok) {
@@ -206,7 +211,7 @@ class AuthManager {
 
       const newTokens = await response.json();
       await this.tokenManager.storeTokens(userId, newTokens);
-      
+
       return newTokens.access_token;
     } catch (error) {
       // Handle refresh failure - redirect to re-authentication
@@ -223,15 +228,15 @@ class AuthManager {
 // Token validation before API requests
 async validateAndRefreshToken(userId) {
   const tokens = await this.getStoredTokens(userId);
-  
+
   // Check if token expires within 5 minutes
   const expiryBuffer = 5 * 60 * 1000; // 5 minutes
   const willExpireSoon = tokens.expires_at - Date.now() < expiryBuffer;
-  
+
   if (willExpireSoon) {
     return await this.refreshToken(userId, tokens.refresh_token);
   }
-  
+
   return tokens.access_token;
 }
 ```
@@ -274,7 +279,7 @@ class KeyManager {
   validateTokenSignature(token) {
     try {
       const decoded = jwt.verify(token, this.publicKey, {
-        algorithms: ['RS256']
+        algorithms: ['RS256'],
       });
       return decoded;
     } catch (error) {
@@ -291,17 +296,17 @@ class KeyManager {
 class AuthMiddleware {
   async validateRequest(request) {
     const authHeader = request.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new AuthenticationError('Missing or invalid authorization header');
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    
+
     try {
       // Validate token signature with public key
       const payload = this.keyManager.validateTokenSignature(token);
-      
+
       // Additional validation
       if (payload.exp < Date.now() / 1000) {
         throw new AuthenticationError('Token expired');
@@ -310,7 +315,7 @@ class AuthMiddleware {
       return {
         userId: payload.sub,
         scopes: payload.scope?.split(' ') || [],
-        clientId: payload.aud
+        clientId: payload.aud,
       };
     } catch (error) {
       throw new AuthenticationError('Token validation failed');
@@ -344,17 +349,17 @@ class UserAuthManager {
     // Create new authentication session
     const authSession = await this.initiateOAuthFlow(userId);
     this.userSessions.set(userId, authSession);
-    
+
     return authSession;
   }
 
   async getAuthenticatedAPIClient(userId) {
     const token = await this.tokenManager.getValidToken(userId);
-    
+
     return new AuthenticatedAPIClient({
       baseURL: this.drupalBaseUrl,
       token: token,
-      userId: userId
+      userId: userId,
     });
   }
 }
@@ -368,18 +373,18 @@ class SecureTokenStorage {
   async storeUserTokens(userId, tokens) {
     const userKey = `auth:tokens:${userId}`;
     const encryptedTokens = await this.encrypt(tokens);
-    
+
     await this.storage.setSecure(userKey, {
       ...encryptedTokens,
       created_at: new Date().toISOString(),
-      last_used: new Date().toISOString()
+      last_used: new Date().toISOString(),
     });
   }
 
   async getUserTokens(userId) {
     const userKey = `auth:tokens:${userId}`;
     const stored = await this.storage.getSecure(userKey);
-    
+
     if (!stored) {
       return null;
     }
@@ -457,11 +462,7 @@ class AuthErrorHandler {
 
   async initiateReauth(userId) {
     const authUrl = await this.authManager.buildAuthorizationUrl(userId);
-    throw new AuthenticationError(
-      'Re-authentication required',
-      'REAUTH_REQUIRED',
-      { authUrl }
-    );
+    throw new AuthenticationError('Re-authentication required', 'REAUTH_REQUIRED', { authUrl });
   }
 }
 ```
@@ -474,14 +475,14 @@ class AuthenticatedAPIRequest {
   async makeRequest(endpoint, params, userId) {
     try {
       const token = await this.authManager.getValidToken(userId);
-      
+
       const response = await this.httpClient.request({
         url: endpoint,
         data: params,
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
       return response.data;
@@ -494,7 +495,7 @@ class AuthenticatedAPIRequest {
           return await this.makeRequest(endpoint, params, userId);
         }
       }
-      
+
       throw error;
     }
   }
@@ -518,7 +519,7 @@ sequenceDiagram
     Store->>Auth: Encrypted tokens
     Auth->>Keys: Decrypt and validate
     Keys->>Auth: Token validation result
-    
+
     alt Token valid
         Auth->>MCP: Valid access token
         MCP->>Drupal: API request with Bearer token
@@ -547,13 +548,13 @@ class MCPAuthenticatedRequest {
     while (attempt < maxRetries) {
       try {
         const token = await this.authManager.getValidToken(userId);
-        
+
         return await operation({
           headers: {
-            'Authorization': `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
+            Accept: 'application/json',
+          },
         });
       } catch (error) {
         if (error.response?.status === 401 && attempt < maxRetries - 1) {
@@ -594,9 +595,9 @@ class AuthenticatedSearchHandler {
         tags: filters.tags,
       },
       {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
       }
     );
@@ -608,9 +609,12 @@ class AuthenticatedSearchHandler {
 
 ### Integration Points with Other Capabilities
 
-- **MCP Tool Authentication**: Every tool request routed through the [MCP Server](./mcp-server-sse.md) requires token validation
-- **Search Request Authorization**: The [Basic Search](./basic-search.md) capability depends on valid OAuth tokens for Drupal API access
-- **Error Handling Coordination**: Authentication errors are managed through the [Error Handling](./error-handling.md) capability for consistent user experience
+- **MCP Tool Authentication**: Every tool request routed through the
+  [MCP Server](./mcp-server-sse.md) requires token validation
+- **Search Request Authorization**: The [Basic Search](./basic-search.md) capability depends on
+  valid OAuth tokens for Drupal API access
+- **Error Handling Coordination**: Authentication errors are managed through the
+  [Error Handling](./error-handling.md) capability for consistent user experience
 
 ## Security Best Practices
 
@@ -668,9 +672,12 @@ class AuthenticatedSearchHandler {
 
 ### Internal Dependencies
 
-- **[MCP Server SSE](./mcp-server-sse.md)**: Transport layer for authentication requests and OAuth callback handling
-- **[Basic Search](./basic-search.md)**: Provides authenticated API request context and token validation
-- **[Error Handling](./error-handling.md)**: Authentication-specific error handling and recovery patterns
+- **[MCP Server SSE](./mcp-server-sse.md)**: Transport layer for authentication requests and OAuth
+  callback handling
+- **[Basic Search](./basic-search.md)**: Provides authenticated API request context and token
+  validation
+- **[Error Handling](./error-handling.md)**: Authentication-specific error handling and recovery
+  patterns
 
 ### Cross-Capability Integration
 
@@ -678,7 +685,8 @@ The Authentication Flow provides foundational security for all other capabilitie
 
 - **MCP Server Integration**: Provides authentication middleware for all incoming MCP tool requests
 - **Search Authentication**: Validates and refreshes tokens before Basic Search API calls to Drupal
-- **Error Recovery Coordination**: Works with Error Handling to provide automatic token refresh and graceful authentication failure recovery
+- **Error Recovery Coordination**: Works with Error Handling to provide automatic token refresh and
+  graceful authentication failure recovery
 - **Session Management**: Maintains per-user authentication state across all capability interactions
 
 ## Implementation Notes

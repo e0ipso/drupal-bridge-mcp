@@ -2,7 +2,10 @@
 
 ## Overview
 
-The Error Handling capability provides comprehensive error management for the MCP (Model Context Protocol) tutorial server, focusing on simplified error messaging for production use and graceful degradation patterns. This capability ensures consistent error responses across all system components while maintaining security through limited error disclosure in non-debug mode.
+The Error Handling capability provides comprehensive error management for the MCP (Model Context
+Protocol) tutorial server, focusing on simplified error messaging for production use and graceful
+degradation patterns. This capability ensures consistent error responses across all system
+components while maintaining security through limited error disclosure in non-debug mode.
 
 ## Core Functionality
 
@@ -13,7 +16,8 @@ The Error Handling capability provides comprehensive error management for the MC
 - **Graceful Degradation**: Fallback mechanisms when components fail
 - **Error Response Formatting**: Consistent JSON error response structure
 - **Debug Mode Support**: Detailed error information for development environments
-- **Cross-Capability Integration**: Unified error handling across MCP Server, Search, and Authentication
+- **Cross-Capability Integration**: Unified error handling across MCP Server, Search, and
+  Authentication
 
 ### Error Categories
 
@@ -50,6 +54,7 @@ All errors follow a consistent JSON response format based on JSON-RPC 2.0 error 
 ### Simplified vs Debug Mode Responses
 
 #### Non-Debug Mode (Production)
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -66,6 +71,7 @@ All errors follow a consistent JSON response format based on JSON-RPC 2.0 error 
 ```
 
 #### Debug Mode (Development)
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -77,7 +83,7 @@ All errors follow a consistent JSON response format based on JSON-RPC 2.0 error 
       "details": "Connection timeout to Drupal API after 30s",
       "stack_trace": "Error: connect ETIMEDOUT...",
       "drupal_endpoint": "https://drupalize.me/jsonrpc",
-      "request_params": {"method": "content.search", "query": "blocks"}
+      "request_params": { "method": "content.search", "query": "blocks" }
     }
   },
   "id": "request-001"
@@ -96,10 +102,10 @@ class AuthenticationErrorHandler {
     switch (error.code) {
       case 'TOKEN_EXPIRED':
         // Simplified user message
-        const userMessage = this.isDebugMode ? 
-          `Access token expired at ${error.expiredAt}` :
-          'Session expired. Please authenticate again.';
-          
+        const userMessage = this.isDebugMode
+          ? `Access token expired at ${error.expiredAt}`
+          : 'Session expired. Please authenticate again.';
+
         try {
           // Attempt automatic token refresh
           const newToken = await this.authManager.refreshToken(userId);
@@ -111,9 +117,9 @@ class AuthenticationErrorHandler {
               message: userMessage,
               data: {
                 type: 'AUTHENTICATION_REQUIRED',
-                action: 'reauth_required'
-              }
-            }
+                action: 'reauth_required',
+              },
+            },
           };
         }
 
@@ -121,14 +127,14 @@ class AuthenticationErrorHandler {
         return {
           error: {
             code: -32002,
-            message: this.isDebugMode ? 
-              `Token validation failed: ${error.reason}` :
-              'Authentication failed. Please sign in again.',
+            message: this.isDebugMode
+              ? `Token validation failed: ${error.reason}`
+              : 'Authentication failed. Please sign in again.',
             data: {
               type: 'INVALID_CREDENTIALS',
-              action: 'reauth_required'
-            }
-          }
+              action: 'reauth_required',
+            },
+          },
         };
 
       case 'REFRESH_FAILED':
@@ -139,9 +145,9 @@ class AuthenticationErrorHandler {
             message: 'Session expired. Please authenticate again.',
             data: {
               type: 'AUTHENTICATION_EXPIRED',
-              action: 'reauth_required'
-            }
-          }
+              action: 'reauth_required',
+            },
+          },
         };
     }
   }
@@ -153,6 +159,7 @@ class AuthenticationErrorHandler {
 Common authentication error patterns with their simplified responses:
 
 #### 1. Missing Authorization Header
+
 ```json
 {
   "error": {
@@ -167,6 +174,7 @@ Common authentication error patterns with their simplified responses:
 ```
 
 #### 2. Malformed Bearer Token
+
 ```json
 {
   "error": {
@@ -181,6 +189,7 @@ Common authentication error patterns with their simplified responses:
 ```
 
 #### 3. Expired Access Token
+
 ```json
 {
   "error": {
@@ -211,13 +220,13 @@ class SearchErrorHandler {
       errors.push({
         field: 'query',
         code: 'REQUIRED_FIELD',
-        message: 'Search query is required'
+        message: 'Search query is required',
       });
     } else if (query.length < 2) {
       errors.push({
         field: 'query',
         code: 'MIN_LENGTH',
-        message: 'Search query must be at least 2 characters'
+        message: 'Search query must be at least 2 characters',
       });
     }
 
@@ -226,7 +235,7 @@ class SearchErrorHandler {
       errors.push({
         field: 'drupal_version',
         code: 'INVALID_VALUE',
-        message: 'Drupal version must be 9, 10, or 11'
+        message: 'Drupal version must be 9, 10, or 11',
       });
     }
 
@@ -234,17 +243,17 @@ class SearchErrorHandler {
   }
 
   formatValidationError(errors) {
-    const message = this.isDebugMode ?
-      `Validation failed: ${errors.map(e => `${e.field}: ${e.message}`).join(', ')}` :
-      'Invalid search parameters';
+    const message = this.isDebugMode
+      ? `Validation failed: ${errors.map(e => `${e.field}: ${e.message}`).join(', ')}`
+      : 'Invalid search parameters';
 
     return {
       code: -32602,
       message: message,
       data: {
         type: 'VALIDATION_ERROR',
-        errors: this.isDebugMode ? errors : undefined
-      }
+        errors: this.isDebugMode ? errors : undefined,
+      },
     };
   }
 }
@@ -253,6 +262,7 @@ class SearchErrorHandler {
 ### API Request Error Scenarios
 
 #### 1. Drupal API Timeout
+
 ```json
 {
   "error": {
@@ -268,6 +278,7 @@ class SearchErrorHandler {
 ```
 
 #### 2. Drupal API Unavailable
+
 ```json
 {
   "error": {
@@ -283,6 +294,7 @@ class SearchErrorHandler {
 ```
 
 #### 3. Invalid Search Response
+
 ```json
 {
   "error": {
@@ -309,25 +321,25 @@ class MCPProtocolErrorHandler {
       case 'INVALID_REQUEST':
         return {
           code: -32600,
-          message: this.isDebugMode ? 
-            `Invalid request format: ${error.details}` :
-            'Invalid request format',
+          message: this.isDebugMode
+            ? `Invalid request format: ${error.details}`
+            : 'Invalid request format',
           data: {
             type: 'PROTOCOL_ERROR',
-            details: 'Request format not recognized'
-          }
+            details: 'Request format not recognized',
+          },
         };
 
       case 'METHOD_NOT_FOUND':
         return {
           code: -32601,
-          message: this.isDebugMode ?
-            `Method '${request.method}' not found` :
-            'Requested operation not available',
+          message: this.isDebugMode
+            ? `Method '${request.method}' not found`
+            : 'Requested operation not available',
           data: {
             type: 'METHOD_ERROR',
-            available_methods: this.isDebugMode ? this.getAvailableMethods() : undefined
-          }
+            available_methods: this.isDebugMode ? this.getAvailableMethods() : undefined,
+          },
         };
 
       case 'TRANSPORT_ERROR':
@@ -337,8 +349,8 @@ class MCPProtocolErrorHandler {
           data: {
             type: 'TRANSPORT_ERROR',
             details: 'Communication with server interrupted',
-            action: 'retry_connection'
-          }
+            action: 'retry_connection',
+          },
         };
     }
   }
@@ -348,6 +360,7 @@ class MCPProtocolErrorHandler {
 ### SSE Transport Error Scenarios
 
 #### 1. Connection Loss
+
 ```json
 {
   "error": {
@@ -363,6 +376,7 @@ class MCPProtocolErrorHandler {
 ```
 
 #### 2. Invalid MCP Message Format
+
 ```json
 {
   "error": {
@@ -380,11 +394,15 @@ class MCPProtocolErrorHandler {
 
 ### Error Flow Between Capabilities
 
-The error handling system manages errors that span multiple capabilities, providing centralized coordination for:
+The error handling system manages errors that span multiple capabilities, providing centralized
+coordination for:
 
-- **[MCP Server](./mcp-server-sse.md) ↔ [Authentication](./authentication-flow.md)**: Protocol-level authentication errors and token validation failures
-- **[Authentication](./authentication-flow.md) ↔ [Basic Search](./basic-search.md)**: Token refresh coordination during search API calls
-- **[MCP Server](./mcp-server-sse.md) ↔ [Basic Search](./basic-search.md)**: Tool request validation and response error formatting
+- **[MCP Server](./mcp-server-sse.md) ↔ [Authentication](./authentication-flow.md)**:
+  Protocol-level authentication errors and token validation failures
+- **[Authentication](./authentication-flow.md) ↔ [Basic Search](./basic-search.md)**: Token refresh
+  coordination during search API calls
+- **[MCP Server](./mcp-server-sse.md) ↔ [Basic Search](./basic-search.md)**: Tool request
+  validation and response error formatting
 
 The error handling system manages errors that span multiple capabilities:
 
@@ -394,7 +412,7 @@ class CrossCapabilityErrorHandler {
     try {
       // Authentication error handling
       const token = await this.authManager.getValidToken(userId);
-      
+
       // Search error handling
       const validationErrors = this.searchValidator.validate(query, filters);
       if (validationErrors.length > 0) {
@@ -403,7 +421,6 @@ class CrossCapabilityErrorHandler {
 
       // Execute search with comprehensive error handling
       return await this.executeAuthenticatedSearch(query, filters, token);
-      
     } catch (error) {
       // Route error to appropriate handler
       if (error instanceof AuthenticationError) {
@@ -425,6 +442,7 @@ class CrossCapabilityErrorHandler {
 #### Authentication-Search Integration Errors
 
 **Scenario**: Search request with expired token
+
 ```json
 {
   "error": {
@@ -441,6 +459,7 @@ class CrossCapabilityErrorHandler {
 ```
 
 **Scenario**: Search request with insufficient permissions
+
 ```json
 {
   "error": {
@@ -465,13 +484,13 @@ The system implements several automatic recovery strategies:
 class ErrorRecoveryManager {
   async executeWithRecovery(operation, recoveryStrategies = []) {
     let lastError = null;
-    
+
     for (const strategy of recoveryStrategies) {
       try {
         return await operation();
       } catch (error) {
         lastError = error;
-        
+
         const recovery = await strategy.attempt(error);
         if (recovery.success) {
           // Recovery successful, update operation context
@@ -484,7 +503,7 @@ class ErrorRecoveryManager {
         // Continue to next recovery strategy
       }
     }
-    
+
     // All recovery strategies failed
     throw this.formatFinalError(lastError);
   }
@@ -498,14 +517,14 @@ const tokenRefreshRecovery = {
         const newToken = await authManager.refreshToken(error.userId);
         return {
           success: true,
-          updatedOperation: () => operation(newToken)
+          updatedOperation: () => operation(newToken),
         };
       } catch (refreshError) {
         return { success: false, shouldStop: true };
       }
     }
     return { success: false, shouldStop: false };
-  }
+  },
 };
 
 const retryRecovery = {
@@ -515,7 +534,7 @@ const retryRecovery = {
       return { success: true, updatedOperation: operation };
     }
     return { success: false, shouldStop: retryCount >= 3 };
-  }
+  },
 };
 ```
 
@@ -524,6 +543,7 @@ const retryRecovery = {
 When all recovery attempts fail, the system provides meaningful fallback responses:
 
 #### 1. Search Service Unavailable
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -538,6 +558,7 @@ When all recovery attempts fail, the system provides meaningful fallback respons
 ```
 
 #### 2. Authentication Service Down
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -567,19 +588,19 @@ class ErrorLogger {
         type: error.constructor.name,
         message: error.message,
         code: error.code,
-        stack: this.isDebugMode ? error.stack : undefined
+        stack: this.isDebugMode ? error.stack : undefined,
       },
       context: {
         userId: context.userId,
         requestId: context.requestId,
         capability: context.capability,
         method: context.method,
-        parameters: this.sanitizeParameters(context.parameters)
+        parameters: this.sanitizeParameters(context.parameters),
       },
       environment: {
         nodeVersion: process.version,
-        environment: process.env.NODE_ENV
-      }
+        environment: process.env.NODE_ENV,
+      },
     };
 
     // Log based on severity
@@ -612,8 +633,7 @@ Error verbosity is controlled through environment configuration:
 ```typescript
 class ErrorConfigManager {
   constructor() {
-    this.debugMode = process.env.NODE_ENV === 'development' || 
-                    process.env.DEBUG_ERRORS === 'true';
+    this.debugMode = process.env.NODE_ENV === 'development' || process.env.DEBUG_ERRORS === 'true';
     this.logLevel = process.env.LOG_LEVEL || 'info';
   }
 
@@ -623,8 +643,8 @@ class ErrorConfigManager {
       message: this.getSimplifiedMessage(error),
       data: {
         type: error.type,
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+      },
     };
 
     if (this.debugMode) {
@@ -634,7 +654,7 @@ class ErrorConfigManager {
         stack: error.stack,
         context: context,
         nodeVersion: process.version,
-        memoryUsage: process.memoryUsage()
+        memoryUsage: process.memoryUsage(),
       };
     }
 
@@ -643,12 +663,12 @@ class ErrorConfigManager {
 
   getSimplifiedMessage(error) {
     const simplifiedMessages = {
-      'ECONNREFUSED': 'Service unavailable',
-      'ENOTFOUND': 'Service unavailable',
-      'ETIMEDOUT': 'Request timeout',
-      'TOKEN_EXPIRED': 'Session expired',
-      'INVALID_TOKEN': 'Authentication failed',
-      'VALIDATION_ERROR': 'Invalid request parameters'
+      ECONNREFUSED: 'Service unavailable',
+      ENOTFOUND: 'Service unavailable',
+      ETIMEDOUT: 'Request timeout',
+      TOKEN_EXPIRED: 'Session expired',
+      INVALID_TOKEN: 'Authentication failed',
+      VALIDATION_ERROR: 'Invalid request parameters',
     };
 
     return simplifiedMessages[error.code] || 'An error occurred';
@@ -678,10 +698,10 @@ class ErrorHandlingSystem {
 
     // Determine appropriate handler
     const handler = this.getErrorHandler(error.type);
-    
+
     // Attempt error recovery
     const recoveryResult = await this.recoveryManager.attemptRecovery(error, context);
-    
+
     if (recoveryResult.success) {
       return recoveryResult.result;
     }
@@ -698,18 +718,25 @@ class ErrorHandlingSystem {
 
 The Error Handling capability provides centralized error management for all other capabilities:
 
-- **[MCP Server SSE](./mcp-server-sse.md)**: Protocol error handling, transport-level error management, and SSE connection error recovery
-- **[Basic Search](./basic-search.md)**: Search validation errors, query parameter validation, API request error handling, and Drupal API timeout management  
-- **[Authentication Flow](./authentication-flow.md)**: OAuth errors, token validation failures, session management errors, and automatic token refresh error handling
+- **[MCP Server SSE](./mcp-server-sse.md)**: Protocol error handling, transport-level error
+  management, and SSE connection error recovery
+- **[Basic Search](./basic-search.md)**: Search validation errors, query parameter validation, API
+  request error handling, and Drupal API timeout management
+- **[Authentication Flow](./authentication-flow.md)**: OAuth errors, token validation failures,
+  session management errors, and automatic token refresh error handling
 
 ### Cross-Capability Error Coordination
 
 This capability serves as the central error management system:
 
-- **Unified Error Format**: Provides consistent JSON-RPC error response format used by all capabilities
-- **Debug Mode Integration**: Controls error verbosity across all capabilities based on environment configuration
-- **Error Recovery Orchestration**: Coordinates error recovery strategies across capabilities (e.g., authentication retry for search failures)
-- **Logging Standardization**: Provides structured error logging format for monitoring all capability interactions
+- **Unified Error Format**: Provides consistent JSON-RPC error response format used by all
+  capabilities
+- **Debug Mode Integration**: Controls error verbosity across all capabilities based on environment
+  configuration
+- **Error Recovery Orchestration**: Coordinates error recovery strategies across capabilities (e.g.,
+  authentication retry for search failures)
+- **Logging Standardization**: Provides structured error logging format for monitoring all
+  capability interactions
 
 ### External Dependencies
 
@@ -756,4 +783,6 @@ This capability serves as the central error management system:
 - **Monitoring Integration**: Ensure error logs integrate with monitoring systems
 - **Alert Thresholds**: Configure appropriate error rate alerts for operations
 
-This capability provides the foundation for reliable error handling across the entire MCP tutorial server system, ensuring users receive helpful feedback while maintaining system security and operational visibility.
+This capability provides the foundation for reliable error handling across the entire MCP tutorial
+server system, ensuring users receive helpful feedback while maintaining system security and
+operational visibility.

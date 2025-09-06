@@ -8,7 +8,10 @@ import type { SearchToolParams, ProcessedSearchParams } from '@/types/index.js';
  * Custom validation error
  */
 export class ValidationError extends Error {
-  constructor(message: string, public readonly field?: string) {
+  constructor(
+    message: string,
+    public readonly field?: string
+  ) {
     super(message);
     this.name = 'ValidationError';
   }
@@ -26,19 +29,28 @@ export function validateSearchToolParams(args: unknown): ProcessedSearchParams {
 
   // Validate query parameter
   if (!params.query || typeof params.query !== 'string') {
-    throw new ValidationError('Invalid query: must be a non-empty string', 'query');
+    throw new ValidationError(
+      'Invalid query: must be a non-empty string',
+      'query'
+    );
   }
 
   const query = params.query.trim();
   if (query.length < 2) {
-    throw new ValidationError('Invalid query: must be at least 2 characters long', 'query');
+    throw new ValidationError(
+      'Invalid query: must be at least 2 characters long',
+      'query'
+    );
   }
 
   // Validate drupal_version parameter
   let drupal_version: string | null = null;
   if (params.drupal_version !== undefined) {
     if (typeof params.drupal_version !== 'string') {
-      throw new ValidationError('Invalid drupal_version: must be a string', 'drupal_version');
+      throw new ValidationError(
+        'Invalid drupal_version: must be a string',
+        'drupal_version'
+      );
     }
 
     const validVersions = ['9', '10', '11'];
@@ -60,7 +72,9 @@ export function validateSearchToolParams(args: unknown): ProcessedSearchParams {
     }
 
     tags = params.tags
-      .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+      .filter(
+        (tag): tag is string => typeof tag === 'string' && tag.trim().length > 0
+      )
       .map(tag => tag.trim().toLowerCase())
       .filter((tag, index, array) => array.indexOf(tag) === index); // Remove duplicates
   }
@@ -76,8 +90,8 @@ export function validateSearchToolParams(args: unknown): ProcessedSearchParams {
  * Validate string parameter with optional constraints
  */
 export function validateStringParam(
-  value: unknown, 
-  fieldName: string, 
+  value: unknown,
+  fieldName: string,
   options: {
     required?: boolean;
     minLength?: number;
@@ -105,11 +119,15 @@ export function validateStringParam(
   }
 
   if (minLength !== undefined && trimmed.length < minLength) {
-    throw new ValidationError(`${fieldName} must be at least ${minLength} characters long`);
+    throw new ValidationError(
+      `${fieldName} must be at least ${minLength} characters long`
+    );
   }
 
   if (maxLength !== undefined && trimmed.length > maxLength) {
-    throw new ValidationError(`${fieldName} must be no more than ${maxLength} characters long`);
+    throw new ValidationError(
+      `${fieldName} must be no more than ${maxLength} characters long`
+    );
   }
 
   if (pattern && !pattern.test(trimmed)) {
@@ -146,11 +164,15 @@ export function validateArrayParam<T>(
   }
 
   if (minLength !== undefined && value.length < minLength) {
-    throw new ValidationError(`${fieldName} must contain at least ${minLength} items`);
+    throw new ValidationError(
+      `${fieldName} must contain at least ${minLength} items`
+    );
   }
 
   if (maxLength !== undefined && value.length > maxLength) {
-    throw new ValidationError(`${fieldName} must contain no more than ${maxLength} items`);
+    throw new ValidationError(
+      `${fieldName} must contain no more than ${maxLength} items`
+    );
   }
 
   try {

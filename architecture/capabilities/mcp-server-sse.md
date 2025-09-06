@@ -2,16 +2,21 @@
 
 ## Overview
 
-The MCP (Model Context Protocol) Server with Server-Sent Events (SSE) transport provides the foundational communication layer between Claude Code/LLM clients and the Drupalize.me tutorial system. This capability implements a simplified HTTP-based MCP server with a dedicated `/mcp/sse` endpoint for real-time bidirectional communication.
+The MCP (Model Context Protocol) Server with Server-Sent Events (SSE) transport provides the
+foundational communication layer between Claude Code/LLM clients and the Drupalize.me tutorial
+system. This capability implements a simplified HTTP-based MCP server with a dedicated `/mcp/sse`
+endpoint for real-time bidirectional communication.
 
 ## Core Requirements
 
 ### Transport Layer
+
 - **SSE Transport**: HTTP-based MCP server with `/mcp/sse` endpoint
 - **Direct Pass-through**: No caching layer - direct API calls to understand performance baseline
 - **Real-time Communication**: Bidirectional message exchange between Claude and the tutorial system
 
 ### Integration Points
+
 - **Claude Code/LLM Client**: Receives questions and tool requests via SSE
 - **Tool Handler**: Routes MCP tool calls to appropriate handlers
 
@@ -90,14 +95,16 @@ graph TB
 ## Implementation Requirements
 
 ### Node.js Project Setup
+
 - **Runtime**: Node.js with TypeScript
 - **HTTP Server**: Express.js or similar for SSE endpoint handling
-- **Dependencies**: 
+- **Dependencies**:
   - MCP protocol libraries
   - SSE implementation packages
   - HTTP client for JSON-RPC integration
 
 ### Core Infrastructure Components
+
 - [ ] Node.js project setup with JavaScript
 - [ ] MCP server with SSE transport
 - [ ] Protocol handler for message routing
@@ -151,11 +158,13 @@ const mcpTools = [
 ## Integration Benefits
 
 ### Simplified Development Approach
+
 - **Pure Integration Testing**: Direct API calls without abstraction layers
 - **Reduced Moving Parts**: Minimal components during initial development
 - **Clear Debugging**: Straightforward request flow for troubleshooting
 
 ### Validation Approach
+
 ```typescript
 // Just pure integration testing:
 const result = await jsonrpcClient.call('content.search', params);
@@ -174,4 +183,7 @@ return result; // That's it!
 
 ## Implementation Notes
 
-This capability focuses on the foundational transport layer without optimization. The direct pass-through approach intentionally avoids caching to establish performance baselines and validate the complete integration stack. Future iterations may introduce caching, connection pooling, and other optimizations based on observed performance patterns.
+This capability focuses on the foundational transport layer without optimization. The direct
+pass-through approach intentionally avoids caching to establish performance baselines and validate
+the complete integration stack. Future iterations may introduce caching, connection pooling, and
+other optimizations based on observed performance patterns.

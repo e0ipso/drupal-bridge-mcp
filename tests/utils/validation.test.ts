@@ -42,7 +42,17 @@ describe('Validation Utilities', () => {
     it('should normalize tags by removing duplicates and filtering', () => {
       const params = {
         query: 'test query',
-        tags: ['Config', 'config', 'SETTINGS', 'settings', '', '  ', null, 123, 'valid-tag'],
+        tags: [
+          'Config',
+          'config',
+          'SETTINGS',
+          'settings',
+          '',
+          '  ',
+          null,
+          123,
+          'valid-tag',
+        ],
       };
 
       const result = validateSearchToolParams(params);
@@ -70,61 +80,89 @@ describe('Validation Utilities', () => {
     describe('Error Cases', () => {
       it('should throw ValidationError for invalid arguments type', () => {
         expect(() => validateSearchToolParams(null)).toThrow(ValidationError);
-        expect(() => validateSearchToolParams('string')).toThrow(ValidationError);
+        expect(() => validateSearchToolParams('string')).toThrow(
+          ValidationError
+        );
         expect(() => validateSearchToolParams(123)).toThrow(ValidationError);
       });
 
       it('should throw ValidationError for missing query', () => {
         expect(() => validateSearchToolParams({})).toThrow(ValidationError);
-        expect(() => validateSearchToolParams({ query: null })).toThrow(ValidationError);
-        expect(() => validateSearchToolParams({ query: undefined })).toThrow(ValidationError);
+        expect(() => validateSearchToolParams({ query: null })).toThrow(
+          ValidationError
+        );
+        expect(() => validateSearchToolParams({ query: undefined })).toThrow(
+          ValidationError
+        );
       });
 
       it('should throw ValidationError for invalid query type', () => {
-        expect(() => validateSearchToolParams({ query: 123 })).toThrow(ValidationError);
-        expect(() => validateSearchToolParams({ query: [] })).toThrow(ValidationError);
-        expect(() => validateSearchToolParams({ query: {} })).toThrow(ValidationError);
+        expect(() => validateSearchToolParams({ query: 123 })).toThrow(
+          ValidationError
+        );
+        expect(() => validateSearchToolParams({ query: [] })).toThrow(
+          ValidationError
+        );
+        expect(() => validateSearchToolParams({ query: {} })).toThrow(
+          ValidationError
+        );
       });
 
       it('should throw ValidationError for empty or too short query', () => {
-        expect(() => validateSearchToolParams({ query: '' })).toThrow(ValidationError);
-        expect(() => validateSearchToolParams({ query: '  ' })).toThrow(ValidationError);
-        expect(() => validateSearchToolParams({ query: 'a' })).toThrow(ValidationError);
+        expect(() => validateSearchToolParams({ query: '' })).toThrow(
+          ValidationError
+        );
+        expect(() => validateSearchToolParams({ query: '  ' })).toThrow(
+          ValidationError
+        );
+        expect(() => validateSearchToolParams({ query: 'a' })).toThrow(
+          ValidationError
+        );
       });
 
       it('should throw ValidationError for invalid drupal_version', () => {
         const invalidVersions = ['8', '12', 'invalid', '10.0', ''];
 
         invalidVersions.forEach(version => {
-          expect(() => validateSearchToolParams({
-            query: 'test',
-            drupal_version: version,
-          })).toThrow(ValidationError);
+          expect(() =>
+            validateSearchToolParams({
+              query: 'test',
+              drupal_version: version,
+            })
+          ).toThrow(ValidationError);
         });
       });
 
       it('should throw ValidationError for invalid drupal_version type', () => {
-        expect(() => validateSearchToolParams({
-          query: 'test',
-          drupal_version: 10,
-        })).toThrow(ValidationError);
+        expect(() =>
+          validateSearchToolParams({
+            query: 'test',
+            drupal_version: 10,
+          })
+        ).toThrow(ValidationError);
 
-        expect(() => validateSearchToolParams({
-          query: 'test',
-          drupal_version: null,
-        })).toThrow(ValidationError);
+        expect(() =>
+          validateSearchToolParams({
+            query: 'test',
+            drupal_version: null,
+          })
+        ).toThrow(ValidationError);
       });
 
       it('should throw ValidationError for invalid tags type', () => {
-        expect(() => validateSearchToolParams({
-          query: 'test',
-          tags: 'not-array',
-        })).toThrow(ValidationError);
+        expect(() =>
+          validateSearchToolParams({
+            query: 'test',
+            tags: 'not-array',
+          })
+        ).toThrow(ValidationError);
 
-        expect(() => validateSearchToolParams({
-          query: 'test',
-          tags: 123,
-        })).toThrow(ValidationError);
+        expect(() =>
+          validateSearchToolParams({
+            query: 'test',
+            tags: 123,
+          })
+        ).toThrow(ValidationError);
       });
 
       it('should provide field-specific error messages', () => {
@@ -136,7 +174,10 @@ describe('Validation Utilities', () => {
         }
 
         try {
-          validateSearchToolParams({ query: 'test', drupal_version: 'invalid' });
+          validateSearchToolParams({
+            query: 'test',
+            drupal_version: 'invalid',
+          });
         } catch (error) {
           expect(error).toBeInstanceOf(ValidationError);
           expect((error as ValidationError).field).toBe('drupal_version');
@@ -154,12 +195,16 @@ describe('Validation Utilities', () => {
 
   describe('validateStringParam', () => {
     it('should validate required string parameters', () => {
-      const result = validateStringParam('test value', 'testField', { required: true });
+      const result = validateStringParam('test value', 'testField', {
+        required: true,
+      });
       expect(result).toBe('test value');
     });
 
     it('should validate optional string parameters', () => {
-      const result = validateStringParam(undefined, 'testField', { required: false });
+      const result = validateStringParam(undefined, 'testField', {
+        required: false,
+      });
       expect(result).toBeNull();
     });
 
@@ -172,25 +217,30 @@ describe('Validation Utilities', () => {
       const result = validateStringParam('test', 'testField', { minLength: 3 });
       expect(result).toBe('test');
 
-      expect(() => validateStringParam('ab', 'testField', { minLength: 3 }))
-        .toThrow(ValidationError);
+      expect(() =>
+        validateStringParam('ab', 'testField', { minLength: 3 })
+      ).toThrow(ValidationError);
     });
 
     it('should validate maximum length', () => {
       const result = validateStringParam('test', 'testField', { maxLength: 5 });
       expect(result).toBe('test');
 
-      expect(() => validateStringParam('toolong', 'testField', { maxLength: 5 }))
-        .toThrow(ValidationError);
+      expect(() =>
+        validateStringParam('toolong', 'testField', { maxLength: 5 })
+      ).toThrow(ValidationError);
     });
 
     it('should validate pattern matching', () => {
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const result = validateStringParam('test@example.com', 'email', { pattern: emailPattern });
+      const result = validateStringParam('test@example.com', 'email', {
+        pattern: emailPattern,
+      });
       expect(result).toBe('test@example.com');
 
-      expect(() => validateStringParam('invalid-email', 'email', { pattern: emailPattern }))
-        .toThrow(ValidationError);
+      expect(() =>
+        validateStringParam('invalid-email', 'email', { pattern: emailPattern })
+      ).toThrow(ValidationError);
     });
   });
 
@@ -203,39 +253,67 @@ describe('Validation Utilities', () => {
     };
 
     it('should validate array with valid items', () => {
-      const result = validateArrayParam(['item1', 'item2'], 'testArray', stringValidator);
+      const result = validateArrayParam(
+        ['item1', 'item2'],
+        'testArray',
+        stringValidator
+      );
       expect(result).toEqual(['item1', 'item2']);
     });
 
     it('should return empty array for undefined when not required', () => {
-      const result = validateArrayParam(undefined, 'testArray', stringValidator);
+      const result = validateArrayParam(
+        undefined,
+        'testArray',
+        stringValidator
+      );
       expect(result).toEqual([]);
     });
 
     it('should validate minimum length', () => {
-      const result = validateArrayParam(['item1', 'item2'], 'testArray', stringValidator, { minLength: 2 });
+      const result = validateArrayParam(
+        ['item1', 'item2'],
+        'testArray',
+        stringValidator,
+        { minLength: 2 }
+      );
       expect(result).toEqual(['item1', 'item2']);
 
-      expect(() => validateArrayParam(['item1'], 'testArray', stringValidator, { minLength: 2 }))
-        .toThrow(ValidationError);
+      expect(() =>
+        validateArrayParam(['item1'], 'testArray', stringValidator, {
+          minLength: 2,
+        })
+      ).toThrow(ValidationError);
     });
 
     it('should validate maximum length', () => {
-      const result = validateArrayParam(['item1'], 'testArray', stringValidator, { maxLength: 1 });
+      const result = validateArrayParam(
+        ['item1'],
+        'testArray',
+        stringValidator,
+        { maxLength: 1 }
+      );
       expect(result).toEqual(['item1']);
 
-      expect(() => validateArrayParam(['item1', 'item2'], 'testArray', stringValidator, { maxLength: 1 }))
-        .toThrow(ValidationError);
+      expect(() =>
+        validateArrayParam(['item1', 'item2'], 'testArray', stringValidator, {
+          maxLength: 1,
+        })
+      ).toThrow(ValidationError);
     });
 
     it('should throw error for invalid array type', () => {
-      expect(() => validateArrayParam('not-array', 'testArray', stringValidator))
-        .toThrow(ValidationError);
+      expect(() =>
+        validateArrayParam('not-array', 'testArray', stringValidator)
+      ).toThrow(ValidationError);
     });
 
     it('should throw error for required array when undefined', () => {
-      expect(() => validateArrayParam(undefined, 'testArray', stringValidator, { required: true }))
-        .toThrow(ValidationError);
+      expect(() =>
+        validateArrayParam(undefined, 'testArray', stringValidator, {
+          required: true,
+        })
+      ).toThrow(ValidationError);
     });
   });
 
@@ -251,11 +329,15 @@ describe('Validation Utilities', () => {
     });
 
     it('should replace spaces with hyphens', () => {
-      expect(sanitizeTag('drupal configuration management')).toBe('drupal-configuration-management');
+      expect(sanitizeTag('drupal configuration management')).toBe(
+        'drupal-configuration-management'
+      );
     });
 
     it('should handle multiple spaces and hyphens', () => {
-      expect(sanitizeTag('drupal   configuration---management')).toBe('drupal-configuration-management');
+      expect(sanitizeTag('drupal   configuration---management')).toBe(
+        'drupal-configuration-management'
+      );
     });
 
     it('should remove leading and trailing hyphens', () => {
@@ -273,7 +355,9 @@ describe('Validation Utilities', () => {
     });
 
     it('should handle mixed cases correctly', () => {
-      expect(sanitizeTag('Drupal 10 Configuration API!')).toBe('drupal-10-configuration-api');
+      expect(sanitizeTag('Drupal 10 Configuration API!')).toBe(
+        'drupal-10-configuration-api'
+      );
     });
   });
 });
@@ -281,7 +365,7 @@ describe('Validation Utilities', () => {
 describe('ValidationError', () => {
   it('should create error with message only', () => {
     const error = new ValidationError('Test error message');
-    
+
     expect(error.name).toBe('ValidationError');
     expect(error.message).toBe('Test error message');
     expect(error.field).toBeUndefined();
@@ -289,7 +373,7 @@ describe('ValidationError', () => {
 
   it('should create error with message and field', () => {
     const error = new ValidationError('Test error message', 'testField');
-    
+
     expect(error.name).toBe('ValidationError');
     expect(error.message).toBe('Test error message');
     expect(error.field).toBe('testField');

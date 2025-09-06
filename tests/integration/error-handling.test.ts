@@ -2,7 +2,14 @@
  * Integration tests for error handling across the JSON-RPC Drupal integration
  */
 
-import { describe, test, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  afterEach,
+  jest,
+} from '@jest/globals';
 import {
   IntegrationError,
   IntegrationErrorType,
@@ -25,10 +32,51 @@ describe('Error Handling Integration', () => {
   let mcpServer: DrupalMcpServer;
 
   beforeEach(async () => {
-    config = await loadConfig();
+    config = {
+      drupal: {
+        baseUrl: 'http://localhost/drupal',
+        endpoint: '/jsonrpc',
+        timeout: 10000,
+        retries: 3,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+      },
+      oauth: {
+        clientId: 'test-client-id',
+        authorizationEndpoint: 'http://localhost/drupal/oauth/authorize',
+        tokenEndpoint: 'http://localhost/drupal/oauth/token',
+        redirectUri: 'http://127.0.0.1:3000/callback',
+        scopes: ['tutorial:read', 'user:profile'],
+      },
+      auth: {
+        enabled: false, // Disable auth for error handling tests
+        requiredScopes: ['tutorial:read'],
+        skipAuth: true,
+      },
+      mcp: {
+        name: 'test-drupalizeme-mcp-server',
+        version: '1.0.0-test',
+        protocolVersion: '2024-11-05',
+        capabilities: {
+          resources: { subscribe: true, listChanged: true },
+          tools: { listChanged: true },
+          prompts: { listChanged: true },
+        },
+      },
+      server: {
+        port: 3000,
+        host: '0.0.0.0',
+      },
+      logging: {
+        level: 'error' as const,
+      },
+      environment: 'test' as const,
+    };
     drupalClient = new DrupalClient(config.drupal);
     mcpServer = new DrupalMcpServer(config);
-    
+
     // Reset all mocks
     jest.clearAllMocks();
   });
@@ -96,7 +144,9 @@ describe('Error Handling Integration', () => {
 
       expect(error.errorType).toBe(IntegrationErrorType.DRUPAL_ERROR);
       expect(error.retryable).toBe(true);
-      expect(error.details?.server_details).toBe('Connection timeout after 30 seconds');
+      expect(error.details?.server_details).toBe(
+        'Connection timeout after 30 seconds'
+      );
     });
   });
 
@@ -179,10 +229,14 @@ describe('Error Handling Integration', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(IntegrationError);
         if (error instanceof IntegrationError) {
-          expect(error.errorType).toBe(IntegrationErrorType.AUTHENTICATION_ERROR);
+          expect(error.errorType).toBe(
+            IntegrationErrorType.AUTHENTICATION_ERROR
+          );
           expect(error.code).toBe(401);
           expect(error.retryable).toBe(false);
-          expect(error.getUserFriendlyMessage()).toContain('Authentication failed');
+          expect(error.getUserFriendlyMessage()).toContain(
+            'Authentication failed'
+          );
         }
       }
     });
@@ -242,14 +296,19 @@ describe('Error Handling Integration', () => {
         false
       );
 
-      const mcpResponse = formatMcpErrorResponse(validationError, 'test-req-123');
+      const mcpResponse = formatMcpErrorResponse(
+        validationError,
+        'test-req-123'
+      );
 
       expect(mcpResponse.content).toHaveLength(1);
       expect(mcpResponse.content[0].type).toBe('text');
 
       const errorData = JSON.parse(mcpResponse.content[0].text);
       expect(errorData.error.type).toBe(IntegrationErrorType.VALIDATION_ERROR);
-      expect(errorData.error.message).toContain('Please check the query parameter');
+      expect(errorData.error.message).toContain(
+        'Please check the query parameter'
+      );
       expect(errorData.error.details.field).toBe('query');
       expect(errorData.error.details.retryable).toBe(false);
       expect(errorData.error.details.request_id).toBe('test-req-123');

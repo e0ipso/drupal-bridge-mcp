@@ -3,6 +3,7 @@
  */
 
 import { DrupalClientConfig, McpServerInfo } from '@/types/index.js';
+import { OAuthConfig } from '@/auth/index.js';
 
 /**
  * Application configuration interface
@@ -10,6 +11,12 @@ import { DrupalClientConfig, McpServerInfo } from '@/types/index.js';
 export interface AppConfig {
   readonly drupal: DrupalClientConfig;
   readonly mcp: McpServerInfo;
+  readonly oauth: OAuthConfig;
+  readonly auth: {
+    readonly enabled: boolean;
+    readonly requiredScopes: string[];
+    readonly skipAuth: boolean;
+  };
   readonly server: {
     readonly port: number;
     readonly host: string;
@@ -24,9 +31,10 @@ export interface AppConfig {
  * Environment variables with defaults
  */
 const getEnvConfig = (): AppConfig => {
-  const drupalBaseUrl = process.env.DRUPAL_BASE_URL ?? 'http://localhost/drupal';
+  const drupalBaseUrl =
+    process.env.DRUPAL_BASE_URL ?? 'http://localhost/drupal';
   const drupalEndpoint = process.env.DRUPAL_JSON_RPC_ENDPOINT ?? '/jsonrpc';
-  
+
   return {
     drupal: {
       baseUrl: drupalBaseUrl,
@@ -35,8 +43,27 @@ const getEnvConfig = (): AppConfig => {
       retries: parseInt(process.env.DRUPAL_RETRIES ?? '3', 10),
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
+    },
+    oauth: {
+      clientId: process.env.OAUTH_CLIENT_ID ?? '',
+      authorizationEndpoint: `${drupalBaseUrl}/oauth/authorize`,
+      tokenEndpoint: `${drupalBaseUrl}/oauth/token`,
+      redirectUri:
+        process.env.OAUTH_REDIRECT_URI ?? 'urn:ietf:wg:oauth:2.0:oob',
+      scopes: (
+        process.env.OAUTH_SCOPES ?? 'tutorial:read user:profile tutorial:search'
+      ).split(' '),
+    },
+    auth: {
+      enabled: process.env.AUTH_ENABLED !== 'false',
+      requiredScopes: (
+        process.env.AUTH_REQUIRED_SCOPES ?? 'tutorial:read'
+      ).split(' '),
+      skipAuth:
+        process.env.AUTH_SKIP === 'true' ||
+        process.env.NODE_ENV === 'development',
     },
     mcp: {
       name: process.env.MCP_SERVER_NAME ?? 'drupalizeme-mcp-server',
@@ -62,7 +89,8 @@ const getEnvConfig = (): AppConfig => {
     logging: {
       level: (process.env.LOG_LEVEL as AppConfig['logging']['level']) ?? 'info',
     },
-    environment: (process.env.NODE_ENV as AppConfig['environment']) ?? 'development',
+    environment:
+      (process.env.NODE_ENV as AppConfig['environment']) ?? 'development',
   };
 };
 
@@ -73,19 +101,25 @@ const validateConfig = (config: AppConfig): void => {
   if (!config.drupal.baseUrl) {
     throw new Error('DRUPAL_BASE_URL is required');
   }
-  
+
   if (!config.drupal.endpoint) {
     throw new Error('DRUPAL_JSON_RPC_ENDPOINT is required');
   }
-  
+
   if (!config.mcp.name) {
     throw new Error('MCP_SERVER_NAME is required');
   }
-  
+
   if (!config.mcp.version) {
     throw new Error('MCP_SERVER_VERSION is required');
   }
-  
+
+  if (config.auth.enabled && !config.oauth.clientId) {
+    throw new Error(
+      'OAUTH_CLIENT_ID is required when authentication is enabled'
+    );
+  }
+
   if (config.server.port < 1 || config.server.port > 65535) {
     throw new Error('PORT must be between 1 and 65535');
   }
@@ -103,10 +137,10 @@ export const loadConfig = async (): Promise<AppConfig> => {
   } catch {
     // dotenv is optional, continue without it
   }
-  
+
   const config = getEnvConfig();
   validateConfig(config);
-  
+
   return config;
 };
 
