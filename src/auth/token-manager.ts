@@ -1,12 +1,12 @@
 /**
- * Token management system with AES-256 encryption and automatic refresh
+ * Simplified token management system for MVP - file-based storage without encryption
  */
 
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import jwt from 'jsonwebtoken';
-import { CryptoUtils } from './crypto-utils.js';
+import { createHash, randomBytes } from 'crypto';
 import { OAuthTokens, OAuthClient } from './oauth-client.js';
 
 export interface StoredTokens extends OAuthTokens {
@@ -25,29 +25,26 @@ export interface TokenValidationResult {
 }
 
 /**
- * Secure token manager with encryption and automatic refresh
+ * Simplified token manager for MVP - file-based storage without encryption
  */
 export class TokenManager {
   private readonly tokenDir: string;
   private readonly tokenFile: string;
-  private encryptionKey: Buffer;
+  private readonly userId: string;
   private oauthClient: OAuthClient;
 
   constructor(oauthClient: OAuthClient, userId?: string) {
     this.oauthClient = oauthClient;
     this.tokenDir = join(homedir(), '.drupalizeme-mcp');
     
-    // Generate encryption key based on user ID or create fingerprint
-    const actualUserId = userId || CryptoUtils.createUserFingerprint();
-    this.encryptionKey = CryptoUtils.generateEncryptionKey(actualUserId);
-    
-    // Use user-specific file to prevent conflicts
-    const userHash = CryptoUtils.hash(actualUserId).substring(0, 8);
+    // Create user fingerprint for file naming
+    this.userId = userId || this.createUserFingerprint();
+    const userHash = this.hash(this.userId).substring(0, 8);
     this.tokenFile = join(this.tokenDir, `tokens_${userHash}.json`);
   }
 
   /**
-   * Store tokens securely with encryption
+   * Store tokens in simple file format (MVP - no encryption)
    */
   async storeTokens(
     tokens: OAuthTokens,
@@ -68,18 +65,10 @@ export class TokenManager {
         refreshExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
       };
 
-      const encryptedData = CryptoUtils.encrypt(
-        JSON.stringify(storedTokens),
-        this.encryptionKey
-      );
-
+      // TODO: Add encryption for production deployment
       await fs.writeFile(
         this.tokenFile,
-        JSON.stringify({
-          version: '1.0',
-          data: encryptedData,
-          timestamp: Date.now(),
-        }),
+        JSON.stringify(storedTokens, null, 2),
         { mode: 0o600 }
       ); // Owner read/write only
     } catch (error) {
@@ -90,18 +79,12 @@ export class TokenManager {
   }
 
   /**
-   * Retrieve and decrypt stored tokens
+   * Retrieve stored tokens from simple file format
    */
   async getTokens(userId?: string): Promise<StoredTokens | null> {
     try {
       const fileContent = await fs.readFile(this.tokenFile, 'utf8');
-      const tokenFile = JSON.parse(fileContent);
-
-      const decryptedData = CryptoUtils.decrypt(
-        tokenFile.data,
-        this.encryptionKey
-      );
-      const tokens: StoredTokens = JSON.parse(decryptedData);
+      const tokens: StoredTokens = JSON.parse(fileContent);
 
       // Validate user ID if provided
       if (userId && tokens.userId !== userId) {
@@ -287,5 +270,22 @@ export class TokenManager {
         throw error;
       }
     }
+  }
+
+  /**
+   * Create secure fingerprint for user identification (simplified from CryptoUtils)
+   */
+  private createUserFingerprint(): string {
+    const hostname = process.env.HOSTNAME || 'unknown';
+    const username = process.env.USER || process.env.USERNAME || 'unknown';
+    const timestamp = Date.now().toString();
+    return this.hash(`${hostname}:${username}:${timestamp}`).substring(0, 16);
+  }
+
+  /**
+   * Hash data using SHA-256 (simplified from CryptoUtils)
+   */
+  private hash(data: string): string {
+    return createHash('sha256').update(data).digest('hex');
   }
 }

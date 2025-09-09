@@ -1,182 +1,77 @@
 /**
- * Authentication error definitions for MCP protocol
+ * Simplified authentication error definitions for MVP
  */
 
 /**
- * Base authentication error class
+ * Base MCP error class - simplified for MVP
  */
-export class AuthError extends Error {
-  public readonly code: string;
-  public readonly mcpErrorCode: number;
+export class MCPError extends Error {
+  public readonly statusCode: number;
 
-  constructor(message: string, code: string, mcpErrorCode: number = -32000) {
+  constructor(message: string, statusCode: number = 500) {
     super(message);
-    this.name = 'AuthError';
-    this.code = code;
-    this.mcpErrorCode = mcpErrorCode;
+    this.name = 'MCPError';
+    this.statusCode = statusCode;
   }
 
   /**
-   * Convert to MCP error format
+   * Convert to MCP error format (simplified)
    */
   toMcpError(): {
     code: number;
     message: string;
-    data?: {
-      errorCode: string;
-      details?: string;
-    };
   } {
     return {
-      code: this.mcpErrorCode,
+      code: this.statusCode === 401 ? -32001 : -32000,
       message: this.message,
-      data: {
-        errorCode: this.code,
-        details: this.stack,
-      },
     };
   }
 }
 
 /**
- * Authentication required error
+ * Authentication error - covers all auth-related issues
  */
-export class AuthenticationRequiredError extends AuthError {
-  constructor(message: string = 'Authentication required') {
-    super(message, 'AUTHENTICATION_REQUIRED', -32001);
-  }
-}
-
-/**
- * Invalid token error
- */
-export class InvalidTokenError extends AuthError {
-  constructor(message: string = 'Invalid or expired token') {
-    super(message, 'INVALID_TOKEN', -32002);
-  }
-}
-
-/**
- * Insufficient scopes error
- */
-export class InsufficientScopesError extends AuthError {
-  public readonly requiredScopes: string[];
-  public readonly userScopes: string[];
-
-  constructor(requiredScopes: string[], userScopes: string[] = []) {
-    const message = `Insufficient scopes. Required: ${requiredScopes.join(', ')}, Have: ${userScopes.join(', ')}`;
-    super(message, 'INSUFFICIENT_SCOPES', -32003);
-    this.requiredScopes = requiredScopes;
-    this.userScopes = userScopes;
-  }
-
-  override toMcpError(): {
-    code: number;
-    message: string;
-    data?: {
-      errorCode: string;
-      requiredScopes: string[];
-      userScopes: string[];
-      details?: string;
-    };
-  } {
-    return {
-      code: this.mcpErrorCode,
-      message: this.message,
-      data: {
-        errorCode: this.code,
-        requiredScopes: this.requiredScopes,
-        userScopes: this.userScopes,
-        details: this.stack,
-      },
-    };
-  }
-}
-
-/**
- * OAuth flow error
- */
-export class OAuthFlowError extends AuthError {
-  public readonly oauthError?: string;
-  public readonly oauthErrorDescription?: string;
-
-  constructor(
-    message: string,
-    oauthError?: string,
-    oauthErrorDescription?: string
-  ) {
-    super(message, 'OAUTH_FLOW_ERROR', -32004);
-    this.oauthError = oauthError;
-    this.oauthErrorDescription = oauthErrorDescription;
-  }
-
-  override toMcpError(): {
-    code: number;
-    message: string;
-    data?: {
-      errorCode: string;
-      oauthError?: string;
-      oauthErrorDescription?: string;
-      details?: string;
-    };
-  } {
-    return {
-      code: this.mcpErrorCode,
-      message: this.message,
-      data: {
-        errorCode: this.code,
-        oauthError: this.oauthError,
-        oauthErrorDescription: this.oauthErrorDescription,
-        details: this.stack,
-      },
-    };
-  }
-}
-
-/**
- * Token refresh error
- */
-export class TokenRefreshError extends AuthError {
-  constructor(message: string = 'Failed to refresh token') {
-    super(message, 'TOKEN_REFRESH_ERROR', -32005);
-  }
-}
-
-/**
- * Session error
- */
-export class SessionError extends AuthError {
+export class AuthError extends MCPError {
   constructor(message: string) {
-    super(message, 'SESSION_ERROR', -32006);
+    super(message, 401);
+    this.name = 'AuthError';
   }
 }
 
 /**
- * Configuration error
+ * Validation error - for input validation issues
  */
-export class AuthConfigError extends AuthError {
+export class ValidationError extends MCPError {
   constructor(message: string) {
-    super(message, 'AUTH_CONFIG_ERROR', -32007);
+    super(message, 400);
+    this.name = 'ValidationError';
   }
 }
 
+// Legacy error class aliases for backward compatibility (removed complexity)
+export const AuthenticationRequiredError = AuthError;
+export const InvalidTokenError = AuthError;
+export const InsufficientScopesError = AuthError;
+export const OAuthFlowError = AuthError;
+export const TokenRefreshError = AuthError;
+export const SessionError = AuthError;
+export const AuthConfigError = AuthError;
+
 /**
- * Utility function to create MCP error response
+ * Simplified utility function to create MCP error response
  */
 export function createMcpErrorResponse(
   id: string | number | null,
-  error: AuthError | Error,
-  code?: number
+  error: MCPError | Error
 ): {
   jsonrpc: '2.0';
   id: string | number | null;
   error: {
     code: number;
     message: string;
-    data?: any;
   };
 } {
-  if (error instanceof AuthError) {
+  if (error instanceof MCPError) {
     return {
       jsonrpc: '2.0',
       id,
@@ -188,41 +83,32 @@ export function createMcpErrorResponse(
     jsonrpc: '2.0',
     id,
     error: {
-      code: code || -32000,
+      code: -32000,
       message: error.message,
-      data: {
-        errorCode: 'UNKNOWN_ERROR',
-        details: error.stack,
-      },
     },
   };
 }
 
 /**
- * Check if error is an authentication error
+ * Check if error is an authentication error (simplified)
  */
 export function isAuthError(error: any): error is AuthError {
   return error instanceof AuthError;
 }
 
 /**
- * Extract MCP error details from any error
+ * Extract MCP error details from any error (simplified)
  */
 export function extractMcpErrorDetails(error: any): {
   code: number;
   message: string;
-  data?: any;
 } {
-  if (error instanceof AuthError) {
+  if (error instanceof MCPError) {
     return error.toMcpError();
   }
 
   return {
     code: -32000,
     message: error?.message || 'Unknown error',
-    data: {
-      errorCode: 'UNKNOWN_ERROR',
-      details: error?.stack,
-    },
   };
 }

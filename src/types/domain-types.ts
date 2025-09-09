@@ -1,6 +1,11 @@
 /**
- * Drupal-specific type definitions for JSON-RPC communication
+ * Domain-specific type definitions (Drupal + Auth)
+ * Consolidated for MVP simplification
  */
+
+// =============================================================================
+// Drupal API Types
+// =============================================================================
 
 /**
  * Drupal entity base structure
@@ -136,4 +141,85 @@ export interface DrupalClientConfig {
   readonly timeout?: number;
   readonly retries?: number;
   readonly headers?: Record<string, string>;
+}
+
+// =============================================================================
+// Authentication Types (consolidated from auth modules)
+// =============================================================================
+
+/**
+ * OAuth 2.0 configuration
+ */
+export interface OAuthConfig {
+  clientId: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  redirectUri: string;
+  scopes: string[];
+}
+
+/**
+ * OAuth 2.0 token set
+ */
+export interface OAuthTokens {
+  accessToken: string;
+  refreshToken?: string;
+  tokenType: string;
+  expiresIn?: number;
+  scope?: string;
+}
+
+/**
+ * PKCE challenge for OAuth flow
+ */
+export interface PKCEChallenge {
+  codeVerifier: string;
+  codeChallenge: string;
+  codeChallengeMethod: 'S256';
+}
+
+/**
+ * Stored tokens with metadata (from token-manager.ts)
+ */
+export interface StoredTokens extends OAuthTokens {
+  expiresAt?: number;
+  userId: string;
+  scopes: string[];
+  refreshExpiresAt?: number;
+}
+
+/**
+ * Token validation result (from token-manager.ts)
+ */
+export interface TokenValidationResult {
+  isValid: boolean;
+  isExpired: boolean;
+  needsRefresh: boolean;
+  scopes?: string[];
+  userId?: string;
+}
+
+/**
+ * Authentication context (from auth-middleware.ts)
+ */
+export interface AuthContext {
+  isAuthenticated: boolean;
+  userId?: string;
+  accessToken?: string;
+  scopes?: string[];
+  expiresAt?: number;
+}
+
+// AuthMiddlewareConfig removed - simplified for MVP, use inline configuration
+
+/**
+ * User session (from session-store.ts)
+ */
+export interface Session {
+  id: string;
+  userId: string;
+  authContext: AuthContext;
+  createdAt: number;
+  lastAccessedAt: number;
+  expiresAt?: number;
 }

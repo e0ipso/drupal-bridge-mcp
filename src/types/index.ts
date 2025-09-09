@@ -1,7 +1,6 @@
 /**
- * Centralized type definitions export
+ * Centralized type definitions export (simplified for MVP)
  */
 
-export * from './jsonrpc.js';
-export * from './drupal.js';
-export * from './mcp.js';
+export * from './core-types.js';
+export * from './domain-types.js';

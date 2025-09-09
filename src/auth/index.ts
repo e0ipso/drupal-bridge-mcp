@@ -13,7 +13,7 @@ export {
   type StoredTokens,
   type TokenValidationResult,
 } from './token-manager.js';
-export { CryptoUtils } from './crypto-utils.js';
+// CryptoUtils removed for MVP simplification
 export {
   AuthMiddleware,
   type AuthContext,
