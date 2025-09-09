@@ -2,8 +2,8 @@
  * Configuration management for the MCP server
  */
 
-import { DrupalClientConfig, McpServerInfo } from '@/types/index.js';
-import { OAuthConfig } from '@/auth/index.js';
+import type { DrupalClientConfig, McpServerInfo } from '@/types/index.js';
+import type { OAuthConfig } from '@/auth/index.js';
 
 /**
  * Application configuration interface

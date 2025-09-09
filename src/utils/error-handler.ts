@@ -2,11 +2,7 @@
  * Simplified error handling utilities for MVP
  */
 
-import {
-  JsonRpcErrorCode,
-  type JsonRpcError,
-  type JsonRpcErrorResponse,
-} from '@/types/index.js';
+import { JsonRpcErrorCode, type JsonRpcErrorResponse } from '@/types/index.js';
 import { DrupalClientError } from '@/services/drupal-client.js';
 import { ValidationError } from '@/utils/validation.js';
 
@@ -21,10 +17,10 @@ export enum IntegrationErrorType {
   TIMEOUT_ERROR = 'TIMEOUT_ERROR',
   AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
   // Legacy compatibility (mapped to other types)
-  PARSE_ERROR = 'JSONRPC_ERROR',
-  RATE_LIMIT_ERROR = 'NETWORK_ERROR', 
-  SERVER_UNAVAILABLE = 'DRUPAL_ERROR',
-  MALFORMED_RESPONSE = 'JSONRPC_ERROR',
+  PARSE_ERROR = 'PARSE_ERROR',
+  RATE_LIMIT_ERROR = 'RATE_LIMIT_ERROR',
+  SERVER_UNAVAILABLE = 'SERVER_UNAVAILABLE',
+  MALFORMED_RESPONSE = 'MALFORMED_RESPONSE',
 }
 
 /**
@@ -32,7 +28,7 @@ export enum IntegrationErrorType {
  */
 export class IntegrationError extends Error {
   public readonly retryable: boolean = false; // Simplified: most errors are not retryable in MVP
-  
+
   constructor(
     public readonly errorType: IntegrationErrorType,
     message: string,
@@ -62,7 +58,13 @@ export class IntegrationError extends Error {
         return 'Authentication failed. Please check your credentials.';
       case IntegrationErrorType.JSONRPC_ERROR:
       case IntegrationErrorType.DRUPAL_ERROR:
+      case IntegrationErrorType.SERVER_UNAVAILABLE:
         return `Server error: ${this.message}`;
+      case IntegrationErrorType.PARSE_ERROR:
+      case IntegrationErrorType.MALFORMED_RESPONSE:
+        return 'Received invalid data from server. Please try again.';
+      case IntegrationErrorType.RATE_LIMIT_ERROR:
+        return 'Too many requests. Please wait a moment before trying again.';
       default:
         return `An error occurred: ${this.message}`;
     }
@@ -74,11 +76,11 @@ export class IntegrationError extends Error {
  */
 export function parseJsonRpcError(
   response: JsonRpcErrorResponse,
-  requestId?: string
+  _requestId?: string
 ): IntegrationError {
   const { error } = response;
   const errorType = mapJsonRpcCodeToErrorType(error.code);
-  
+
   return new IntegrationError(
     errorType,
     error.message,
@@ -108,9 +110,9 @@ function mapJsonRpcCodeToErrorType(code: number): IntegrationErrorType {
  * Simplified error normalization (supports legacy signatures)
  */
 export function normalizeError(
-  error: unknown, 
-  context?: string, 
-  requestId?: string
+  error: unknown,
+  context?: string,
+  _requestId?: string
 ): IntegrationError {
   if (error instanceof IntegrationError) {
     return error;
@@ -132,7 +134,8 @@ export function normalizeError(
     return new IntegrationError(
       IntegrationErrorType.DRUPAL_ERROR,
       error.message,
-      (error as any).code || (error as any).statusCode,
+      error.code ||
+        (error as DrupalClientError & { statusCode?: number }).statusCode,
       undefined,
       { context },
       error,
@@ -157,7 +160,7 @@ export function normalizeError(
  * Simplified MCP error response formatting (supports legacy signature)
  */
 export function formatMcpErrorResponse(
-  error: IntegrationError, 
+  error: IntegrationError,
   requestId?: string
 ): {
   content: Array<{ type: string; text: string }>;
@@ -199,7 +202,10 @@ export function formatErrorForLogging(
   message: string;
   meta: Record<string, unknown>;
 } {
-  const level = error.errorType === IntegrationErrorType.VALIDATION_ERROR ? 'warn' : 'error';
+  const level =
+    error.errorType === IntegrationErrorType.VALIDATION_ERROR
+      ? 'warn'
+      : 'error';
 
   return {
     level,

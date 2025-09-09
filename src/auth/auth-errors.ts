@@ -92,14 +92,14 @@ export function createMcpErrorResponse(
 /**
  * Check if error is an authentication error (simplified)
  */
-export function isAuthError(error: any): error is AuthError {
+export function isAuthError(error: unknown): error is AuthError {
   return error instanceof AuthError;
 }
 
 /**
  * Extract MCP error details from any error (simplified)
  */
-export function extractMcpErrorDetails(error: any): {
+export function extractMcpErrorDetails(error: unknown): {
   code: number;
   message: string;
 } {
@@ -109,6 +109,6 @@ export function extractMcpErrorDetails(error: any): {
 
   return {
     code: -32000,
-    message: error?.message || 'Unknown error',
+    message: (error as Error)?.message ?? 'Unknown error',
   };
 }

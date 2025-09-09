@@ -7,7 +7,8 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import jwt from 'jsonwebtoken';
 import { TokenManager, StoredTokens } from '../../src/auth/token-manager.js';
-import { OAuthClient, OAuthTokens } from '../../src/auth/oauth-client.js';
+import type { OAuthTokens } from '../../src/auth/oauth-client.js';
+import { OAuthClient } from '../../src/auth/oauth-client.js';
 // CryptoUtils removed for MVP simplification
 // import { CryptoUtils } from '../../src/auth/crypto-utils.js';
 
@@ -72,7 +73,7 @@ describe('Token Management Integration Tests', () => {
     test('should store tokens in plain JSON format (MVP simplified)', async () => {
       // Create a fresh token manager for this specific test
       const testTokenManager = new TokenManager(oauthClient, 'plain-test-user');
-      
+
       const mockTokens: OAuthTokens = {
         accessToken: 'test-access-token',
         refreshToken: 'test-refresh-token',
@@ -86,7 +87,7 @@ describe('Token Management Integration Tests', () => {
       ]);
 
       // Read raw file content - use the specific token file for this user
-      const tokenFile = (testTokenManager as any).tokenFile;
+      const { tokenFile } = testTokenManager as any;
       const rawContent = await fs.readFile(tokenFile, 'utf8');
       const tokenData = JSON.parse(rawContent);
 
@@ -146,8 +147,8 @@ describe('Token Management Integration Tests', () => {
         'tutorial:read',
       ]);
 
-      const tokenDir = (tokenManager as any).tokenDir;
-      
+      const { tokenDir } = tokenManager as any;
+
       try {
         // Check directory permissions (owner only)
         const dirStats = await fs.stat(tokenDir);
@@ -156,12 +157,17 @@ describe('Token Management Integration Tests', () => {
 
         // Find the actual token file and check file permissions (owner only)
         const files = await fs.readdir(tokenDir);
-        const tokenFile = join(tokenDir, files.find(f => f.startsWith('tokens_')) || 'tokens.json');
+        const tokenFile = join(
+          tokenDir,
+          files.find(f => f.startsWith('tokens_')) || 'tokens.json'
+        );
         const fileStats = await fs.stat(tokenFile);
         const fileMode = fileStats.mode & parseInt('777', 8);
         expect(fileMode).toBe(parseInt('600', 8)); // Owner read/write only
       } catch (error) {
-        throw new Error(`File permissions test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `File permissions test failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     });
   });

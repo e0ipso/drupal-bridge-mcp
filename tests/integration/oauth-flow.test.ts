@@ -2,13 +2,11 @@
  * OAuth flow integration tests
  */
 
-import {
-  OAuthClient,
-  PKCEChallenge,
-  OAuthTokens,
-} from '../../src/auth/oauth-client.js';
-import { createServer, Server } from 'http';
-import { AddressInfo } from 'net';
+import type { OAuthTokens } from '../../src/auth/oauth-client.js';
+import { OAuthClient, PKCEChallenge } from '../../src/auth/oauth-client.js';
+import type { Server } from 'http';
+import { createServer } from 'http';
+import type { AddressInfo } from 'net';
 
 describe('OAuth Flow Integration Tests', () => {
   let mockOAuthServer: Server;
@@ -176,9 +174,7 @@ describe('OAuth Flow Integration Tests', () => {
       setMockTokenResponse(mockTokens);
 
       // Mock the authorize method directly
-      jest
-        .spyOn(oauthClient, 'authorize')
-        .mockResolvedValue(mockTokens);
+      jest.spyOn(oauthClient, 'authorize').mockResolvedValue(mockTokens);
 
       const tokens = await oauthClient.authorize();
       expect(tokens.accessToken).toBe(mockTokens.accessToken);

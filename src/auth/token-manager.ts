@@ -6,8 +6,8 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import jwt from 'jsonwebtoken';
-import { createHash, randomBytes } from 'crypto';
-import { OAuthTokens, OAuthClient } from './oauth-client.js';
+import { createHash } from 'crypto';
+import type { OAuthTokens, OAuthClient } from './oauth-client.js';
 
 export interface StoredTokens extends OAuthTokens {
   expiresAt?: number;
@@ -31,12 +31,12 @@ export class TokenManager {
   private readonly tokenDir: string;
   private readonly tokenFile: string;
   private readonly userId: string;
-  private oauthClient: OAuthClient;
+  private readonly oauthClient: OAuthClient;
 
   constructor(oauthClient: OAuthClient, userId?: string) {
     this.oauthClient = oauthClient;
     this.tokenDir = join(homedir(), '.drupalizeme-mcp');
-    
+
     // Create user fingerprint for file naming
     this.userId = userId || this.createUserFingerprint();
     const userHash = this.hash(this.userId).substring(0, 8);
@@ -93,7 +93,11 @@ export class TokenManager {
 
       return tokens;
     } catch (error) {
-      if ((error as any).code === 'ENOENT') {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
         return null; // File doesn't exist
       }
       throw new Error(
@@ -134,7 +138,7 @@ export class TokenManager {
         await this.storeTokens(refreshedTokens, tokens.userId, tokens.scopes);
 
         return refreshedTokens.accessToken;
-      } catch (error) {
+      } catch {
         // Refresh failed - tokens are invalid
         await this.clearTokens();
         return null;
@@ -153,7 +157,7 @@ export class TokenManager {
   ): Promise<TokenValidationResult> {
     try {
       // Decode JWT without verification to get basic info
-      const decoded = jwt.decode(accessToken) as any;
+      const decoded = jwt.decode(accessToken) as jwt.JwtPayload | null;
 
       if (!decoded || typeof decoded !== 'object') {
         return { isValid: false, isExpired: true, needsRefresh: true };
@@ -179,10 +183,11 @@ export class TokenManager {
         isValid: !isExpired && scopesValid,
         isExpired,
         needsRefresh,
-        scopes: decoded.scope ? decoded.scope.split(' ') : [],
-        userId: decoded.sub,
+        scopes:
+          typeof decoded.scope === 'string' ? decoded.scope.split(' ') : [],
+        userId: decoded.sub as string,
       };
-    } catch (error) {
+    } catch {
       return { isValid: false, isExpired: true, needsRefresh: true };
     }
   }
@@ -201,7 +206,7 @@ export class TokenManager {
         audience: process.env.OAUTH_CLIENT_ID,
       });
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -214,7 +219,13 @@ export class TokenManager {
       await fs.unlink(this.tokenFile);
     } catch (error) {
       // Ignore if file doesn't exist
-      if ((error as any).code !== 'ENOENT') {
+      if (
+        !(
+          error instanceof Error &&
+          'code' in error &&
+          (error as NodeJS.ErrnoException).code === 'ENOENT'
+        )
+      ) {
         throw error;
       }
     }
@@ -266,7 +277,13 @@ export class TokenManager {
     try {
       await fs.mkdir(this.tokenDir, { recursive: true, mode: 0o700 }); // Owner access only
     } catch (error) {
-      if ((error as any).code !== 'EEXIST') {
+      if (
+        !(
+          error instanceof Error &&
+          'code' in error &&
+          (error as NodeJS.ErrnoException).code === 'EEXIST'
+        )
+      ) {
         throw error;
       }
     }

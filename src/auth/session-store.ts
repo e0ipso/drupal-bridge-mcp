@@ -2,7 +2,8 @@
  * User session management for MCP authentication
  */
 
-import { AuthContext } from './auth-middleware.js';
+import { randomBytes } from 'crypto';
+import type { AuthContext } from './auth-middleware.js';
 
 export interface Session {
   id: string;
@@ -17,7 +18,7 @@ export interface Session {
  * In-memory session store for MCP user sessions
  */
 export class SessionStore {
-  private sessions: Map<string, Session> = new Map();
+  private readonly sessions: Map<string, Session> = new Map();
   private readonly defaultTtl: number = 24 * 60 * 60 * 1000; // 24 hours
 
   /**
@@ -213,7 +214,6 @@ export class SessionStore {
    * Generate secure session ID
    */
   private generateSessionId(): string {
-    const { randomBytes } = require('crypto');
     return randomBytes(32).toString('hex');
   }
 

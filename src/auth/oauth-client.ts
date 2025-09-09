@@ -3,7 +3,8 @@
  */
 
 import { createHash, randomBytes } from 'crypto';
-import { createServer, Server } from 'http';
+import type { Server } from 'http';
+import { createServer } from 'http';
 import { parse } from 'url';
 
 export interface OAuthConfig {
@@ -32,8 +33,8 @@ export interface PKCEChallenge {
  * OAuth 2.0 client with PKCE support for terminal environments
  */
 export class OAuthClient {
-  private config: OAuthConfig;
-  private server?: Server;
+  private readonly config: OAuthConfig;
+  private readonly server?: Server;
 
   constructor(config: OAuthConfig) {
     this.config = config;
@@ -99,8 +100,10 @@ export class OAuthClient {
         try {
           const { default: open } = await import('open');
           await open(authUrl);
-        } catch (error) {
-          console.log('Browser auto-open failed. Please manually open the URL above.');
+        } catch {
+          console.log(
+            'Browser auto-open failed. Please manually open the URL above.'
+          );
         }
 
         const authCode = await this.waitForAuthCode(server);
@@ -173,7 +176,7 @@ export class OAuthClient {
             res.end(
               '<html><body><h1>Authorization Successful</h1><p>You can close this window.</p></body></html>'
             );
-            (server as any).authCode = code;
+            (server as typeof server & { authCode?: string }).authCode = code;
             server.close();
           }
         } else {
@@ -217,7 +220,7 @@ export class OAuthClient {
 
       server.on('close', () => {
         clearTimeout(timeout);
-        const authCode = (server as any).authCode;
+        const { authCode } = server as typeof server & { authCode?: string };
         if (authCode) {
           resolve(authCode as string);
         } else {
@@ -255,7 +258,7 @@ export class OAuthClient {
     code: string,
     codeVerifier: string
   ): Promise<OAuthTokens> {
-    const fetch = globalThis.fetch || require('node-fetch');
+    const fetch = globalThis.fetch || (await import('node-fetch')).default;
 
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -279,7 +282,7 @@ export class OAuthClient {
       throw new Error(`Token exchange failed: ${response.status} ${errorText}`);
     }
 
-    const tokenData = (await response.json()) as any;
+    const tokenData = await response.json();
 
     return {
       accessToken: tokenData.access_token,
@@ -294,7 +297,7 @@ export class OAuthClient {
    * Refresh access token using refresh token
    */
   async refreshToken(refreshToken: string): Promise<OAuthTokens> {
-    const fetch = globalThis.fetch || require('node-fetch');
+    const fetch = globalThis.fetch || (await import('node-fetch')).default;
 
     const body = new URLSearchParams({
       grant_type: 'refresh_token',
@@ -316,7 +319,7 @@ export class OAuthClient {
       throw new Error(`Token refresh failed: ${response.status} ${errorText}`);
     }
 
-    const tokenData = (await response.json()) as any;
+    const tokenData = await response.json();
 
     return {
       accessToken: tokenData.access_token,

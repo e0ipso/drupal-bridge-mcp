@@ -17,7 +17,6 @@ import type {
   McpResource,
   McpTool,
   McpPrompt,
-  SearchToolParams,
   ProcessedSearchParams,
   SearchTutorialsResponse,
   TutorialSearchResult,
@@ -38,7 +37,6 @@ import {
   SessionStore,
   AuthenticationRequiredError,
   createMcpErrorResponse,
-  type AuthContext,
 } from '@/auth/index.js';
 
 /**
@@ -60,7 +58,11 @@ export class DrupalMcpServer {
         version: config.mcp.version,
       },
       {
-        capabilities: config.mcp.capabilities as any,
+        capabilities: {
+          resources: config.mcp.capabilities.resources,
+          tools: config.mcp.capabilities.tools,
+          prompts: config.mcp.capabilities.prompts,
+        },
       }
     );
 
@@ -156,9 +158,7 @@ export class DrupalMcpServer {
   /**
    * Read a specific resource
    */
-  private async readResource(
-    uri: string
-  ): Promise<{
+  private async readResource(uri: string): Promise<{
     contents: Array<{ uri: string; mimeType?: string; text?: string }>;
   }> {
     try {
@@ -860,12 +860,12 @@ export class DrupalMcpServer {
 
     if (firstContentLine) {
       return firstContentLine.length > 200
-        ? firstContentLine.substring(0, 197) + '...'
+        ? `${firstContentLine.substring(0, 197)}...`
         : firstContentLine;
     }
 
     // Fallback: return first 200 characters
-    return content.substring(0, 197) + '...';
+    return `${content.substring(0, 197)}...`;
   }
 
   /**
@@ -976,7 +976,7 @@ export class DrupalMcpServer {
   /**
    * Connect the server to a transport
    */
-  async connect(transport: any): Promise<void> {
+  async connect(transport: { connect(): Promise<void> }): Promise<void> {
     await this.server.connect(transport);
   }
 

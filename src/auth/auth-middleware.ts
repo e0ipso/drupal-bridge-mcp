@@ -2,8 +2,8 @@
  * MCP authentication middleware
  */
 
-import { TokenManager } from './token-manager.js';
-import { OAuthClient } from './oauth-client.js';
+import type { TokenManager } from './token-manager.js';
+import type { OAuthClient } from './oauth-client.js';
 
 export interface AuthContext {
   isAuthenticated: boolean;
@@ -23,7 +23,7 @@ export interface AuthMiddlewareConfig {
  * Authentication middleware for MCP requests
  */
 export class AuthMiddleware {
-  private config: AuthMiddlewareConfig;
+  private readonly config: AuthMiddlewareConfig;
 
   constructor(config: AuthMiddlewareConfig) {
     this.config = config;
@@ -117,7 +117,13 @@ export class AuthMiddleware {
    */
   async getAuthStatus(userId?: string): Promise<{
     isAuthenticated: boolean;
-    tokenInfo?: any;
+    tokenInfo?: {
+      isValid: boolean;
+      isExpired: boolean;
+      needsRefresh: boolean;
+      scopes?: string[];
+      userId?: string;
+    };
     needsAuthentication?: boolean;
   }> {
     const hasTokens = await this.config.tokenManager.hasValidTokens(
@@ -142,7 +148,7 @@ export class AuthMiddleware {
   /**
    * Logout user by clearing tokens
    */
-  async logout(userId?: string): Promise<void> {
+  async logout(_userId?: string): Promise<void> {
     await this.config.tokenManager.clearTokens();
   }
 }

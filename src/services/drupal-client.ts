@@ -11,7 +11,6 @@ import {
   type NodeCreateParams,
   type DrupalNode,
   type JsonRpcResponse,
-  type JsonRpcErrorResponse,
   isJsonRpcErrorResponse,
 } from '@/types/index.js';
 import {
@@ -99,7 +98,7 @@ export class DrupalClient {
 
         if (response.status === 200) {
           const contentType = response.headers.get('content-type');
-          if (!contentType || !contentType.includes('application/json')) {
+          if (!contentType?.includes('application/json')) {
             throw new IntegrationError(
               IntegrationErrorType.MALFORMED_RESPONSE,
               `Invalid content-type: expected application/json, got ${contentType}`,
@@ -161,7 +160,7 @@ export class DrupalClient {
             throw parseJsonRpcError(rpcResponse, requestId);
           }
 
-          this.client.receive(jsonRPCResponse as any);
+          this.client.receive(jsonRPCResponse);
           return;
         } else {
           // Handle HTTP error responses

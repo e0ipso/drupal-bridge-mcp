@@ -3,9 +3,9 @@
  */
 
 import { DrupalMcpServer } from '../../src/mcp/server.js';
-import { AppConfig } from '../../src/config/index.js';
+import type { AppConfig } from '../../src/config/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { OAuthTokens } from '../../src/auth/oauth-client.js';
+import type { OAuthTokens } from '../../src/auth/oauth-client.js';
 import { tmpdir } from 'os';
 
 describe('MCP Authentication Integration Tests', () => {

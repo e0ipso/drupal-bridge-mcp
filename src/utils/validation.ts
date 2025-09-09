@@ -2,7 +2,7 @@
  * Parameter validation utilities for MCP tools
  */
 
-import type { SearchToolParams, ProcessedSearchParams } from '@/types/index.js';
+import type { ProcessedSearchParams } from '@/types/index.js';
 
 /**
  * Custom validation error
