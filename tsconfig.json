@@ -58,9 +58,5 @@
     "skipLibCheck": true
   },
   "include": ["src/**/*", "*.config.ts"],
-  "exclude": ["node_modules", "dist", "*.config.mjs", "eslint.config.*"],
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  }
+  "exclude": ["node_modules", "dist", "*.config.mjs", "eslint.config.*"]
 }
