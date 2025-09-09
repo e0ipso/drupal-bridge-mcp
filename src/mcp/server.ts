@@ -3,6 +3,7 @@
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   CallToolRequestSchema,
   GetPromptRequestSchema,
@@ -976,7 +977,7 @@ export class DrupalMcpServer {
   /**
    * Connect the server to a transport
    */
-  async connect(transport: { connect(): Promise<void> }): Promise<void> {
+  async connect(transport: Transport): Promise<void> {
     await this.server.connect(transport);
   }
 

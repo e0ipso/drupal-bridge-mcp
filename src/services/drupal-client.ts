@@ -160,7 +160,7 @@ export class DrupalClient {
             throw parseJsonRpcError(rpcResponse, requestId);
           }
 
-          this.client.receive(jsonRPCResponse);
+          this.client.receive(rpcResponse as any);
           return;
         } else {
           // Handle HTTP error responses

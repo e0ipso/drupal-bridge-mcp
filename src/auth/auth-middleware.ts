@@ -133,10 +133,18 @@ export class AuthMiddleware {
 
     if (hasTokens) {
       const tokenInfo = await this.config.tokenManager.getTokenInfo(userId);
-      return {
-        isAuthenticated: true,
-        tokenInfo,
-      };
+      if (tokenInfo) {
+        return {
+          isAuthenticated: true,
+          tokenInfo: {
+            isValid: tokenInfo.hasTokens,
+            isExpired: tokenInfo.isExpired ?? false,
+            needsRefresh: tokenInfo.needsRefresh ?? false,
+            scopes: tokenInfo.scopes,
+            userId: tokenInfo.userId,
+          },
+        };
+      }
     }
 
     return {

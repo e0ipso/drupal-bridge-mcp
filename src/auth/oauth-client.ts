@@ -176,7 +176,9 @@ export class OAuthClient {
             res.end(
               '<html><body><h1>Authorization Successful</h1><p>You can close this window.</p></body></html>'
             );
-            (server as typeof server & { authCode?: string }).authCode = code;
+            const authCode = Array.isArray(code) ? code[0] : code;
+            (server as typeof server & { authCode?: string }).authCode =
+              authCode;
             server.close();
           }
         } else {
