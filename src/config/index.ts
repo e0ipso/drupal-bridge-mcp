@@ -66,7 +66,7 @@ const getEnvConfig = (): AppConfig => {
         process.env.NODE_ENV === 'development',
     },
     mcp: {
-      name: process.env.MCP_SERVER_NAME ?? 'drupalizeme-mcp-server',
+      name: process.env.MCP_SERVER_NAME ?? 'drupal-bridge-mcp',
       version: process.env.MCP_SERVER_VERSION ?? '1.0.0',
       protocolVersion: '2024-11-05',
       capabilities: {

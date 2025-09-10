@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Question or Discussion
-    url: https://github.com/drupalize/mcp-server/discussions
+    url: https://github.com/e0ipso/drupal-bridge-mcp/discussions
     about: Ask questions or start discussions about the MCP server
   - name: Security Vulnerability
-    url: https://github.com/drupalize/mcp-server/security/advisories/new
+    url: https://github.com/e0ipso/drupal-bridge-mcp/security/advisories/new
     about: Report security vulnerabilities privately

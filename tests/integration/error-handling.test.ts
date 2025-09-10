@@ -56,7 +56,7 @@ describe('Error Handling Integration', () => {
         skipAuth: true,
       },
       mcp: {
-        name: 'test-drupalizeme-mcp-server',
+        name: 'test-drupal-bridge-mcp',
         version: '1.0.0-test',
         protocolVersion: '2024-11-05',
         capabilities: {

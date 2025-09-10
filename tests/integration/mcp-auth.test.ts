@@ -51,7 +51,7 @@ describe('MCP Authentication Integration Tests', () => {
         skipAuth: false,
       },
       mcp: {
-        name: 'test-drupalizeme-mcp-server',
+        name: 'test-drupal-bridge-mcp',
         version: '1.0.0-test',
         protocolVersion: '2024-11-05',
         capabilities: {
@@ -82,7 +82,7 @@ describe('MCP Authentication Integration Tests', () => {
     try {
       const { promises: fs } = await import('fs');
       const { join } = await import('path');
-      await fs.rm(join(tmpdir(), '.drupalizeme-mcp'), {
+      await fs.rm(join(tmpdir(), '.drupal-bridge-mcp'), {
         recursive: true,
         force: true,
       });

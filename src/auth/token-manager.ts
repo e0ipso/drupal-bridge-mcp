@@ -35,7 +35,7 @@ export class TokenManager {
 
   constructor(oauthClient: OAuthClient, userId?: string) {
     this.oauthClient = oauthClient;
-    this.tokenDir = join(homedir(), '.drupalizeme-mcp');
+    this.tokenDir = join(homedir(), '.drupal-bridge-mcp');
 
     // Create user fingerprint for file naming
     this.userId = userId || this.createUserFingerprint();

@@ -8,7 +8,7 @@ describe('Main module', () => {
   test('config loads with defaults', async () => {
     const config = await loadConfig();
 
-    expect(config.mcp.name).toBe('drupalizeme-mcp-server');
+    expect(config.mcp.name).toBe('drupal-bridge-mcp');
     expect(config.mcp.version).toBe('1.0.0');
     expect(config.drupal.baseUrl).toBe('http://localhost/drupal');
     expect(config.drupal.endpoint).toBe('/jsonrpc');

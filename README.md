@@ -21,7 +21,7 @@
 ### Installation
 
 ```bash
-npm install @e0ipso/drupalizeme-mcp-server
+npm install @e0ipso/drupal-bridge-mcp
 ```
 
 ### Configuration
@@ -50,9 +50,9 @@ Add to your MCP client configuration:
 ```json
 {
   "mcpServers": {
-    "drupalize": {
+    "drupal-bridge-mcp": {
       "command": "npx",
-      "args": ["@e0ipso/drupalizeme-mcp-server"]
+      "args": ["@e0ipso/drupal-bridge-mcp"]
     }
   }
 }
@@ -61,7 +61,7 @@ Add to your MCP client configuration:
 #### Direct Usage
 
 ```bash
-npx @e0ipso/drupalizeme-mcp-server
+npx @e0ipso/drupal-bridge-mcp
 ```
 
 ## 🛠️ Development
@@ -70,8 +70,8 @@ npx @e0ipso/drupalizeme-mcp-server
 
 ```bash
 # Clone repository
-git clone https://github.com/e0ipso/drupalizeme-mcp-server.git
-cd drupalizeme-mcp-server
+git clone https://github.com/e0ipso/drupal-bridge-mcp.git
+cd drupal-bridge-mcp
 
 # Install dependencies
 npm install
@@ -99,7 +99,7 @@ Add to your `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "drupalize-local": {
+    "drupal-bridge-mcp-local": {
       "command": "node",
       "args": ["/path/to/your/project/dist/main.js"],
       "env": {
@@ -118,7 +118,7 @@ For live reloading during development:
 ```json
 {
   "mcpServers": {
-    "drupalize-dev": {
+    "drupal-bridge-mcp-dev": {
       "command": "npm",
       "args": ["run", "dev"],
       "cwd": "/path/to/your/project",
@@ -152,25 +152,26 @@ LOG_LEVEL=debug
 ### OAuth Setup in Drupal
 
 1. **Install Simple OAuth in Drupal**:
+
    ```bash
    composer require drupal/simple_oauth:^5
    drush en simple_oauth
    ```
 
 2. **Create OAuth Client**:
-    - Navigate to `/admin/config/services/consumer/add`
-    - Configure:
-        - Label: "MCP Server"
-        - Client ID: (auto-generated or custom)
-        - Scopes: `tutorial:read`, `user:profile`
-        - Grant type: "Authorization Code"
-        - Redirect URI: `http://127.0.0.1:3000/callback`
+   - Navigate to `/admin/config/services/consumer/add`
+   - Configure:
+     - Label: "MCP Server"
+     - Client ID: (auto-generated or custom)
+     - Scopes: `tutorial:read`, `user:profile`
+     - Grant type: "Authorization Code"
+     - Redirect URI: `http://127.0.0.1:3000/callback`
 
 3. **First Authentication**:
-    - On first use, the MCP server will open your browser
-    - Log into Drupal and authorize the application
-    - Tokens are encrypted and stored locally
-    - Subsequent requests use refresh tokens automatically
+   - On first use, the MCP server will open your browser
+   - Log into Drupal and authorize the application
+   - Tokens are encrypted and stored locally
+   - Subsequent requests use refresh tokens automatically
 
 ### Testing with MCP Client
 

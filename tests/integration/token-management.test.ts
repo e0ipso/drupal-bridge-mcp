@@ -27,7 +27,7 @@ describe('Token Management Integration Tests', () => {
   beforeAll(() => {
     // Mock homedir for testing
     originalHomedir = process.env.HOME || '';
-    testTokenDir = join(tmpdir(), 'drupalizeme-test-tokens');
+    testTokenDir = join(tmpdir(), 'drupal-test-tokens');
     process.env.HOME = tmpdir();
 
     oauthClient = new OAuthClient({
@@ -48,7 +48,7 @@ describe('Token Management Integration Tests', () => {
   beforeEach(async () => {
     // Clean up test tokens before each test
     try {
-      await fs.rm(join(tmpdir(), '.drupalizeme-mcp'), {
+      await fs.rm(join(tmpdir(), '.drupal-bridge-mcp'), {
         recursive: true,
         force: true,
       });
@@ -60,7 +60,7 @@ describe('Token Management Integration Tests', () => {
   afterEach(async () => {
     // Clean up test tokens after each test
     try {
-      await fs.rm(join(tmpdir(), '.drupalizeme-mcp'), {
+      await fs.rm(join(tmpdir(), '.drupal-bridge-mcp'), {
         recursive: true,
         force: true,
       });
