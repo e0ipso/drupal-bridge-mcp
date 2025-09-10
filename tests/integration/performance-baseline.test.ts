@@ -207,7 +207,7 @@ describe('Performance Baseline Measurements', () => {
         'Basic Search Tutorial',
         async () => {
           return await (mcpServer as any).executeSearchTutorials({
-            query: 'forms',
+            keywords: 'forms',
           });
         },
         50
@@ -235,9 +235,9 @@ describe('Performance Baseline Measurements', () => {
         'Filtered Search Tutorial',
         async () => {
           return await (mcpServer as any).executeSearchTutorials({
-            query: 'content management',
-            drupal_version: '10',
-            tags: ['tutorial', 'cms'],
+            keywords: 'content management',
+            drupal_version: ['10'],
+            category: ['tutorial', 'cms'],
           });
         },
         30
@@ -249,17 +249,17 @@ describe('Performance Baseline Measurements', () => {
     });
 
     test('should benchmark parameter validation performance', async () => {
-      const { validateSearchToolParams } = await import(
+      const { validateSearchContentParams } = await import(
         '@/utils/validation.js'
       );
 
       const benchmark = await runBenchmark(
         'Parameter Validation',
         async () => {
-          return validateSearchToolParams({
-            query: 'test validation performance',
-            drupal_version: '11',
-            tags: ['performance', 'testing', 'validation'],
+          return validateSearchContentParams({
+            keywords: 'test validation performance',
+            drupal_version: ['11'],
+            category: ['performance', 'testing', 'validation'],
           });
         },
         1000
@@ -277,7 +277,7 @@ describe('Performance Baseline Measurements', () => {
         'MCP Tool Execution',
         async () => {
           return await (mcpServer as any).executeTool('search_tutorials', {
-            query: 'mcp performance test',
+            keywords: 'mcp performance test',
           });
         },
         30
@@ -294,7 +294,7 @@ describe('Performance Baseline Measurements', () => {
         async () => {
           try {
             return await (mcpServer as any).executeTool('search_tutorials', {
-              query: 'x', // Will trigger validation error
+              keywords: 'x', // Will trigger validation error
             });
           } catch (error) {
             return error;
@@ -314,7 +314,7 @@ describe('Performance Baseline Measurements', () => {
       const { result, metrics } = await measurePerformance(async () => {
         // Simulate processing large tutorial content
         const searchResult = await (mcpServer as any).executeSearchTutorials({
-          query: 'large content test',
+          keywords: 'large content test',
         });
 
         // Process and format multiple results
@@ -346,7 +346,7 @@ describe('Performance Baseline Measurements', () => {
       const { result, metrics } = await measurePerformance(async () => {
         const promises = Array.from({ length: concurrentOperations }, (_, i) =>
           (mcpServer as any).executeSearchTutorials({
-            query: `concurrent test ${i}`,
+            keywords: `concurrent test ${i}`,
           })
         );
 
@@ -410,7 +410,7 @@ describe('Performance Baseline Measurements', () => {
             error: {
               code: -32602,
               message: 'Invalid parameters for testing',
-              data: { field: 'query', type: 'VALIDATION_ERROR' },
+              data: { field: 'keywords', type: 'VALIDATION_ERROR' },
             },
             id: 'test-error',
           }),
@@ -420,7 +420,9 @@ describe('Performance Baseline Measurements', () => {
         'JSON-RPC Error Processing',
         async () => {
           try {
-            return await drupalClient.searchTutorials({ query: 'error test' });
+            return await drupalClient.searchTutorials({
+              keywords: 'error test',
+            });
           } catch (error) {
             return { error: true };
           }

@@ -164,21 +164,27 @@ export interface McpError {
 }
 
 /**
- * Search tutorials tool input parameters
+ * New search tutorials tool input parameters
  */
-export interface SearchToolParams {
-  readonly query: string;
-  readonly drupal_version?: '9' | '10' | '11';
-  readonly tags?: string[];
+export interface SearchContentParams {
+  readonly keywords: string;
+  readonly types?: string[];
+  readonly drupal_version?: string[];
+  readonly category?: string[];
+  readonly sort?: string;
+  readonly page?: { limit: number; offset: number };
 }
 
 /**
- * Processed search parameters after validation
+ * Processed new search parameters after validation
  */
-export interface ProcessedSearchParams {
-  readonly query: string;
-  readonly drupal_version: string | null;
-  readonly tags: string[];
+export interface ProcessedSearchContentParams {
+  readonly keywords: string;
+  readonly types: string[];
+  readonly drupal_version?: string[];
+  readonly category?: string[];
+  readonly sort: string;
+  readonly page: { limit: number; offset: number };
 }
 
 /**
@@ -197,12 +203,11 @@ export interface TutorialSearchResult {
 }
 
 /**
- * Search tutorials response
+ * New search content response
  */
-export interface SearchTutorialsResponse {
+export interface SearchContentResponse {
   readonly results: TutorialSearchResult[];
   readonly total: number;
-  readonly page: number;
-  readonly limit: number;
-  readonly query: ProcessedSearchParams;
+  readonly facets?: Record<string, unknown>;
+  readonly query: ProcessedSearchContentParams;
 }

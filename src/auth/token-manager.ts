@@ -93,15 +93,23 @@ export class TokenManager {
 
       return tokens;
     } catch (error) {
+      // Check for file not found error (ENOENT)
       if (
-        error instanceof Error &&
+        error &&
+        typeof error === 'object' &&
         'code' in error &&
-        (error as NodeJS.ErrnoException).code === 'ENOENT'
+        error.code === 'ENOENT'
       ) {
         return null; // File doesn't exist
       }
+
+      // Handle JSON parsing errors - treat as if file doesn't exist
+      if (error instanceof SyntaxError) {
+        return null;
+      }
+
       throw new Error(
-        `Failed to retrieve tokens: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to retrieve tokens: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
@@ -218,16 +226,19 @@ export class TokenManager {
     try {
       await fs.unlink(this.tokenFile);
     } catch (error) {
-      // Ignore if file doesn't exist
+      // Ignore if file doesn't exist - check for ENOENT code directly since instanceof Error might fail in Node.js
       if (
-        !(
-          error instanceof Error &&
-          'code' in error &&
-          (error as NodeJS.ErrnoException).code === 'ENOENT'
-        )
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
       ) {
-        throw error;
+        // File doesn't exist, which is fine for clearing tokens
+        return;
       }
+
+      // Re-throw any other errors
+      throw error;
     }
   }
 

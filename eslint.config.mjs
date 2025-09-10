@@ -15,7 +15,7 @@ export default defineConfig([
       "eslint.config.*"
     ]
   },
-  
+
   // Base configuration for all TypeScript files
   {
     files: ["**/*.{ts,tsx}"],
@@ -44,7 +44,7 @@ export default defineConfig([
       ],
     },
   },
-  
+
   // Test files configuration
   {
     files: ["**/*.test.ts", "**/*.spec.ts", "tests/**/*.ts"],
@@ -60,7 +60,7 @@ export default defineConfig([
       "@typescript-eslint/no-namespace": "off",
     },
   },
-  
+
   // Config files
   {
     files: ["**/*.config.{js,ts}", "**/jest.config.js"],

@@ -2,7 +2,7 @@
  * Parameter validation utilities for MCP tools
  */
 
-import type { ProcessedSearchParams } from '@/types/index.js';
+import type { ProcessedSearchContentParams } from '@/types/index.js';
 
 /**
  * Custom validation error
@@ -15,75 +15,6 @@ export class ValidationError extends Error {
     super(message);
     this.name = 'ValidationError';
   }
-}
-
-/**
- * Validate and process search tutorial parameters
- */
-export function validateSearchToolParams(args: unknown): ProcessedSearchParams {
-  if (!args || typeof args !== 'object') {
-    throw new ValidationError('Invalid arguments: must be an object');
-  }
-
-  const params = args as Record<string, unknown>;
-
-  // Validate query parameter
-  if (!params.query || typeof params.query !== 'string') {
-    throw new ValidationError(
-      'Invalid query: must be a non-empty string',
-      'query'
-    );
-  }
-
-  const query = params.query.trim();
-  if (query.length < 2) {
-    throw new ValidationError(
-      'Invalid query: must be at least 2 characters long',
-      'query'
-    );
-  }
-
-  // Validate drupal_version parameter
-  let drupal_version: string | null = null;
-  if (params.drupal_version !== undefined) {
-    if (typeof params.drupal_version !== 'string') {
-      throw new ValidationError(
-        'Invalid drupal_version: must be a string',
-        'drupal_version'
-      );
-    }
-
-    const validVersions = ['9', '10', '11'];
-    if (!validVersions.includes(params.drupal_version)) {
-      throw new ValidationError(
-        `Invalid drupal_version: must be one of ${validVersions.join(', ')}`,
-        'drupal_version'
-      );
-    }
-
-    drupal_version = params.drupal_version;
-  }
-
-  // Validate tags parameter
-  let tags: string[] = [];
-  if (params.tags !== undefined) {
-    if (!Array.isArray(params.tags)) {
-      throw new ValidationError('Invalid tags: must be an array', 'tags');
-    }
-
-    tags = params.tags
-      .filter(
-        (tag): tag is string => typeof tag === 'string' && tag.trim().length > 0
-      )
-      .map(tag => tag.trim().toLowerCase())
-      .filter((tag, index, array) => array.indexOf(tag) === index); // Remove duplicates
-  }
-
-  return {
-    query,
-    drupal_version,
-    tags,
-  };
 }
 
 /**
@@ -120,7 +51,8 @@ export function validateStringParam(
 
   if (minLength !== undefined && trimmed.length < minLength) {
     throw new ValidationError(
-      `${fieldName} must be at least ${minLength} characters long`
+      `${fieldName} must be at least ${minLength} characters long`,
+      fieldName
     );
   }
 
@@ -196,4 +128,124 @@ export function sanitizeTag(tag: string): string {
     .replace(/\s+/g, '-') // Replace spaces with hyphens
     .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
     .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+}
+
+/**
+ * Validate and process new search content parameters
+ */
+export function validateSearchContentParams(
+  args: unknown
+): ProcessedSearchContentParams {
+  if (!args || typeof args !== 'object') {
+    throw new ValidationError('Invalid arguments: must be an object');
+  }
+
+  const params = args as Record<string, unknown>;
+
+  // Validate keywords parameter (required)
+  const keywords = validateStringParam(params.keywords, 'keywords', {
+    required: true,
+    minLength: 2,
+  });
+  if (!keywords) {
+    throw new ValidationError('Keywords parameter is required', 'keywords');
+  }
+
+  // Validate types parameter (optional array)
+  const validTypes = ['tutorial', 'topic', 'course', 'video', 'guide'];
+  const types = validateArrayParam(params.types, 'types', (item: unknown) => {
+    if (typeof item !== 'string' || !validTypes.includes(item)) {
+      throw new ValidationError(`must be one of: ${validTypes.join(', ')}`);
+    }
+    return item;
+  });
+  const finalTypes = types.length > 0 ? types : ['tutorial', 'topic', 'course'];
+
+  // Validate drupal_version parameter (optional array)
+  const validVersions = ['9', '10', '11'];
+  const drupalVersions =
+    params.drupal_version !== undefined
+      ? validateArrayParam(
+          params.drupal_version,
+          'drupal_version',
+          (item: unknown) => {
+            if (typeof item !== 'string' || !validVersions.includes(item)) {
+              throw new ValidationError(
+                `must be one of: ${validVersions.join(', ')}`
+              );
+            }
+            return item;
+          }
+        )
+      : undefined;
+
+  // Validate category parameter (optional array of strings)
+  const categories =
+    params.category !== undefined
+      ? validateArrayParam(params.category, 'category', (item: unknown) => {
+          if (typeof item !== 'string' || item.trim().length === 0) {
+            throw new ValidationError('must be a non-empty string');
+          }
+          return sanitizeTag(item);
+        }).filter((tag, index, array) => array.indexOf(tag) === index) // Remove duplicates
+      : undefined;
+
+  // Validate sort parameter (optional)
+  const validSorts = ['search_api_relevance', 'created', 'changed', 'title'];
+  let sort = 'search_api_relevance';
+  if (params.sort !== undefined) {
+    if (typeof params.sort !== 'string' || !validSorts.includes(params.sort)) {
+      throw new ValidationError(
+        `Invalid sort: must be one of ${validSorts.join(', ')}`,
+        'sort'
+      );
+    }
+    sort = params.sort;
+  }
+
+  // Validate page parameter (optional object)
+  const page = { limit: 10, offset: 0 };
+  if (params.page !== undefined) {
+    if (!params.page || typeof params.page !== 'object') {
+      throw new ValidationError(
+        'Invalid page: must be an object with limit and offset',
+        'page'
+      );
+    }
+
+    const pageObj = params.page as Record<string, unknown>;
+
+    if (pageObj.limit !== undefined) {
+      if (
+        typeof pageObj.limit !== 'number' ||
+        pageObj.limit < 1 ||
+        pageObj.limit > 100
+      ) {
+        throw new ValidationError(
+          'Invalid page.limit: must be a number between 1 and 100',
+          'page.limit'
+        );
+      }
+      page.limit = pageObj.limit;
+    }
+
+    if (pageObj.offset !== undefined) {
+      if (typeof pageObj.offset !== 'number' || pageObj.offset < 0) {
+        throw new ValidationError(
+          'Invalid page.offset: must be a non-negative number',
+          'page.offset'
+        );
+      }
+      page.offset = pageObj.offset;
+    }
+  }
+
+  return {
+    keywords,
+    types: finalTypes,
+    drupal_version: drupalVersions,
+    category: categories,
+    sort,
+    page,
+  };
 }

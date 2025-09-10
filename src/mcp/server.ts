@@ -18,12 +18,12 @@ import type {
   McpResource,
   McpTool,
   McpPrompt,
-  ProcessedSearchParams,
-  SearchTutorialsResponse,
+  ProcessedSearchContentParams,
+  SearchContentResponse,
   TutorialSearchResult,
 } from '@/types/index.js';
 import { DrupalClient, DrupalClientError } from '@/services/drupal-client.js';
-import { validateSearchToolParams, ValidationError } from '@/utils/index.js';
+import { validateSearchContentParams, ValidationError } from '@/utils/index.js';
 import {
   IntegrationError,
   IntegrationErrorType,
@@ -341,29 +341,65 @@ export class DrupalMcpServer {
       {
         name: 'search_tutorials',
         description:
-          'Search Drupalize.me tutorials with optional filtering by Drupal version and tags',
+          'Search Drupalize.me tutorials with filtering by content types, Drupal versions, categories, and sorting options',
         inputSchema: {
           type: 'object',
           properties: {
-            query: {
+            keywords: {
               type: 'string',
-              description: 'Search query string (minimum 2 characters)',
+              description: 'Search keywords (minimum 2 characters)',
               minLength: 2,
             },
-            drupal_version: {
-              type: 'string',
-              description: 'Filter by Drupal version',
-              enum: ['9', '10', '11'],
-            },
-            tags: {
+            types: {
               type: 'array',
-              description: 'Filter by tutorial tags',
+              description:
+                'Filter by content types (defaults to ["tutorial", "topic", "course"])',
+              items: {
+                type: 'string',
+                enum: ['tutorial', 'topic', 'course', 'video', 'guide'],
+              },
+            },
+            drupal_version: {
+              type: 'array',
+              description: 'Filter by Drupal versions',
+              items: {
+                type: 'string',
+                enum: ['9', '10', '11'],
+              },
+            },
+            category: {
+              type: 'array',
+              description: 'Filter by tutorial categories/tags',
               items: {
                 type: 'string',
               },
             },
+            sort: {
+              type: 'string',
+              description: 'Sort results by relevance, date, or title',
+              enum: ['search_api_relevance', 'created', 'changed', 'title'],
+            },
+            page: {
+              type: 'object',
+              description: 'Pagination settings',
+              properties: {
+                limit: {
+                  type: 'number',
+                  description: 'Number of results per page',
+                  minimum: 1,
+                  maximum: 100,
+                  default: 10,
+                },
+                offset: {
+                  type: 'number',
+                  description: 'Number of results to skip',
+                  minimum: 0,
+                  default: 0,
+                },
+              },
+            },
           },
-          required: ['query'],
+          required: ['keywords'],
         },
       },
     ];
@@ -638,6 +674,9 @@ export class DrupalMcpServer {
 
       const session = this.sessionStore.createSession(userId, authContext);
 
+      // Set access token on Drupal client for immediate use
+      this.drupalClient.setAccessToken(tokens.accessToken);
+
       return {
         success: true,
         message: 'Authentication successful',
@@ -704,27 +743,28 @@ export class DrupalMcpServer {
    */
   private async executeSearchTutorials(
     args: unknown
-  ): Promise<SearchTutorialsResponse> {
-    // Validate and process input parameters - this will throw ValidationError if invalid
-    const processedParams = validateSearchToolParams(args);
+  ): Promise<SearchContentResponse> {
+    // Validate and process input parameters using new validation function
+    const processedParams = validateSearchContentParams(args);
 
     // In test environment or when Drupal is unavailable, return mock data
     if (this.config.environment === 'test' || process.env.NODE_ENV === 'test') {
-      return this.getMockSearchResults(processedParams);
+      return this.getMockSearchContentResults(processedParams);
     }
 
     try {
-      // Make real JSON-RPC call to Drupal endpoint
+      // Make real JSON-RPC call to Drupal endpoint using new parameter structure
       const response = await this.drupalClient.searchTutorials({
-        query: processedParams.query,
+        keywords: processedParams.keywords,
+        types: processedParams.types,
         drupal_version: processedParams.drupal_version,
-        tags: processedParams.tags,
-        limit: 10,
-        page: 1,
+        category: processedParams.category,
+        sort: processedParams.sort,
+        page: processedParams.page,
       });
 
       // Process and format the response for MCP consumption
-      const results: TutorialSearchResult[] = response.tutorials.map(
+      const results: TutorialSearchResult[] = response.results.map(
         tutorial => ({
           id: tutorial.id,
           title: tutorial.title,
@@ -747,8 +787,7 @@ export class DrupalMcpServer {
       return {
         results,
         total: response.total,
-        page: response.page,
-        limit: 10,
+        facets: response.facets,
         query: processedParams,
       };
     } catch (error) {
@@ -776,7 +815,7 @@ export class DrupalMcpServer {
         console.warn(
           `API unavailable (${error.errorType}), returning mock data: ${error.message}`
         );
-        return this.getMockSearchResults(processedParams);
+        return this.getMockSearchContentResults(processedParams);
       }
 
       // Handle any other unexpected errors
@@ -790,27 +829,27 @@ export class DrupalMcpServer {
       console.warn(
         `Unexpected error, returning mock data: ${integrationError.message}`
       );
-      return this.getMockSearchResults(processedParams);
+      return this.getMockSearchContentResults(processedParams);
     }
   }
 
   /**
-   * Get mock search results for testing and fallback scenarios
+   * Get mock search results for new content API (testing and fallback scenarios)
    */
-  private getMockSearchResults(
-    processedParams: ProcessedSearchParams
-  ): SearchTutorialsResponse {
+  private getMockSearchContentResults(
+    processedParams: ProcessedSearchContentParams
+  ): SearchContentResponse {
     // Create mock results that support filtering
     const allMockResults: TutorialSearchResult[] = [
       {
         id: '1',
-        title: `Tutorial about ${processedParams.query}`,
+        title: `Tutorial about ${processedParams.keywords}`,
         url: 'https://drupalize.me/tutorial/sample-tutorial',
-        description: `A comprehensive tutorial covering ${processedParams.query} concepts`,
+        description: `A comprehensive tutorial covering ${processedParams.keywords} concepts`,
         drupal_version: ['10', '11'],
         tags:
-          processedParams.tags.length > 0
-            ? processedParams.tags
+          processedParams.category && processedParams.category.length > 0
+            ? processedParams.category
             : ['tutorial', 'drupal'],
         difficulty: 'intermediate',
         created: '2024-01-01T00:00:00Z',
@@ -819,13 +858,13 @@ export class DrupalMcpServer {
       // Add a Drupal 9 specific tutorial for testing filtering
       {
         id: '2',
-        title: `Drupal 9 specific tutorial about ${processedParams.query}`,
+        title: `Drupal 9 specific tutorial about ${processedParams.keywords}`,
         url: 'https://drupalize.me/tutorial/drupal9-tutorial',
-        description: `Legacy tutorial for ${processedParams.query} in Drupal 9`,
+        description: `Legacy tutorial for ${processedParams.keywords} in Drupal 9`,
         drupal_version: ['9'],
         tags:
-          processedParams.tags.length > 0
-            ? [...processedParams.tags, 'drupal-9']
+          processedParams.category && processedParams.category.length > 0
+            ? [...processedParams.category, 'drupal-9']
             : ['tutorial', 'drupal', 'drupal-9'],
         difficulty: 'intermediate',
         created: '2023-01-01T00:00:00Z',
@@ -834,17 +873,31 @@ export class DrupalMcpServer {
     ];
 
     // Filter results by drupal_version if specified
-    const filteredResults = processedParams.drupal_version
-      ? allMockResults.filter(result =>
-          result.drupal_version?.includes(processedParams.drupal_version!)
-        )
-      : allMockResults.slice(0, 1); // Return only the first result when no version filter is applied
+    const filteredResults =
+      processedParams.drupal_version &&
+      processedParams.drupal_version.length > 0
+        ? allMockResults.filter(result =>
+            processedParams.drupal_version!.some(version =>
+              result.drupal_version?.includes(version)
+            )
+          )
+        : allMockResults.slice(0, 1); // Return only the first result when no version filter is applied
 
     return {
       results: filteredResults,
       total: filteredResults.length,
-      page: 1,
-      limit: 10,
+      facets: {
+        drupal_version: {
+          '9': 1,
+          '10': 1,
+          '11': 1,
+        },
+        content_type: {
+          tutorial: 2,
+          topic: 0,
+          course: 0,
+        },
+      },
       query: processedParams,
     };
   }

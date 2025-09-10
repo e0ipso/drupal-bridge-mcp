@@ -407,16 +407,17 @@ export class DrupalClient {
   }
 
   /**
-   * Search tutorials using JSON-RPC content.search method
+   * Search tutorials using JSON-RPC dme_mcp.search_content method
    */
   async searchTutorials(params: {
-    query: string;
-    drupal_version?: string | null;
-    tags?: string[];
-    limit?: number;
-    page?: number;
+    keywords: string;
+    types?: string[];
+    drupal_version?: string[];
+    category?: string[];
+    sort?: string;
+    page?: { limit: number; offset: number };
   }): Promise<{
-    tutorials: Array<{
+    results: Array<{
       id: string;
       title: string;
       content: string;
@@ -429,18 +430,19 @@ export class DrupalClient {
       updated?: string;
     }>;
     total: number;
-    page: number;
+    facets?: Record<string, unknown>;
   }> {
     const requestParams = {
-      query: params.query,
-      ...(params.drupal_version && { drupal_version: params.drupal_version }),
-      ...(params.tags && params.tags.length > 0 && { tags: params.tags }),
-      limit: params.limit || 10,
-      page: params.page || 1,
+      keywords: params.keywords,
+      types: params.types || ['tutorial', 'topic', 'course'],
+      drupal_version: params.drupal_version,
+      category: params.category,
+      sort: params.sort || 'search_api_relevance',
+      page: params.page || { limit: 10, offset: 0 },
     };
 
     return this.request<{
-      tutorials: Array<{
+      results: Array<{
         id: string;
         title: string;
         content: string;
@@ -453,8 +455,8 @@ export class DrupalClient {
         updated?: string;
       }>;
       total: number;
-      page: number;
-    }>('content.search', requestParams);
+      facets?: Record<string, unknown>;
+    }>('dme_mcp.search_content', requestParams);
   }
 
   /**

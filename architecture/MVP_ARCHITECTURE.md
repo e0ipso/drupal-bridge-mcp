@@ -24,10 +24,8 @@
 
 ### MVP Success Criteria
 
-✅ User can authenticate and search tutorials  
-✅ Search returns relevant results in clean Markdown  
-✅ System handles token expiration gracefully  
-✅ Basic error scenarios are handled
+✅ User can authenticate and search tutorials ✅ Search returns relevant results in clean Markdown
+✅ System handles token expiration gracefully ✅ Basic error scenarios are handled
 
 ## 🎯 Implementation Strategy
 
@@ -197,7 +195,5 @@ return result; // That's it!
 
 ### Validation Criteria
 
-✅ User can authenticate via OAuth  
-✅ Search queries return relevant Markdown content  
-✅ Individual tutorials can be retrieved  
-✅ Error scenarios are handled gracefully
+✅ User can authenticate via OAuth ✅ Search queries return relevant Markdown content ✅ Individual
+tutorials can be retrieved ✅ Error scenarios are handled gracefully

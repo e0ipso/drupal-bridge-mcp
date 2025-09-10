@@ -30,11 +30,6 @@
   ],
   "testPathIgnorePatterns": ["/node_modules/", "/dist/", "/coverage/"],
   "transformIgnorePatterns": ["node_modules/(?!(@modelcontextprotocol/sdk)/)"],
-  "globals": {
-    "ts-jest": {
-      "useESM": true
-    }
-  },
   "setupFilesAfterEnv": ["<rootDir>/tests/setup.ts"],
   "collectCoverage": false,
   "coverageDirectory": "coverage",

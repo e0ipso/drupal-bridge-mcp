@@ -13,7 +13,7 @@ import {
 import { DrupalMcpServer } from '@/mcp/server.js';
 import { DrupalClient } from '@/services/drupal-client.js';
 import { loadConfig } from '@/config/index.js';
-import type { SearchTutorialsResponse, DrupalNode } from '@/types/index.js';
+import type { SearchContentResponse, DrupalNode } from '@/types/index.js';
 
 // Mock fetch for controlled testing
 const mockFetch = jest.fn();
@@ -82,9 +82,9 @@ describe('End-to-End Integration Tests', () => {
     test('should execute complete search workflow successfully', async () => {
       // This test runs in test environment, so it should return mock data
       const searchArgs = {
-        query: 'content management',
-        drupal_version: '10',
-        tags: ['tutorial', 'cms'],
+        keywords: 'content management',
+        drupal_version: ['10'],
+        category: ['tutorial', 'cms'],
       };
 
       // Execute the search through the MCP tool interface
@@ -95,15 +95,14 @@ describe('End-to-End Integration Tests', () => {
       // Verify the response structure
       expect(result).toHaveProperty('results');
       expect(result).toHaveProperty('total');
-      expect(result).toHaveProperty('page');
-      expect(result).toHaveProperty('limit');
       expect(result).toHaveProperty('query');
+      expect(result.query).toHaveProperty('page');
 
       // Verify result content
       expect(Array.isArray(result.results)).toBe(true);
       expect(result.total).toBeGreaterThan(0);
-      expect(result.query.query).toBe('content management');
-      expect(result.query.drupal_version).toBe('10');
+      expect(result.query.keywords).toBe('content management');
+      expect(result.query.drupal_version).toEqual(['10']);
 
       // Verify individual tutorial result structure
       const firstResult = result.results[0];
@@ -121,7 +120,7 @@ describe('End-to-End Integration Tests', () => {
 
     test('should handle search with minimal parameters', async () => {
       const searchArgs = {
-        query: 'forms',
+        keywords: 'forms',
       };
 
       const result = await (mcpServer as any).executeSearchTutorials(
@@ -129,15 +128,15 @@ describe('End-to-End Integration Tests', () => {
       );
 
       expect(result.results).toBeDefined();
-      expect(result.query.query).toBe('forms');
-      expect(result.query.drupal_version).toBeNull();
-      expect(result.query.tags).toEqual([]);
+      expect(result.query.keywords).toBe('forms');
+      expect(result.query.drupal_version).toBeUndefined();
+      expect(result.query.category).toBeUndefined();
     });
 
     test('should filter results by Drupal version', async () => {
       const searchArgs = {
-        query: 'testing',
-        drupal_version: '9',
+        keywords: 'testing',
+        drupal_version: ['9'],
       };
 
       const result = await (mcpServer as any).executeSearchTutorials(
@@ -155,8 +154,8 @@ describe('End-to-End Integration Tests', () => {
   describe('MCP Tool Integration', () => {
     test('should execute search_tutorials tool through MCP interface', async () => {
       const args = {
-        query: 'blocks',
-        drupal_version: '11',
+        keywords: 'blocks',
+        drupal_version: ['11'],
       };
 
       const toolResponse = await (mcpServer as any).executeTool(
@@ -176,7 +175,7 @@ describe('End-to-End Integration Tests', () => {
 
     test('should handle tool validation errors gracefully', async () => {
       const invalidArgs = {
-        query: 'x', // Too short
+        keywords: 'x', // Too short
       };
 
       const toolResponse = await (mcpServer as any).executeTool(
@@ -189,7 +188,7 @@ describe('End-to-End Integration Tests', () => {
       const errorResponse = JSON.parse(toolResponse.content[0].text);
       expect(errorResponse).toHaveProperty('error');
       expect(errorResponse.error.type).toBe('VALIDATION_ERROR');
-      expect(errorResponse.error.details.field).toBe('query');
+      expect(errorResponse.error.details.field).toBe('keywords');
       expect(errorResponse.error.details.retryable).toBe(false);
     });
 
@@ -260,8 +259,8 @@ describe('End-to-End Integration Tests', () => {
       // Execute multiple searches to test memory efficiency
       const promises = Array.from({ length: 10 }, (_, i) =>
         (mcpServer as any).executeSearchTutorials({
-          query: `test query ${i}`,
-          drupal_version: i % 2 === 0 ? '10' : '11',
+          keywords: `test query ${i}`,
+          drupal_version: [i % 2 === 0 ? '10' : '11'],
         })
       );
 
@@ -274,7 +273,7 @@ describe('End-to-End Integration Tests', () => {
       expect(results).toHaveLength(10);
       results.forEach((result, i) => {
         expect(result.results).toBeDefined();
-        expect(result.query.query).toBe(`test query ${i}`);
+        expect(result.query.keywords).toBe(`test query ${i}`);
       });
 
       // Performance assertions (these are baseline measurements)
@@ -296,7 +295,7 @@ describe('End-to-End Integration Tests', () => {
         { length: concurrentSearches },
         (_, i) =>
           (mcpServer as any).executeTool('search_tutorials', {
-            query: `concurrent search ${i}`,
+            keywords: `concurrent search ${i}`,
           })
       );
 
@@ -328,13 +327,13 @@ describe('End-to-End Integration Tests', () => {
       const devServer = new DrupalMcpServer(devConfig);
 
       const result = await (devServer as any).executeSearchTutorials({
-        query: 'fallback test',
+        keywords: 'fallback test',
       });
 
       // Should receive mock data instead of error
       expect(result.results).toBeDefined();
       expect(result.results.length).toBeGreaterThan(0);
-      expect(result.query.query).toBe('fallback test');
+      expect(result.query.keywords).toBe('fallback test');
     });
 
     test('should propagate errors in production environment', async () => {
@@ -355,7 +354,7 @@ describe('End-to-End Integration Tests', () => {
       try {
         await expect(
           (prodServer as any).executeSearchTutorials({
-            query: 'production test',
+            keywords: 'production test',
           })
         ).rejects.toThrow();
       } finally {
@@ -368,21 +367,21 @@ describe('End-to-End Integration Tests', () => {
   describe('Data Validation and Processing', () => {
     test('should validate and process search parameters correctly', async () => {
       const args = {
-        query: '  Content Management  ', // Test trimming
-        drupal_version: '10',
-        tags: ['Tutorial', 'CMS', 'tutorial'], // Test deduplication and normalization
+        keywords: '  Content Management  ', // Test trimming
+        drupal_version: ['10'],
+        category: ['Tutorial', 'CMS', 'tutorial'], // Test deduplication and normalization
       };
 
       const result = await (mcpServer as any).executeSearchTutorials(args);
 
-      expect(result.query.query).toBe('Content Management');
-      expect(result.query.drupal_version).toBe('10');
-      expect(result.query.tags).toEqual(['tutorial', 'cms']); // Should be deduplicated and lowercased
+      expect(result.query.keywords).toBe('Content Management');
+      expect(result.query.drupal_version).toEqual(['10']);
+      expect(result.query.category).toEqual(['tutorial', 'cms']); // Should be deduplicated and lowercased
     });
 
     test('should extract descriptions from tutorial content', async () => {
       const result = await (mcpServer as any).executeSearchTutorials({
-        query: 'description test',
+        keywords: 'description test',
       });
 
       const tutorial = result.results[0];

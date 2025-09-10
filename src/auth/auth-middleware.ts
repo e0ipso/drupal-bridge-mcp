@@ -70,38 +70,12 @@ export class AuthMiddleware {
   }
 
   /**
-   * Ensure user is authenticated, initiate OAuth flow if not
+   * Ensure user is authenticated - just check, don't initiate OAuth
    */
   async requireAuthentication(userId?: string): Promise<AuthContext> {
     const authContext = await this.authenticate(userId);
 
-    if (!authContext.isAuthenticated) {
-      // Initiate OAuth flow
-      try {
-        console.log('Authentication required. Starting OAuth flow...');
-
-        const tokens = await this.config.oauthClient.authorize();
-        const actualUserId = userId || 'default';
-
-        await this.config.tokenManager.storeTokens(
-          tokens,
-          actualUserId,
-          this.config.requiredScopes || []
-        );
-
-        return {
-          isAuthenticated: true,
-          userId: actualUserId,
-          scopes: this.config.requiredScopes,
-          accessToken: tokens.accessToken,
-        };
-      } catch (error) {
-        throw new Error(
-          `Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
-      }
-    }
-
+    // Just return the context - let the caller decide what to do if not authenticated
     return authContext;
   }
 
