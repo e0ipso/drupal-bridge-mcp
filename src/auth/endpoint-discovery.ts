@@ -111,7 +111,7 @@ async function fetchWithTimeout(
 /**
  * Validate required fields in OAuth server metadata
  */
-function validateMetadata(metadata: any): OAuthServerMetadata {
+function validateMetadata(metadata: unknown): OAuthServerMetadata {
   if (!metadata || typeof metadata !== 'object') {
     throw new DiscoveryError(
       'Invalid metadata: response is not a JSON object',
@@ -120,7 +120,9 @@ function validateMetadata(metadata: any): OAuthServerMetadata {
   }
 
   const requiredFields = ['issuer', 'authorization_endpoint', 'token_endpoint'];
-  const missingFields = requiredFields.filter(field => !metadata[field]);
+  const missingFields = requiredFields.filter(
+    field => !(metadata as Record<string, unknown>)[field]
+  );
 
   if (missingFields.length > 0) {
     throw new DiscoveryError(
@@ -130,9 +132,10 @@ function validateMetadata(metadata: any): OAuthServerMetadata {
   }
 
   // Validate URL format for required endpoints
+  const metadataRecord = metadata as Record<string, unknown>;
   try {
-    new URL(metadata.authorization_endpoint);
-    new URL(metadata.token_endpoint);
+    new URL(metadataRecord.authorization_endpoint as string);
+    new URL(metadataRecord.token_endpoint as string);
   } catch (error) {
     throw new DiscoveryError(
       'Invalid endpoint URL format in metadata',

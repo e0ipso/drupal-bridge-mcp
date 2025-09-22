@@ -91,7 +91,11 @@ async function demonstrateDiscovery() {
 
   // Test cache hit
   console.log('\n🚀 Testing Cache Performance');
-  const cachedConfig = scenarios[0].config;
+  const cachedConfig = scenarios[0]?.config;
+  if (!cachedConfig) {
+    console.log('No cached config available for testing');
+    return;
+  }
   console.log(`   Re-discovering endpoints for ${cachedConfig.baseUrl}`);
 
   const startTime = Date.now();
