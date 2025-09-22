@@ -562,6 +562,15 @@ export class DrupalMcpServer {
     name: string,
     args: unknown
   ): Promise<{ content: Array<{ type: string; text: string }> }> {
+    // Check if authentication is disabled first
+    if (!this.config.auth.enabled) {
+      debug(`Auth tool called with authentication disabled: ${name}`);
+      console.info(
+        `[Server] Auth tool called with authentication disabled: ${name}`
+      );
+      return this.getAuthDisabledResponse(name);
+    }
+
     try {
       let result: unknown;
 
@@ -604,6 +613,51 @@ export class DrupalMcpServer {
 
       return formatMcpErrorResponse(integrationError, this.generateRequestId());
     }
+  }
+
+  /**
+   * Get user-friendly response when authentication is disabled
+   */
+  private getAuthDisabledResponse(toolName: string): {
+    content: Array<{ type: string; text: string }>;
+  } {
+    const messages = {
+      auth_login:
+        'Authentication is disabled for this server. No login required to access available tools. You can immediately use the data tools like search_tutorials, load_node, create_node, and test_connection.',
+      auth_status:
+        'Authentication status: DISABLED. This server is running in non-authenticated mode. All tools are available without authentication.',
+      auth_logout:
+        'Authentication is disabled for this server. No logout action is needed since there are no active sessions to terminate.',
+    };
+
+    const baseMessage =
+      messages[toolName as keyof typeof messages] ||
+      'Authentication is disabled for this server.';
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              success: true,
+              authenticationDisabled: true,
+              message: baseMessage,
+              serverMode: 'non-authenticated',
+              availableTools: [
+                'search_tutorials',
+                'load_node',
+                'create_node',
+                'search_nodes',
+                'test_connection',
+              ],
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
   }
 
   /**
@@ -750,13 +804,9 @@ export class DrupalMcpServer {
    * Execute authentication login using new MCP OAuth provider
    */
   private async executeAuthLogin(): Promise<unknown> {
-    // If authentication is disabled, return success without doing anything
-    if (!this.config.auth.enabled || !this.mcpOAuthProvider) {
-      return {
-        success: true,
-        message: 'Authentication is disabled - access granted automatically',
-        authenticationDisabled: true,
-      };
+    // Note: Authentication disabled check is now handled in executeAuthTool method
+    if (!this.mcpOAuthProvider) {
+      throw new Error('OAuth provider not configured');
     }
 
     try {
@@ -809,18 +859,9 @@ export class DrupalMcpServer {
    * Execute authentication status check
    */
   private async executeAuthStatus(): Promise<unknown> {
-    // If authentication is disabled, return status without checking tokens
-    if (!this.config.auth.enabled || !this.mcpOAuthProvider) {
-      const authContext = await this.requireAuthentication();
-      return {
-        isAuthenticated: authContext.isAuthenticated,
-        authenticationDisabled: true,
-        message: 'Authentication is disabled - access granted automatically',
-        configInfo: {
-          authEnabled: this.config.auth.enabled,
-          skipAuth: this.config.auth.skipAuth,
-        },
-      };
+    // Note: Authentication disabled check is now handled in executeAuthTool method
+    if (!this.mcpOAuthProvider) {
+      throw new Error('OAuth provider not configured');
     }
 
     try {
@@ -861,13 +902,9 @@ export class DrupalMcpServer {
    * Execute authentication logout
    */
   private async executeAuthLogout(): Promise<unknown> {
-    // If authentication is disabled, there's nothing to logout from
-    if (!this.config.auth.enabled || !this.mcpOAuthProvider) {
-      return {
-        success: true,
-        message: 'Authentication is disabled - no tokens to clear',
-        authenticationDisabled: true,
-      };
+    // Note: Authentication disabled check is now handled in executeAuthTool method
+    if (!this.mcpOAuthProvider) {
+      throw new Error('OAuth provider not configured');
     }
 
     try {
