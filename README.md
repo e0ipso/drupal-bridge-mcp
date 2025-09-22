@@ -194,10 +194,68 @@ The server exposes these MCP tools:
 
 ## 📝 Scripts
 
-| Command          | Description              |
-| ---------------- | ------------------------ |
-| `npm run dev`    | Start development server |
-| `npm run build`  | Build for production     |
-| `npm test`       | Run test suite           |
-| `npm run lint`   | Lint code                |
-| `npm run format` | Format code              |
+| Command                             | Description                         |
+| ----------------------------------- | ----------------------------------- |
+| `npm run dev`                       | Start development server            |
+| `npm run build`                     | Build for production                |
+| `npm test`                          | Run complete test suite             |
+| `npm run test:unit`                 | Run unit tests (fast, isolated)     |
+| `npm run test:integration`          | Run integration tests               |
+| `npm run test:unit:coverage`        | Generate unit test coverage         |
+| `npm run test:integration:coverage` | Generate integration coverage       |
+| `npm run test:all`                  | Run both unit and integration tests |
+| `npm run lint`                      | Lint code                           |
+| `npm run format`                    | Format code                         |
+
+## 🧪 Testing Strategy
+
+The project uses a comprehensive testing approach designed for reliability and efficiency:
+
+### Test Types
+
+#### Unit Tests (`npm run test:unit`)
+
+- **Purpose**: Test business logic in isolation with mocked dependencies
+- **Location**: `src/**/*.test.ts`
+- **Focus**: Configuration, OAuth discovery logic, validation, and core application functions
+- **Speed**: Fast execution (~4 seconds)
+
+#### Integration Tests (`npm run test:integration`)
+
+- **Purpose**: Test real interactions with external systems
+- **Location**: `tests/integration/**/*.test.ts`
+- **Focus**: OAuth flows, MCP server functionality, real HTTP requests, and end-to-end workflows
+- **Speed**: Moderate execution (~85 seconds)
+
+### Quick Testing Commands
+
+```bash
+# Run all tests
+npm test
+
+# Fast feedback loop (unit tests only)
+npm run test:unit
+
+# Test real integrations
+npm run test:integration
+
+# Generate coverage reports
+npm run test:unit:coverage
+npm run test:integration:coverage
+
+# Watch mode for development
+npm run test:unit:watch
+npm run test:integration:watch
+```
+
+### Test Guidelines
+
+For detailed testing guidelines and best practices, see
+[TESTING_GUIDELINES.md](.ai/task-manager/plans/09--test-suite-optimization/TESTING_GUIDELINES.md).
+
+**Key Principles:**
+
+- Unit tests focus on business logic with mocked dependencies
+- Integration tests use real HTTP servers and external services
+- No testing of upstream dependencies (Node.js built-ins, external libraries)
+- Clear separation between unit and integration test responsibilities

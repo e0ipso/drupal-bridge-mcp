@@ -1,0 +1,270 @@
+58288919f019282bda58199ab080273e
+"use strict";
+
+/**
+ * Core protocol type definitions (JSON-RPC + MCP)
+ * Consolidated for MVP simplification
+ */
+/* istanbul ignore next */
+function cov_2ot7cnbl8s() {
+  var path = "/workspace/src/types/core-types.ts";
+  var hash = "f6ebdb78e9ed6212af9ea0c8a8f183a67d637044";
+  var global = new Function("return this")();
+  var gcv = "__coverage__";
+  var coverageData = {
+    path: "/workspace/src/types/core-types.ts",
+    statementMap: {
+      "0": {
+        start: {
+          line: 6,
+          column: 0
+        },
+        end: {
+          line: 6,
+          column: 62
+        }
+      },
+      "1": {
+        start: {
+          line: 7,
+          column: 0
+        },
+        end: {
+          line: 7,
+          column: 125
+        }
+      },
+      "2": {
+        start: {
+          line: 11,
+          column: 33
+        },
+        end: {
+          line: 13,
+          column: 1
+        }
+      },
+      "3": {
+        start: {
+          line: 12,
+          column: 4
+        },
+        end: {
+          line: 12,
+          column: 32
+        }
+      },
+      "4": {
+        start: {
+          line: 14,
+          column: 0
+        },
+        end: {
+          line: 14,
+          column: 60
+        }
+      },
+      "5": {
+        start: {
+          line: 18,
+          column: 31
+        },
+        end: {
+          line: 20,
+          column: 1
+        }
+      },
+      "6": {
+        start: {
+          line: 19,
+          column: 4
+        },
+        end: {
+          line: 19,
+          column: 31
+        }
+      },
+      "7": {
+        start: {
+          line: 21,
+          column: 0
+        },
+        end: {
+          line: 21,
+          column: 56
+        }
+      },
+      "8": {
+        start: {
+          line: 25,
+          column: 0
+        },
+        end: {
+          line: 32,
+          column: 2
+        }
+      },
+      "9": {
+        start: {
+          line: 36,
+          column: 0
+        },
+        end: {
+          line: 41,
+          column: 2
+        }
+      }
+    },
+    fnMap: {
+      "0": {
+        name: "(anonymous_0)",
+        decl: {
+          start: {
+            line: 11,
+            column: 33
+          },
+          end: {
+            line: 11,
+            column: 34
+          }
+        },
+        loc: {
+          start: {
+            line: 11,
+            column: 47
+          },
+          end: {
+            line: 13,
+            column: 1
+          }
+        },
+        line: 11
+      },
+      "1": {
+        name: "(anonymous_1)",
+        decl: {
+          start: {
+            line: 18,
+            column: 31
+          },
+          end: {
+            line: 18,
+            column: 32
+          }
+        },
+        loc: {
+          start: {
+            line: 18,
+            column: 45
+          },
+          end: {
+            line: 20,
+            column: 1
+          }
+        },
+        line: 18
+      }
+    },
+    branchMap: {},
+    s: {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "6": 0,
+      "7": 0,
+      "8": 0,
+      "9": 0
+    },
+    f: {
+      "0": 0,
+      "1": 0
+    },
+    b: {},
+    inputSourceMap: {
+      file: "/workspace/src/types/core-types.ts",
+      mappings: ";AAAA;;;GAGG;;;AAkDH;;GAEG;AACI,MAAM,wBAAwB,GAAG,CACtC,QAAkC,EACW,EAAE;IAC/C,OAAO,QAAQ,IAAI,QAAQ,CAAC;AAC9B,CAAC,CAAC;AAJW,QAAA,wBAAwB,4BAInC;AAEF;;GAEG;AACI,MAAM,sBAAsB,GAAG,CACpC,QAAyB,EACS,EAAE;IACpC,OAAO,OAAO,IAAI,QAAQ,CAAC;AAC7B,CAAC,CAAC;AAJW,QAAA,sBAAsB,0BAIjC;AAEF;;GAEG;AACU,QAAA,gBAAgB,GAAG;IAC9B,WAAW,EAAE,CAAC,KAAK;IACnB,eAAe,EAAE,CAAC,KAAK;IACvB,gBAAgB,EAAE,CAAC,KAAK;IACxB,cAAc,EAAE,CAAC,KAAK;IACtB,cAAc,EAAE,CAAC,KAAK;IACtB,YAAY,EAAE,CAAC,KAAK,EAAE,uCAAuC;CACrD,CAAC;AA+DX;;GAEG;AACU,QAAA,YAAY,GAAG;IAC1B,eAAe,EAAE,gBAAgB;IACjC,gBAAgB,EAAE,gBAAgB;IAClC,cAAc,EAAE,eAAe;IAC/B,cAAc,EAAE,eAAe;CACvB,CAAC",
+      names: [],
+      sources: ["/workspace/src/types/core-types.ts"],
+      sourcesContent: ["/**\n * Core protocol type definitions (JSON-RPC + MCP)\n * Consolidated for MVP simplification\n */\n\n// =============================================================================\n// JSON-RPC 2.0 Types\n// =============================================================================\n\n/**\n * JSON-RPC 2.0 request structure\n */\nexport interface JsonRpcRequest<TParams = unknown> {\n  readonly jsonrpc: '2.0';\n  readonly method: string;\n  readonly params?: TParams;\n  readonly id?: string | number | null;\n}\n\n/**\n * JSON-RPC 2.0 response structure for successful calls\n */\nexport interface JsonRpcSuccessResponse<TResult = unknown> {\n  readonly jsonrpc: '2.0';\n  readonly result: TResult;\n  readonly id: string | number | null;\n}\n\n/**\n * JSON-RPC 2.0 error object\n */\nexport interface JsonRpcError {\n  readonly code: number;\n  readonly message: string;\n  readonly data?: unknown;\n}\n\n/**\n * JSON-RPC 2.0 response structure for failed calls\n */\nexport interface JsonRpcErrorResponse {\n  readonly jsonrpc: '2.0';\n  readonly error: JsonRpcError;\n  readonly id: string | number | null;\n}\n\n/**\n * Union type for JSON-RPC 2.0 responses\n */\nexport type JsonRpcResponse<TResult = unknown> =\n  | JsonRpcSuccessResponse<TResult>\n  | JsonRpcErrorResponse;\n\n/**\n * Type guard to check if response is successful\n */\nexport const isJsonRpcSuccessResponse = <TResult = unknown>(\n  response: JsonRpcResponse<TResult>\n): response is JsonRpcSuccessResponse<TResult> => {\n  return 'result' in response;\n};\n\n/**\n * Type guard to check if response is an error\n */\nexport const isJsonRpcErrorResponse = (\n  response: JsonRpcResponse\n): response is JsonRpcErrorResponse => {\n  return 'error' in response;\n};\n\n/**\n * Standard JSON-RPC 2.0 error codes\n */\nexport const JsonRpcErrorCode = {\n  PARSE_ERROR: -32700,\n  INVALID_REQUEST: -32600,\n  METHOD_NOT_FOUND: -32601,\n  INVALID_PARAMS: -32602,\n  INTERNAL_ERROR: -32603,\n  SERVER_ERROR: -32000, // to -32099 reserved for server errors\n} as const;\n\nexport type JsonRpcErrorCode =\n  (typeof JsonRpcErrorCode)[keyof typeof JsonRpcErrorCode];\n\n// =============================================================================\n// MCP Protocol Types\n// =============================================================================\n\n/**\n * MCP resource definition\n */\nexport interface McpResource {\n  readonly uri: string;\n  readonly name: string;\n  readonly description?: string;\n  readonly mimeType?: string;\n}\n\n/**\n * MCP tool definition\n */\nexport interface McpTool {\n  readonly name: string;\n  readonly description: string;\n  readonly inputSchema: Record<string, unknown>;\n}\n\n/**\n * MCP prompt definition\n */\nexport interface McpPrompt {\n  readonly name: string;\n  readonly description: string;\n  readonly arguments?: Array<{\n    readonly name: string;\n    readonly description: string;\n    readonly required?: boolean;\n  }>;\n}\n\n// Simplified MCP types for MVP - removed unused complex nested structures\n\n/**\n * MCP server capabilities (simplified)\n */\nexport interface McpServerCapabilities {\n  readonly resources?: Record<string, unknown>;\n  readonly tools?: Record<string, unknown>;\n  readonly prompts?: Record<string, unknown>;\n  readonly [key: string]: unknown;\n}\n\n/**\n * MCP server information (simplified)\n */\nexport interface McpServerInfo {\n  readonly name: string;\n  readonly version: string;\n  readonly protocolVersion: string;\n  readonly capabilities: McpServerCapabilities;\n}\n\n/**\n * MCP error types\n */\nexport const McpErrorType = {\n  INVALID_REQUEST: 'InvalidRequest',\n  METHOD_NOT_FOUND: 'MethodNotFound',\n  INVALID_PARAMS: 'InvalidParams',\n  INTERNAL_ERROR: 'InternalError',\n} as const;\n\nexport type McpErrorType = (typeof McpErrorType)[keyof typeof McpErrorType];\n\n/**\n * MCP error structure\n */\nexport interface McpError {\n  readonly type: McpErrorType;\n  readonly message: string;\n  readonly data?: unknown;\n}\n\n/**\n * New search tutorials tool input parameters\n */\nexport interface SearchContentParams {\n  readonly keywords: string;\n  readonly types?: string[];\n  readonly drupal_version?: string[];\n  readonly category?: string[];\n  readonly sort?: string;\n  readonly page?: { limit: number; offset: number };\n}\n\n/**\n * Processed new search parameters after validation\n */\nexport interface ProcessedSearchContentParams {\n  readonly keywords: string;\n  readonly types: string[];\n  readonly drupal_version?: string[];\n  readonly category?: string[];\n  readonly sort: string;\n  readonly page: { limit: number; offset: number };\n}\n\n/**\n * Tutorial search result item\n */\nexport interface TutorialSearchResult {\n  readonly id: string;\n  readonly title: string;\n  readonly url: string;\n  readonly description?: string;\n  readonly drupal_version?: string[];\n  readonly tags?: string[];\n  readonly difficulty?: 'beginner' | 'intermediate' | 'advanced';\n  readonly created: string;\n  readonly updated?: string;\n}\n\n/**\n * New search content response\n */\nexport interface SearchContentResponse {\n  readonly results: TutorialSearchResult[];\n  readonly total: number;\n  readonly facets?: Record<string, unknown>;\n  readonly query: ProcessedSearchContentParams;\n}\n"],
+      version: 3
+    },
+    _coverageSchema: "1a1c01bbd47fc00a2c39e90264f33305004495a9",
+    hash: "f6ebdb78e9ed6212af9ea0c8a8f183a67d637044"
+  };
+  var coverage = global[gcv] || (global[gcv] = {});
+  if (!coverage[path] || coverage[path].hash !== hash) {
+    coverage[path] = coverageData;
+  }
+  var actualCoverage = coverage[path];
+  {
+    // @ts-ignore
+    cov_2ot7cnbl8s = function () {
+      return actualCoverage;
+    };
+  }
+  return actualCoverage;
+}
+cov_2ot7cnbl8s();
+cov_2ot7cnbl8s().s[0]++;
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+/* istanbul ignore next */
+cov_2ot7cnbl8s().s[1]++;
+exports.McpErrorType = exports.JsonRpcErrorCode = exports.isJsonRpcErrorResponse = exports.isJsonRpcSuccessResponse = void 0;
+/**
+ * Type guard to check if response is successful
+ */
+/* istanbul ignore next */
+cov_2ot7cnbl8s().s[2]++;
+const isJsonRpcSuccessResponse = response => {
+  /* istanbul ignore next */
+  cov_2ot7cnbl8s().f[0]++;
+  cov_2ot7cnbl8s().s[3]++;
+  return 'result' in response;
+};
+/* istanbul ignore next */
+cov_2ot7cnbl8s().s[4]++;
+exports.isJsonRpcSuccessResponse = isJsonRpcSuccessResponse;
+/**
+ * Type guard to check if response is an error
+ */
+/* istanbul ignore next */
+cov_2ot7cnbl8s().s[5]++;
+const isJsonRpcErrorResponse = response => {
+  /* istanbul ignore next */
+  cov_2ot7cnbl8s().f[1]++;
+  cov_2ot7cnbl8s().s[6]++;
+  return 'error' in response;
+};
+/* istanbul ignore next */
+cov_2ot7cnbl8s().s[7]++;
+exports.isJsonRpcErrorResponse = isJsonRpcErrorResponse;
+/**
+ * Standard JSON-RPC 2.0 error codes
+ */
+/* istanbul ignore next */
+cov_2ot7cnbl8s().s[8]++;
+exports.JsonRpcErrorCode = {
+  PARSE_ERROR: -32700,
+  INVALID_REQUEST: -32600,
+  METHOD_NOT_FOUND: -32601,
+  INVALID_PARAMS: -32602,
+  INTERNAL_ERROR: -32603,
+  SERVER_ERROR: -32000 // to -32099 reserved for server errors
+};
+/**
+ * MCP error types
+ */
+/* istanbul ignore next */
+cov_2ot7cnbl8s().s[9]++;
+exports.McpErrorType = {
+  INVALID_REQUEST: 'InvalidRequest',
+  METHOD_NOT_FOUND: 'MethodNotFound',
+  INVALID_PARAMS: 'InvalidParams',
+  INTERNAL_ERROR: 'InternalError'
+};
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJuYW1lcyI6WyJjb3ZfMm90N2NuYmw4cyIsInBhdGgiLCJoYXNoIiwiZ2xvYmFsIiwiRnVuY3Rpb24iLCJnY3YiLCJjb3ZlcmFnZURhdGEiLCJzdGF0ZW1lbnRNYXAiLCJzdGFydCIsImxpbmUiLCJjb2x1bW4iLCJlbmQiLCJmbk1hcCIsIm5hbWUiLCJkZWNsIiwibG9jIiwiYnJhbmNoTWFwIiwicyIsImYiLCJiIiwiaW5wdXRTb3VyY2VNYXAiLCJmaWxlIiwibWFwcGluZ3MiLCJuYW1lcyIsInNvdXJjZXMiLCJzb3VyY2VzQ29udGVudCIsInZlcnNpb24iLCJfY292ZXJhZ2VTY2hlbWEiLCJjb3ZlcmFnZSIsImFjdHVhbENvdmVyYWdlIiwiaXNKc29uUnBjU3VjY2Vzc1Jlc3BvbnNlIiwicmVzcG9uc2UiLCJleHBvcnRzIiwiaXNKc29uUnBjRXJyb3JSZXNwb25zZSIsIkpzb25ScGNFcnJvckNvZGUiLCJQQVJTRV9FUlJPUiIsIklOVkFMSURfUkVRVUVTVCIsIk1FVEhPRF9OT1RfRk9VTkQiLCJJTlZBTElEX1BBUkFNUyIsIklOVEVSTkFMX0VSUk9SIiwiU0VSVkVSX0VSUk9SIiwiTWNwRXJyb3JUeXBlIl0sInNvdXJjZXMiOlsiL3dvcmtzcGFjZS9zcmMvdHlwZXMvY29yZS10eXBlcy50cyJdLCJzb3VyY2VzQ29udGVudCI6WyIvKipcbiAqIENvcmUgcHJvdG9jb2wgdHlwZSBkZWZpbml0aW9ucyAoSlNPTi1SUEMgKyBNQ1ApXG4gKiBDb25zb2xpZGF0ZWQgZm9yIE1WUCBzaW1wbGlmaWNhdGlvblxuICovXG5cbi8vID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09XG4vLyBKU09OLVJQQyAyLjAgVHlwZXNcbi8vID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09XG5cbi8qKlxuICogSlNPTi1SUEMgMi4wIHJlcXVlc3Qgc3RydWN0dXJlXG4gKi9cbmV4cG9ydCBpbnRlcmZhY2UgSnNvblJwY1JlcXVlc3Q8VFBhcmFtcyA9IHVua25vd24+IHtcbiAgcmVhZG9ubHkganNvbnJwYzogJzIuMCc7XG4gIHJlYWRvbmx5IG1ldGhvZDogc3RyaW5nO1xuICByZWFkb25seSBwYXJhbXM/OiBUUGFyYW1zO1xuICByZWFkb25seSBpZD86IHN0cmluZyB8IG51bWJlciB8IG51bGw7XG59XG5cbi8qKlxuICogSlNPTi1SUEMgMi4wIHJlc3BvbnNlIHN0cnVjdHVyZSBmb3Igc3VjY2Vzc2Z1bCBjYWxsc1xuICovXG5leHBvcnQgaW50ZXJmYWNlIEpzb25ScGNTdWNjZXNzUmVzcG9uc2U8VFJlc3VsdCA9IHVua25vd24+IHtcbiAgcmVhZG9ubHkganNvbnJwYzogJzIuMCc7XG4gIHJlYWRvbmx5IHJlc3VsdDogVFJlc3VsdDtcbiAgcmVhZG9ubHkgaWQ6IHN0cmluZyB8IG51bWJlciB8IG51bGw7XG59XG5cbi8qKlxuICogSlNPTi1SUEMgMi4wIGVycm9yIG9iamVjdFxuICovXG5leHBvcnQgaW50ZXJmYWNlIEpzb25ScGNFcnJvciB7XG4gIHJlYWRvbmx5IGNvZGU6IG51bWJlcjtcbiAgcmVhZG9ubHkgbWVzc2FnZTogc3RyaW5nO1xuICByZWFkb25seSBkYXRhPzogdW5rbm93bjtcbn1cblxuLyoqXG4gKiBKU09OLVJQQyAyLjAgcmVzcG9uc2Ugc3RydWN0dXJlIGZvciBmYWlsZWQgY2FsbHNcbiAqL1xuZXhwb3J0IGludGVyZmFjZSBKc29uUnBjRXJyb3JSZXNwb25zZSB7XG4gIHJlYWRvbmx5IGpzb25ycGM6ICcyLjAnO1xuICByZWFkb25seSBlcnJvcjogSnNvblJwY0Vycm9yO1xuICByZWFkb25seSBpZDogc3RyaW5nIHwgbnVtYmVyIHwgbnVsbDtcbn1cblxuLyoqXG4gKiBVbmlvbiB0eXBlIGZvciBKU09OLVJQQyAyLjAgcmVzcG9uc2VzXG4gKi9cbmV4cG9ydCB0eXBlIEpzb25ScGNSZXNwb25zZTxUUmVzdWx0ID0gdW5rbm93bj4gPVxuICB8IEpzb25ScGNTdWNjZXNzUmVzcG9uc2U8VFJlc3VsdD5cbiAgfCBKc29uUnBjRXJyb3JSZXNwb25zZTtcblxuLyoqXG4gKiBUeXBlIGd1YXJkIHRvIGNoZWNrIGlmIHJlc3BvbnNlIGlzIHN1Y2Nlc3NmdWxcbiAqL1xuZXhwb3J0IGNvbnN0IGlzSnNvblJwY1N1Y2Nlc3NSZXNwb25zZSA9IDxUUmVzdWx0ID0gdW5rbm93bj4oXG4gIHJlc3BvbnNlOiBKc29uUnBjUmVzcG9uc2U8VFJlc3VsdD5cbik6IHJlc3BvbnNlIGlzIEpzb25ScGNTdWNjZXNzUmVzcG9uc2U8VFJlc3VsdD4gPT4ge1xuICByZXR1cm4gJ3Jlc3VsdCcgaW4gcmVzcG9uc2U7XG59O1xuXG4vKipcbiAqIFR5cGUgZ3VhcmQgdG8gY2hlY2sgaWYgcmVzcG9uc2UgaXMgYW4gZXJyb3JcbiAqL1xuZXhwb3J0IGNvbnN0IGlzSnNvblJwY0Vycm9yUmVzcG9uc2UgPSAoXG4gIHJlc3BvbnNlOiBKc29uUnBjUmVzcG9uc2Vcbik6IHJlc3BvbnNlIGlzIEpzb25ScGNFcnJvclJlc3BvbnNlID0+IHtcbiAgcmV0dXJuICdlcnJvcicgaW4gcmVzcG9uc2U7XG59O1xuXG4vKipcbiAqIFN0YW5kYXJkIEpTT04tUlBDIDIuMCBlcnJvciBjb2Rlc1xuICovXG5leHBvcnQgY29uc3QgSnNvblJwY0Vycm9yQ29kZSA9IHtcbiAgUEFSU0VfRVJST1I6IC0zMjcwMCxcbiAgSU5WQUxJRF9SRVFVRVNUOiAtMzI2MDAsXG4gIE1FVEhPRF9OT1RfRk9VTkQ6IC0zMjYwMSxcbiAgSU5WQUxJRF9QQVJBTVM6IC0zMjYwMixcbiAgSU5URVJOQUxfRVJST1I6IC0zMjYwMyxcbiAgU0VSVkVSX0VSUk9SOiAtMzIwMDAsIC8vIHRvIC0zMjA5OSByZXNlcnZlZCBmb3Igc2VydmVyIGVycm9yc1xufSBhcyBjb25zdDtcblxuZXhwb3J0IHR5cGUgSnNvblJwY0Vycm9yQ29kZSA9XG4gICh0eXBlb2YgSnNvblJwY0Vycm9yQ29kZSlba2V5b2YgdHlwZW9mIEpzb25ScGNFcnJvckNvZGVdO1xuXG4vLyA9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PVxuLy8gTUNQIFByb3RvY29sIFR5cGVzXG4vLyA9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PVxuXG4vKipcbiAqIE1DUCByZXNvdXJjZSBkZWZpbml0aW9uXG4gKi9cbmV4cG9ydCBpbnRlcmZhY2UgTWNwUmVzb3VyY2Uge1xuICByZWFkb25seSB1cmk6IHN0cmluZztcbiAgcmVhZG9ubHkgbmFtZTogc3RyaW5nO1xuICByZWFkb25seSBkZXNjcmlwdGlvbj86IHN0cmluZztcbiAgcmVhZG9ubHkgbWltZVR5cGU/OiBzdHJpbmc7XG59XG5cbi8qKlxuICogTUNQIHRvb2wgZGVmaW5pdGlvblxuICovXG5leHBvcnQgaW50ZXJmYWNlIE1jcFRvb2wge1xuICByZWFkb25seSBuYW1lOiBzdHJpbmc7XG4gIHJlYWRvbmx5IGRlc2NyaXB0aW9uOiBzdHJpbmc7XG4gIHJlYWRvbmx5IGlucHV0U2NoZW1hOiBSZWNvcmQ8c3RyaW5nLCB1bmtub3duPjtcbn1cblxuLyoqXG4gKiBNQ1AgcHJvbXB0IGRlZmluaXRpb25cbiAqL1xuZXhwb3J0IGludGVyZmFjZSBNY3BQcm9tcHQge1xuICByZWFkb25seSBuYW1lOiBzdHJpbmc7XG4gIHJlYWRvbmx5IGRlc2NyaXB0aW9uOiBzdHJpbmc7XG4gIHJlYWRvbmx5IGFyZ3VtZW50cz86IEFycmF5PHtcbiAgICByZWFkb25seSBuYW1lOiBzdHJpbmc7XG4gICAgcmVhZG9ubHkgZGVzY3JpcHRpb246IHN0cmluZztcbiAgICByZWFkb25seSByZXF1aXJlZD86IGJvb2xlYW47XG4gIH0+O1xufVxuXG4vLyBTaW1wbGlmaWVkIE1DUCB0eXBlcyBmb3IgTVZQIC0gcmVtb3ZlZCB1bnVzZWQgY29tcGxleCBuZXN0ZWQgc3RydWN0dXJlc1xuXG4vKipcbiAqIE1DUCBzZXJ2ZXIgY2FwYWJpbGl0aWVzIChzaW1wbGlmaWVkKVxuICovXG5leHBvcnQgaW50ZXJmYWNlIE1jcFNlcnZlckNhcGFiaWxpdGllcyB7XG4gIHJlYWRvbmx5IHJlc291cmNlcz86IFJlY29yZDxzdHJpbmcsIHVua25vd24+O1xuICByZWFkb25seSB0b29scz86IFJlY29yZDxzdHJpbmcsIHVua25vd24+O1xuICByZWFkb25seSBwcm9tcHRzPzogUmVjb3JkPHN0cmluZywgdW5rbm93bj47XG4gIHJlYWRvbmx5IFtrZXk6IHN0cmluZ106IHVua25vd247XG59XG5cbi8qKlxuICogTUNQIHNlcnZlciBpbmZvcm1hdGlvbiAoc2ltcGxpZmllZClcbiAqL1xuZXhwb3J0IGludGVyZmFjZSBNY3BTZXJ2ZXJJbmZvIHtcbiAgcmVhZG9ubHkgbmFtZTogc3RyaW5nO1xuICByZWFkb25seSB2ZXJzaW9uOiBzdHJpbmc7XG4gIHJlYWRvbmx5IHByb3RvY29sVmVyc2lvbjogc3RyaW5nO1xuICByZWFkb25seSBjYXBhYmlsaXRpZXM6IE1jcFNlcnZlckNhcGFiaWxpdGllcztcbn1cblxuLyoqXG4gKiBNQ1AgZXJyb3IgdHlwZXNcbiAqL1xuZXhwb3J0IGNvbnN0IE1jcEVycm9yVHlwZSA9IHtcbiAgSU5WQUxJRF9SRVFVRVNUOiAnSW52YWxpZFJlcXVlc3QnLFxuICBNRVRIT0RfTk9UX0ZPVU5EOiAnTWV0aG9kTm90Rm91bmQnLFxuICBJTlZBTElEX1BBUkFNUzogJ0ludmFsaWRQYXJhbXMnLFxuICBJTlRFUk5BTF9FUlJPUjogJ0ludGVybmFsRXJyb3InLFxufSBhcyBjb25zdDtcblxuZXhwb3J0IHR5cGUgTWNwRXJyb3JUeXBlID0gKHR5cGVvZiBNY3BFcnJvclR5cGUpW2tleW9mIHR5cGVvZiBNY3BFcnJvclR5cGVdO1xuXG4vKipcbiAqIE1DUCBlcnJvciBzdHJ1Y3R1cmVcbiAqL1xuZXhwb3J0IGludGVyZmFjZSBNY3BFcnJvciB7XG4gIHJlYWRvbmx5IHR5cGU6IE1jcEVycm9yVHlwZTtcbiAgcmVhZG9ubHkgbWVzc2FnZTogc3RyaW5nO1xuICByZWFkb25seSBkYXRhPzogdW5rbm93bjtcbn1cblxuLyoqXG4gKiBOZXcgc2VhcmNoIHR1dG9yaWFscyB0b29sIGlucHV0IHBhcmFtZXRlcnNcbiAqL1xuZXhwb3J0IGludGVyZmFjZSBTZWFyY2hDb250ZW50UGFyYW1zIHtcbiAgcmVhZG9ubHkga2V5d29yZHM6IHN0cmluZztcbiAgcmVhZG9ubHkgdHlwZXM/OiBzdHJpbmdbXTtcbiAgcmVhZG9ubHkgZHJ1cGFsX3ZlcnNpb24/OiBzdHJpbmdbXTtcbiAgcmVhZG9ubHkgY2F0ZWdvcnk/OiBzdHJpbmdbXTtcbiAgcmVhZG9ubHkgc29ydD86IHN0cmluZztcbiAgcmVhZG9ubHkgcGFnZT86IHsgbGltaXQ6IG51bWJlcjsgb2Zmc2V0OiBudW1iZXIgfTtcbn1cblxuLyoqXG4gKiBQcm9jZXNzZWQgbmV3IHNlYXJjaCBwYXJhbWV0ZXJzIGFmdGVyIHZhbGlkYXRpb25cbiAqL1xuZXhwb3J0IGludGVyZmFjZSBQcm9jZXNzZWRTZWFyY2hDb250ZW50UGFyYW1zIHtcbiAgcmVhZG9ubHkga2V5d29yZHM6IHN0cmluZztcbiAgcmVhZG9ubHkgdHlwZXM6IHN0cmluZ1tdO1xuICByZWFkb25seSBkcnVwYWxfdmVyc2lvbj86IHN0cmluZ1tdO1xuICByZWFkb25seSBjYXRlZ29yeT86IHN0cmluZ1tdO1xuICByZWFkb25seSBzb3J0OiBzdHJpbmc7XG4gIHJlYWRvbmx5IHBhZ2U6IHsgbGltaXQ6IG51bWJlcjsgb2Zmc2V0OiBudW1iZXIgfTtcbn1cblxuLyoqXG4gKiBUdXRvcmlhbCBzZWFyY2ggcmVzdWx0IGl0ZW1cbiAqL1xuZXhwb3J0IGludGVyZmFjZSBUdXRvcmlhbFNlYXJjaFJlc3VsdCB7XG4gIHJlYWRvbmx5IGlkOiBzdHJpbmc7XG4gIHJlYWRvbmx5IHRpdGxlOiBzdHJpbmc7XG4gIHJlYWRvbmx5IHVybDogc3RyaW5nO1xuICByZWFkb25seSBkZXNjcmlwdGlvbj86IHN0cmluZztcbiAgcmVhZG9ubHkgZHJ1cGFsX3ZlcnNpb24/OiBzdHJpbmdbXTtcbiAgcmVhZG9ubHkgdGFncz86IHN0cmluZ1tdO1xuICByZWFkb25seSBkaWZmaWN1bHR5PzogJ2JlZ2lubmVyJyB8ICdpbnRlcm1lZGlhdGUnIHwgJ2FkdmFuY2VkJztcbiAgcmVhZG9ubHkgY3JlYXRlZDogc3RyaW5nO1xuICByZWFkb25seSB1cGRhdGVkPzogc3RyaW5nO1xufVxuXG4vKipcbiAqIE5ldyBzZWFyY2ggY29udGVudCByZXNwb25zZVxuICovXG5leHBvcnQgaW50ZXJmYWNlIFNlYXJjaENvbnRlbnRSZXNwb25zZSB7XG4gIHJlYWRvbmx5IHJlc3VsdHM6IFR1dG9yaWFsU2VhcmNoUmVzdWx0W107XG4gIHJlYWRvbmx5IHRvdGFsOiBudW1iZXI7XG4gIHJlYWRvbmx5IGZhY2V0cz86IFJlY29yZDxzdHJpbmcsIHVua25vd24+O1xuICByZWFkb25seSBxdWVyeTogUHJvY2Vzc2VkU2VhcmNoQ29udGVudFBhcmFtcztcbn1cbiJdLCJtYXBwaW5ncyI6Ijs7QUFBQTs7OztBQUFBO0FBQUEsU0FBQUEsZUFBQTtFQUFBLElBQUFDLElBQUE7RUFBQSxJQUFBQyxJQUFBO0VBQUEsSUFBQUMsTUFBQSxPQUFBQyxRQUFBO0VBQUEsSUFBQUMsR0FBQTtFQUFBLElBQUFDLFlBQUE7SUFBQUwsSUFBQTtJQUFBTSxZQUFBO01BQUE7UUFBQUMsS0FBQTtVQUFBQyxJQUFBO1VBQUFDLE1BQUE7UUFBQTtRQUFBQyxHQUFBO1VBQUFGLElBQUE7VUFBQUMsTUFBQTtRQUFBO01BQUE7TUFBQTtRQUFBRixLQUFBO1VBQUFDLElBQUE7VUFBQUMsTUFBQTtRQUFBO1FBQUFDLEdBQUE7VUFBQUYsSUFBQTtVQUFBQyxNQUFBO1FBQUE7TUFBQTtNQUFBO1FBQUFGLEtBQUE7VUFBQUMsSUFBQTtVQUFBQyxNQUFBO1FBQUE7UUFBQUMsR0FBQTtVQUFBRixJQUFBO1VBQUFDLE1BQUE7UUFBQTtNQUFBO01BQUE7UUFBQUYsS0FBQTtVQUFBQyxJQUFBO1VBQUFDLE1BQUE7UUFBQTtRQUFBQyxHQUFBO1VBQUFGLElBQUE7VUFBQUMsTUFBQTtRQUFBO01BQUE7TUFBQTtRQUFBRixLQUFBO1VBQUFDLElBQUE7VUFBQUMsTUFBQTtRQUFBO1FBQUFDLEdBQUE7VUFBQUYsSUFBQTtVQUFBQyxNQUFBO1FBQUE7TUFBQTtNQUFBO1FBQUFGLEtBQUE7VUFBQUMsSUFBQTtVQUFBQyxNQUFBO1FBQUE7UUFBQUMsR0FBQTtVQUFBRixJQUFBO1VBQUFDLE1BQUE7UUFBQTtNQUFBO01BQUE7UUFBQUYsS0FBQTtVQUFBQyxJQUFBO1VBQUFDLE1BQUE7UUFBQTtRQUFBQyxHQUFBO1VBQUFGLElBQUE7VUFBQUMsTUFBQTtRQUFBO01BQUE7TUFBQTtRQUFBRixLQUFBO1VBQUFDLElBQUE7VUFBQUMsTUFBQTtRQUFBO1FBQUFDLEdBQUE7VUFBQUYsSUFBQTtVQUFBQyxNQUFBO1FBQUE7TUFBQTtNQUFBO1FBQUFGLEtBQUE7VUFBQUMsSUFBQTtVQUFBQyxNQUFBO1FBQUE7UUFBQUMsR0FBQTtVQUFBRixJQUFBO1VBQUFDLE1BQUE7UUFBQTtNQUFBO01BQUE7UUFBQUYsS0FBQTtVQUFBQyxJQUFBO1VBQUFDLE1BQUE7UUFBQTtRQUFBQyxHQUFBO1VBQUFGLElBQUE7VUFBQUMsTUFBQTtRQUFBO01BQUE7SUFBQTtJQUFBRSxLQUFBO01BQUE7UUFBQUMsSUFBQTtRQUFBQyxJQUFBO1VBQUFOLEtBQUE7WUFBQUMsSUFBQTtZQUFBQyxNQUFBO1VBQUE7VUFBQUMsR0FBQTtZQUFBRixJQUFBO1lBQUFDLE1BQUE7VUFBQTtRQUFBO1FBQUFLLEdBQUE7VUFBQVAsS0FBQTtZQUFBQyxJQUFBO1lBQUFDLE1BQUE7VUFBQTtVQUFBQyxHQUFBO1lBQUFGLElBQUE7WUFBQUMsTUFBQTtVQUFBO1FBQUE7UUFBQUQsSUFBQTtNQUFBO01BQUE7UUFBQUksSUFBQTtRQUFBQyxJQUFBO1VBQUFOLEtBQUE7WUFBQUMsSUFBQTtZQUFBQyxN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
