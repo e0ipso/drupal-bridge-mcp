@@ -6,9 +6,9 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import jwt from 'jsonwebtoken';
-import { TokenManager, StoredTokens } from '../../src/auth/token-manager.js';
-import type { OAuthTokens } from '../../src/auth/oauth-client.js';
-import { OAuthClient } from '../../src/auth/oauth-client.js';
+import { TokenManager, StoredTokens } from '@/auth/token-manager.js';
+import type { OAuthTokens } from '@/auth/oauth-client.js';
+import { OAuthClient } from '@/auth/oauth-client.js';
 // CryptoUtils removed for MVP simplification
 // import { CryptoUtils } from '../../src/auth/crypto-utils.js';
 

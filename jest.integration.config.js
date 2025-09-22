@@ -20,8 +20,10 @@ export default {
       },
     ],
   },
-  moduleNameMapping: {
+  moduleNameMapper: {
+    '^@/(.*)\\.(js|ts)$': '<rootDir>/src/$1',
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^(.*)\\.js$': '$1',
   },
   extensionsToTreatAsEsm: ['.ts'],
   collectCoverageFrom: ['src/auth/**/*.ts', '!src/auth/index.ts', '!**/*.d.ts'],

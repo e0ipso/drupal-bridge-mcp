@@ -2,8 +2,8 @@
  * OAuth flow integration tests
  */
 
-import type { OAuthTokens } from '../../src/auth/oauth-client.js';
-import { OAuthClient, PKCEChallenge } from '../../src/auth/oauth-client.js';
+import type { OAuthTokens } from '@/auth/oauth-client.js';
+import { OAuthClient, PKCEChallenge } from '@/auth/oauth-client.js';
 import type { Server } from 'http';
 import { createServer } from 'http';
 import type { AddressInfo } from 'net';
