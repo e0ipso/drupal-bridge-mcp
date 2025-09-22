@@ -220,15 +220,15 @@ When creating tasks, you need to determine the next available task ID for the sp
 
 #### Command
 ```bash
-PLAN_ID=$1; echo $(($(find .ai/task-manager/plans/$(printf "%02d" $PLAN_ID)--*/tasks -name "*.md" -exec grep "^id:" {} \; 2>/dev/null | sed 's/id: *//' | sort -n | tail -1 | sed 's/^$/0/') + 1))
+PLAN_ID=$1; echo $(($(find .ai/task-manager/plans/$(printf "%02d" $PLAN_ID)--*/tasks -name "*.md" -exec grep "^id: *[0-9][0-9]* *$" {} \; 2>/dev/null | sed 's/.*id: *//' | sed 's/ *$//' | sort -n | tail -1 | sed 's/^$/0/') + 1))
 ```
 
 #### How It Works
 1. **Finds task files** using the pattern `*.md` in the specific plan's tasks directory
-2. **Extracts front-matter IDs** using grep to find `id:` lines from all task files
-3. **Strips the `id:` prefix** using sed to get numeric values only
+2. **Validates and extracts front-matter IDs** using grep to find `id:` lines with valid numeric values, filtering out malformed or string IDs
+3. **Strips the `id:` prefix and whitespace** using sed to get clean numeric values only
 4. **Sorts numerically** to find the highest existing task ID
-5. **Handles empty results** by defaulting to 0 if no tasks exist
+5. **Handles empty results** by defaulting to 0 if no valid tasks exist
 6. **Adds 1** to get the next available task ID
 
 This command reads the actual `id:` values from task front-matter, making it the definitive source of truth.
@@ -249,8 +249,8 @@ This command reads the actual `id:` values from task front-matter, making it the
 **Example 1: Plan 6 with existing tasks**
 ```bash
 # Command execution (plan ID = 6)
-PLAN_ID=6; echo $(($(find .ai/task-manager/plans/$(printf "%02d" $PLAN_ID)--*/tasks -name "*.md" -exec grep "^id:" {} \; 2>/dev/null | sed 's/id: *//' | sort -n | tail -1 | sed 's/^$/0/') + 1))
-# Output: 5 (if highest task front-matter has id: 4)
+PLAN_ID=6; echo $(($(find .ai/task-manager/plans/$(printf "%02d" $PLAN_ID)--*/tasks -name "*.md" -exec grep "^id: *[0-9][0-9]* *$" {} \; 2>/dev/null | sed 's/.*id: *//' | sed 's/ *$//' | sort -n | tail -1 | sed 's/^$/0/') + 1))
+# Output: 5 (if highest valid numeric task front-matter has id: 4)
 
 # Front-matter usage:
 ---
@@ -266,8 +266,8 @@ skills: ["api-endpoints", "database"]
 **Example 2: Plan 1 with no existing tasks**
 ```bash
 # Command execution (plan ID = 1)
-PLAN_ID=1; echo $(($(find .ai/task-manager/plans/$(printf "%02d" $PLAN_ID)--*/tasks -name "*.md" -exec grep "^id:" {} \; 2>/dev/null | sed 's/id: *//' | sort -n | tail -1 | sed 's/^$/0/') + 1))
-# Output: 1 (empty tasks directory, no front-matter to read)
+PLAN_ID=1; echo $(($(find .ai/task-manager/plans/$(printf "%02d" $PLAN_ID)--*/tasks -name "*.md" -exec grep "^id: *[0-9][0-9]* *$" {} \; 2>/dev/null | sed 's/.*id: *//' | sed 's/ *$//' | sort -n | tail -1 | sed 's/^$/0/') + 1))
+# Output: 1 (empty tasks directory, no valid front-matter to read)
 
 # Front-matter usage:
 ---
@@ -286,6 +286,8 @@ The command handles several edge cases automatically:
 - **Non-sequential task IDs**: Returns the maximum existing ID + 1
 - **Missing plan directory**: Returns `1` (graceful fallback)
 - **Mixed numbering**: Correctly finds the highest numeric ID regardless of gaps
+- **Malformed frontmatter**: Skips files with non-numeric, string, or missing ID fields
+- **Whitespace variations**: Handles extra spaces around ID values (e.g., `id:  5  `)
 
 #### Command Execution Context
 - Run this command from the repository root directory
@@ -348,106 +350,4 @@ If the plan lacks sufficient detail:
 - Create placeholder tasks marked with `status: "needs-clarification"`
 - Document assumptions made
 
-## Update the plan document
-
-After creating all tasks with their dependencies, update the original plan document with two critical sections: a task dependency visualization and a phase-based execution blueprint.
-
-### Section 1: Dependency Visualization
-
-If any tasks have dependencies, create a Mermaid diagram showing the dependency graph:
-
-```mermaid
-graph TD
-    001[Task 001: Database Schema] --> 002[Task 002: API Endpoints]
-    001 --> 003[Task 003: Data Models]
-    002 --> 004[Task 004: Frontend Integration]
-    003 --> 004
-```
-
-Note: Ensure the graph is acyclic (no circular dependencies).
-
-### Section 2: Phase-Based Execution Blueprint
-
-#### Core Concept
-The execution blueprint organizes tasks into sequential phases where:
-- **Within a phase**: All tasks execute in parallel
-- **Between phases**: Execution is strictly sequential
-- **Phase progression**: Requires all tasks in current phase to complete AND validation gates to pass
-
-#### Phase Definition Rules
-1. **Phase 1**: Contains all tasks with zero dependencies
-2. **Phase N**: Contains tasks whose dependencies are ALL satisfied by tasks in phases 1 through N-1
-3. **Parallelism Priority**: Maximize the number of tasks that can run simultaneously in each phase
-4. **Completeness**: Every task must be assigned to exactly one phase
-
-#### Blueprint Structure
-
-```markdown
-## Execution Blueprint
-
-**Validation Gates:**
-- Reference: `@.ai/task-manager/config/hooks/POST_PHASE.md`
-
-### Phase 1: [Descriptive Phase Name]
-**Parallel Tasks:**
-- Task 001: [Description]
-- Task 005: [Description]
-- Task 009: [Description]
-
-### Phase 2: [Descriptive Phase Name]
-**Parallel Tasks:**
-- Task 002: [Description] (depends on: 001)
-- Task 003: [Description] (depends on: 001)
-- Task 006: [Description] (depends on: 005)
-
-[Continue for all phases...]
-
-### Post-phase Actions
-
-### Execution Summary
-- Total Phases: X
-- Total Tasks: Y
-- Maximum Parallelism: Z tasks (in Phase N)
-- Critical Path Length: X phases
-```
-
-### Validation Requirements
-
-#### Phase Transition Rules
-1. All tasks in the current phase must have status: "completed"
-2. All validation gates defined in `@.ai/task-manager/config/hooks/POST_PHASE.md` for the current phase must pass
-3. No task in a future phase can begin until these conditions are met
-
-#### Blueprint Verification
-Before finalizing, ensure:
-- [ ] Every task appears in exactly one phase
-- [ ] No task appears in a phase before all its dependencies
-- [ ] Phase 1 contains only tasks with no dependencies
-- [ ] Each phase maximizes parallel execution opportunities
-- [ ] All phases reference their validation gates
-- [ ] The execution summary accurately reflects the blueprint
-
-### Important Notes
-
-#### Parallel Execution
-- Tasks within a phase have no interdependencies and can run simultaneously
-- This enables efficient resource utilization and faster completion
-- AI agents can be assigned to multiple tasks within the same phase
-
-#### Sequential Phases
-- Phases execute in strict numerical order
-- Phase N+1 cannot begin until Phase N is fully complete and validated
-- This ensures dependency integrity and systematic progress
--
-
-#### Validation Gates
-- Each phase has associated validation criteria defined externally
-- Gates ensure quality and correctness before progression
-- Failed validations require task remediation before phase completion
-
-### Error Handling
-
-If dependency analysis reveals issues:
-- **Circular dependencies**: Document the cycle and mark affected tasks for review
-- **Orphaned tasks**: Tasks that cannot be scheduled due to missing dependencies
-- **Ambiguous dependencies**: Note assumptions made and flag for clarification
+Read and execute @.ai/task-manager/config/hooks/POST_PLAN.md

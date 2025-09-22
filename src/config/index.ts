@@ -164,7 +164,7 @@ export const loadConfig = async (): Promise<AppConfig> => {
       );
 
       // Update OAuth config with discovered endpoints
-      (config as any).oauth = {
+      (config as { oauth: OAuthConfig }).oauth = {
         ...config.oauth,
         authorizationEndpoint: discoveredEndpoints.authorizationEndpoint,
         tokenEndpoint: discoveredEndpoints.tokenEndpoint,

@@ -7,7 +7,8 @@
       "Bash(npx tsc:*)",
       "Bash(npm test)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "WebSearch"
     ],
     "deny": []
   }

@@ -20,30 +20,16 @@ If no user input is provided stop immediately and show an error message to the u
 
 ### Process
 
-#### Step 1: Context Analysis
-Before creating any plan, analyze the user's request for:
-- **Objective**: What is the end goal?
-- **Scope**: What are the boundaries and constraints?
-- **Resources**: What tools, budget, or team are available?
-- **Success Criteria**: How will success be measured?
-- **Dependencies**: What prerequisites or blockers exist?
-- **Technical Requirements**: What technologies or skills are needed?
+Use your internal Todo task tool to track the plan generation. Example:
 
-#### Step 2: Clarification Phase
-If any critical context is missing:
-1. Identify specific gaps in the information provided
-2. Ask targeted follow-up questions grouped by category
-3. Wait for user responses before proceeding to planning
-4. Frame questions clearly with examples when helpful
-5. Be extra cautious. Users miss important context very often. Extract it from them
+- [ ] User input and context analysis
+- [ ] Clarification questions
+- [ ] Plan generation: Executive Summary
+- [ ] Plan generation: Detailed Steps
+- [ ] Plan generation: Risk Considerations
+- [ ] Plan generation: Success Metrics
 
-Example clarifying questions:
-- "What is your primary goal with [specific aspect]?"
-- "Do you have any existing [resources/code/infrastructure] I should consider?"
-- "What is your timeline for completing this?"
-- "Are there specific constraints I should account for?"
-- "Do you want me to write tests for this?"
-- "Are there other systems, projects, or modules that perform a similar task?"
+Read and execute @.ai/task-manager/config/hooks/POST_PLAN.md
 
 #### Step 3: Plan Generation
 Only after confirming sufficient context, create a plan that includes:
@@ -54,14 +40,7 @@ Only after confirming sufficient context, create a plan that includes:
 
 Remember that a plan needs to be reviewed by a human. Be concise and to the point. Also, include mermaid diagrams to illustrate the plan.
 
-### Important Notes
-- Never generate a partial or assumed plan without adequate context
-- Prioritize accuracy over speed
-- Consider both technical and non-technical aspects
-- Adapt the plan format based on the task type (development, design, research, etc.)
-- DO NOT create or list any tasks or phases during the plan creation. This will be done in a later step. Stick to writing the PRD (Project Requirements Document).
-
-### Scope Control Guidelines
+##### Scope Control Guidelines
 **Critical: Implement ONLY what is explicitly requested**
 
 - **Minimal Viable Implementation**: Build exactly what the user asked for, nothing more
@@ -79,7 +58,7 @@ Remember that a plan needs to be reviewed by a human. Be concise and to the poin
 
 **When in doubt, ask**: "Is this feature explicitly mentioned in the user's request?"
 
-### Simplicity Principles
+##### Simplicity Principles
 **Favor maintainability over cleverness**
 
 - **Simple Solutions First**: Choose the most straightforward approach that meets requirements
@@ -91,23 +70,23 @@ Remember that a plan needs to be reviewed by a human. Be concise and to the poin
 
 **Remember**: A working simple solution is better than a complex "perfect" one.
 
-### Output Format
+##### Output Format
 Structure your response as follows:
 - If context is insufficient: List specific clarifying questions
 - If context is sufficient: Provide the comprehensive plan using the structure above. Use the information in @TASK_MANAGER.md for the directory structure and additional information about plans.
 
 Outside the plan document, be **extremely** concise. Just tell the user that you are done, and instruct them to review the plan document.
 
-#### Plan Template
+###### Plan Template
 
 Use the template in @.ai/task-manager/config/templates/PLAN_TEMPLATE.md
 
-#### Patterns to Avoid
+###### Patterns to Avoid
 Do not include the following in your plan output.
 - Avoid time estimations
 - Avoid task lists and mentions of phases (those are things we'll introduce later)
 
-#### Frontmatter Structure
+###### Frontmatter Structure
 
 Example:
 ```yaml
@@ -142,15 +121,36 @@ The schema for this frontmatter is:
 }
 ```
 
+### Critical Notes
+- Never generate a partial or assumed plan without adequate context
+- Prioritize accuracy over speed
+- Consider both technical and non-technical aspects
+- Use the plan template in .ai/task-manager/config/templates/PLAN_TEMPLATE.md
+- DO NOT create or list any tasks or phases during the plan creation. This will be done in a later step. Stick to writing the PRD (Project Requirements Document).
+
 ### Plan ID Generation
 
 **Auto-generate the next plan ID:**
 ```bash
-echo $(($(find .ai/task-manager/{plans,archive} -name "plan-*.md" -exec grep "^id:" {} \; 2>/dev/null | sed 's/id: *//' | sort -n | tail -1 | sed 's/^$/0/') + 1))
+echo $(($(find .ai/task-manager/{plans,archive} -name "plan-[0-9]*--*.md" 2>/dev/null -exec sh -c 'grep -m1 "^[[:space:]]*id:[[:space:]]*[0-9][0-9]*[[:space:]]*$" "$1" 2>/dev/null || echo "id: 0"' _ {} \; | sed -E "s/^[[:space:]]*id:[[:space:]]*([0-9]+)[[:space:]]*$/\1/" | awk 'BEGIN{max=0} {if($1+0>max) max=$1+0} END{print max}') + 1))
 ```
 
 **Key formatting:**
 - **Front-matter**: Use numeric values (`id: 7`)
 - **Directory names**: Use zero-padded strings (`07--plan-name`)
 
-This command reads `id:` values from existing plan front-matter as the source of truth. Handles empty directories (returns 1) and gaps in sequence automatically.
+This enhanced command provides robust plan ID generation with comprehensive error handling:
+
+**Features:**
+- **Flexible Whitespace Handling**: Supports various patterns: `id: 5`, `id:5`, `id:  15`, `id:	25` (tabs)
+- **Validation Layer**: Only processes files with valid numeric ID fields in YAML frontmatter
+- **Error Resilience**: Gracefully handles empty directories, corrupted files, and parsing failures
+- **Fallback Logic**: Returns ID 1 when no valid plans found, ensuring command never fails
+- **Robust Parsing**: Uses POSIX character classes for reliable whitespace matching across systems
+
+**Handles Edge Cases:**
+- Empty plans/archive directories → Returns 1
+- Corrupted or malformed YAML frontmatter → Skips invalid files
+- Non-numeric ID values → Filters out automatically
+- Missing frontmatter → Ignored safely
+- File system errors → Suppressed with 2>/dev/null
