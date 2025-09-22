@@ -4,6 +4,8 @@
 
 import type { DrupalClientConfig, McpServerInfo } from '@/types/index.js';
 import type { OAuthConfig } from '@/auth/index.js';
+import type { DiscoveryConfig } from '@/auth/types.js';
+import { discoverOAuthEndpoints } from '@/auth/endpoint-discovery.js';
 
 /**
  * Application configuration interface
@@ -25,6 +27,7 @@ export interface AppConfig {
     readonly level: 'error' | 'warn' | 'info' | 'debug';
   };
   readonly environment: 'development' | 'test' | 'production';
+  readonly discovery: DiscoveryConfig;
 }
 
 /**
@@ -48,6 +51,7 @@ const getEnvConfig = (): AppConfig => {
     },
     oauth: {
       clientId: process.env.OAUTH_CLIENT_ID ?? '',
+      // These will be populated by endpoint discovery or fallback to these defaults
       authorizationEndpoint: `${drupalBaseUrl}/oauth/authorize`,
       tokenEndpoint: `${drupalBaseUrl}/oauth/token`,
       redirectUri:
@@ -91,6 +95,17 @@ const getEnvConfig = (): AppConfig => {
     },
     environment:
       (process.env.NODE_ENV as AppConfig['environment']) ?? 'development',
+    discovery: {
+      baseUrl: drupalBaseUrl,
+      timeout: parseInt(process.env.OAUTH_DISCOVERY_TIMEOUT ?? '5000', 10),
+      retries: parseInt(process.env.OAUTH_DISCOVERY_RETRIES ?? '2', 10),
+      cacheTtl: parseInt(
+        process.env.OAUTH_DISCOVERY_CACHE_TTL ?? '3600000',
+        10
+      ), // 1 hour
+      validateHttps: process.env.OAUTH_DISCOVERY_VALIDATE_HTTPS !== 'false',
+      debug: process.env.OAUTH_DISCOVERY_DEBUG === 'true',
+    },
   };
 };
 
@@ -126,7 +141,7 @@ const validateConfig = (config: AppConfig): void => {
 };
 
 /**
- * Load and validate configuration
+ * Load and validate configuration with OAuth endpoint discovery
  */
 export const loadConfig = async (): Promise<AppConfig> => {
   try {
@@ -140,6 +155,38 @@ export const loadConfig = async (): Promise<AppConfig> => {
 
   const config = getEnvConfig();
   validateConfig(config);
+
+  // Perform OAuth endpoint discovery if authentication is enabled
+  if (config.auth.enabled && !process.env.OAUTH_SKIP_DISCOVERY) {
+    try {
+      const discoveredEndpoints = await discoverOAuthEndpoints(
+        config.discovery
+      );
+
+      // Update OAuth config with discovered endpoints
+      (config as any).oauth = {
+        ...config.oauth,
+        authorizationEndpoint: discoveredEndpoints.authorizationEndpoint,
+        tokenEndpoint: discoveredEndpoints.tokenEndpoint,
+      };
+
+      if (config.discovery.debug) {
+        console.log('[Config] OAuth endpoints discovered:', {
+          authorization: discoveredEndpoints.authorizationEndpoint,
+          token: discoveredEndpoints.tokenEndpoint,
+          isFallback: discoveredEndpoints.isFallback,
+        });
+      }
+    } catch (error) {
+      if (config.discovery.debug) {
+        console.warn(
+          '[Config] OAuth endpoint discovery failed, using defaults:',
+          error
+        );
+      }
+      // Continue with default endpoints from getEnvConfig
+    }
+  }
 
   return config;
 };

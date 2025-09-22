@@ -2,17 +2,21 @@
  * Authentication module exports
  */
 
+// Legacy OAuth client (deprecated)
 export {
   OAuthClient,
   type OAuthConfig,
-  type OAuthTokens,
   type PKCEChallenge,
 } from './oauth-client.js';
+export { TokenManager, type StoredTokens } from './token-manager.js';
+
+// New MCP SDK-based OAuth provider (recommended)
 export {
-  TokenManager,
-  type StoredTokens,
+  McpOAuthProvider,
+  type McpOAuthConfig,
+  type OAuthTokens,
   type TokenValidationResult,
-} from './token-manager.js';
+} from './oauth-provider.js';
 // CryptoUtils removed for MVP simplification
 export {
   AuthMiddleware,
@@ -33,3 +37,19 @@ export {
   isAuthError,
   extractMcpErrorDetails,
 } from './auth-errors.js';
+
+// OAuth 2.1 endpoint discovery (RFC8414)
+export {
+  discoverOAuthEndpoints,
+  clearDiscoveryCache,
+  cleanupDiscoveryCache,
+  getDiscoveryCacheStats,
+} from './endpoint-discovery.js';
+export type {
+  OAuthServerMetadata,
+  OAuthEndpoints,
+  DiscoveryConfig,
+  CacheEntry,
+  DiscoveryErrorType,
+} from './types.js';
+export { DiscoveryError } from './types.js';

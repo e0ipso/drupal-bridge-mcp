@@ -57,6 +57,6 @@
     "skipDefaultLibCheck": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "*.config.ts"],
+  "include": ["src/**/*", "examples/**/*", "*.config.ts"],
   "exclude": ["node_modules", "dist", "*.config.mjs", "eslint.config.*"]
 }

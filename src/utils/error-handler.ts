@@ -112,7 +112,7 @@ export function parseJsonRpcError(
     {
       jsonrpc_code: error.code,
       jsonrpc_data: error.data,
-      server_details: error.data?.details as string,
+      server_details: (error.data as any)?.details as string,
     },
     response,
     retryable
