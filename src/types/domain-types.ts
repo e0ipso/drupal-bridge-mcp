@@ -199,27 +199,5 @@ export interface TokenValidationResult {
   userId?: string;
 }
 
-/**
- * Authentication context (from auth-middleware.ts)
- */
-export interface AuthContext {
-  isAuthenticated: boolean;
-  userId?: string;
-  accessToken?: string;
-  scopes?: string[];
-  expiresAt?: number;
-}
-
+// Authentication types moved to auth-errors.ts for OAuth 2.1 stateless design
 // AuthMiddlewareConfig removed - simplified for MVP, use inline configuration
-
-/**
- * User session (from session-store.ts)
- */
-export interface Session {
-  id: string;
-  userId: string;
-  authContext: AuthContext;
-  createdAt: number;
-  lastAccessedAt: number;
-  expiresAt?: number;
-}

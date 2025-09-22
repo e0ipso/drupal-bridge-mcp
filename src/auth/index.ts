@@ -18,14 +18,10 @@ export {
   type TokenValidationResult,
 } from './oauth-provider.js';
 // CryptoUtils removed for MVP simplification
-export {
-  AuthMiddleware,
-  type AuthContext,
-  type AuthMiddlewareConfig,
-} from './auth-middleware.js';
-export { SessionStore, type Session } from './session-store.js';
+// Simplified authentication errors and types for OAuth 2.1 stateless design
 export {
   AuthError,
+  ValidationError,
   AuthenticationRequiredError,
   InvalidTokenError,
   InsufficientScopesError,
@@ -36,6 +32,8 @@ export {
   createMcpErrorResponse,
   isAuthError,
   extractMcpErrorDetails,
+  type AuthContext,
+  type Session,
 } from './auth-errors.js';
 
 // OAuth 2.1 endpoint discovery (RFC8414)

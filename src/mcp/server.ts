@@ -35,11 +35,10 @@ import {
 import {
   OAuthClient,
   TokenManager,
-  AuthMiddleware,
-  SessionStore,
   AuthenticationRequiredError,
   createMcpErrorResponse,
   McpOAuthProvider,
+  type AuthContext,
 } from '@/auth/index.js';
 
 /**
@@ -51,8 +50,6 @@ export class DrupalMcpServer {
   private readonly oauthClient: OAuthClient;
   private readonly mcpOAuthProvider: McpOAuthProvider;
   private readonly tokenManager: TokenManager;
-  private readonly authMiddleware: AuthMiddleware;
-  private readonly sessionStore: SessionStore;
   private requestCounter = 0;
 
   constructor(private readonly config: AppConfig) {
@@ -72,17 +69,26 @@ export class DrupalMcpServer {
 
     this.drupalClient = new DrupalClient(config.drupal);
 
-    // Initialize authentication components with new MCP OAuth provider
+    // Initialize authentication components with new MCP OAuth provider (OAuth 2.1 stateless design)
     this.mcpOAuthProvider = createOAuthProvider(config);
-    this.oauthClient = new OAuthClient(config.oauth); // Keep for backward compatibility
+
+    // Convert SimplifiedOAuthConfig to OAuthConfig for backward compatibility
+    const legacyOAuthConfig = {
+      clientId: config.oauth.clientId,
+      authorizationEndpoint:
+        config.oauth.authorizationEndpoint ||
+        config.oauth.discoveredEndpoints?.authorizationEndpoint ||
+        '',
+      tokenEndpoint:
+        config.oauth.tokenEndpoint ||
+        config.oauth.discoveredEndpoints?.tokenEndpoint ||
+        '',
+      redirectUri: config.oauth.redirectUri,
+      scopes: config.oauth.scopes,
+    };
+
+    this.oauthClient = new OAuthClient(legacyOAuthConfig); // Keep for backward compatibility
     this.tokenManager = new TokenManager(this.oauthClient);
-    this.authMiddleware = new AuthMiddleware({
-      oauthClient: this.oauthClient,
-      tokenManager: this.tokenManager,
-      requiredScopes: config.auth.requiredScopes,
-      skipAuth: config.auth.skipAuth,
-    });
-    this.sessionStore = new SessionStore();
 
     this.setupHandlers();
   }
@@ -92,6 +98,58 @@ export class DrupalMcpServer {
    */
   private generateRequestId(): string {
     return `mcp-req-${Date.now()}-${++this.requestCounter}`;
+  }
+
+  /**
+   * Simplified authentication check for OAuth 2.1 stateless design
+   */
+  private async requireAuthentication(): Promise<AuthContext> {
+    // Skip authentication if configured
+    if (this.config.auth.skipAuth) {
+      return { isAuthenticated: true };
+    }
+
+    try {
+      // Try to get valid access token from new MCP OAuth provider first
+      const validToken = await this.mcpOAuthProvider.getValidAccessToken();
+
+      if (validToken) {
+        // OAuth 2.1 tokens are stateless - no user info stored in token
+        return {
+          isAuthenticated: true,
+          userId: 'default', // OAuth 2.1 stateless design - derive from token claims if needed
+          scopes: this.config.auth.requiredScopes,
+          accessToken: validToken,
+        };
+      }
+
+      // Fall back to legacy token manager if needed
+      const accessToken = await this.tokenManager.getValidAccessToken(
+        undefined,
+        this.config.auth.requiredScopes
+      );
+
+      if (accessToken) {
+        const validation = await this.tokenManager.validateToken(
+          accessToken,
+          this.config.auth.requiredScopes
+        );
+
+        if (validation.isValid) {
+          return {
+            isAuthenticated: true,
+            userId: validation.userId || 'default',
+            scopes: validation.scopes,
+            accessToken,
+          };
+        }
+      }
+
+      return { isAuthenticated: false };
+    } catch (error) {
+      console.error('Authentication error:', error);
+      return { isAuthenticated: false };
+    }
   }
 
   /**
@@ -428,26 +486,17 @@ export class DrupalMcpServer {
 
       // For data tools, require authentication (unless skipped)
       if (!this.config.auth.skipAuth) {
-        // Try to get valid access token from new MCP OAuth provider first
-        const validToken = await this.mcpOAuthProvider.getValidAccessToken();
+        const authContext = await this.requireAuthentication();
 
-        if (validToken) {
-          // Use token from new provider
-          this.drupalClient.setAccessToken(validToken);
-        } else {
-          // Fall back to existing authentication middleware
-          const authContext = await this.authMiddleware.requireAuthentication();
+        if (!authContext.isAuthenticated) {
+          throw new AuthenticationRequiredError(
+            'Please authenticate first using auth_login tool'
+          );
+        }
 
-          if (!authContext.isAuthenticated) {
-            throw new AuthenticationRequiredError(
-              'Please authenticate first using auth_login tool'
-            );
-          }
-
-          // Update Drupal client with access token
-          if (authContext.accessToken) {
-            this.drupalClient.setAccessToken(authContext.accessToken);
-          }
+        // Update Drupal client with access token
+        if (authContext.accessToken) {
+          this.drupalClient.setAccessToken(authContext.accessToken);
         }
       }
 
@@ -689,29 +738,21 @@ export class DrupalMcpServer {
       );
       await this.mcpOAuthProvider.saveTokens(tokens);
 
-      // Create session
-      const authContext = {
-        isAuthenticated: true,
-        userId,
-        scopes: this.config.auth.requiredScopes,
-        accessToken: tokens.access_token,
-      };
-
-      const session = this.sessionStore.createSession(userId, authContext);
-
       // Set access token on Drupal client for immediate use
       this.drupalClient.setAccessToken(tokens.access_token);
 
       return {
         success: true,
         message:
-          'Authentication successful using simplified OAuth configuration',
-        sessionId: session.id,
-        expiresAt: session.expiresAt,
+          'Authentication successful using OAuth 2.1 stateless configuration',
+        userId,
         scopes: this.config.auth.requiredScopes,
         provider: 'McpOAuthProvider',
         endpointsDiscovered: !!this.config.oauth.discoveredEndpoints,
         isFallback: this.config.oauth.discoveredEndpoints?.isFallback,
+        tokenExpiry: tokens.expires_in
+          ? Date.now() + tokens.expires_in * 1000
+          : undefined,
       };
     } catch (error) {
       return {
@@ -728,24 +769,26 @@ export class DrupalMcpServer {
   private async executeAuthStatus(): Promise<unknown> {
     try {
       const tokenInfo = await this.tokenManager.getTokenInfo();
-      const authStatus = await this.authMiddleware.getAuthStatus();
       const mcpTokenInfo = await this.mcpOAuthProvider.getTokenInfo();
       const hasValidTokens = await this.mcpOAuthProvider.hasValidTokens();
+      const authContext = await this.requireAuthentication();
 
       return {
-        ...authStatus,
+        isAuthenticated: authContext.isAuthenticated,
+        userId: authContext.userId,
+        scopes: authContext.scopes,
         tokenInfo,
         mcpProvider: {
           hasValidTokens,
           tokenInfo: mcpTokenInfo,
         },
-        sessionStats: this.sessionStore.getStats(),
-        provider: 'McpOAuthProvider',
+        provider: 'McpOAuthProvider (OAuth 2.1 Stateless)',
         configInfo: {
           endpointsDiscovered: !!this.config.oauth.discoveredEndpoints,
           isFallback: this.config.oauth.discoveredEndpoints?.isFallback,
           authorizationEndpoint: this.config.oauth.authorizationEndpoint,
           tokenEndpoint: this.config.oauth.tokenEndpoint,
+          skipAuth: this.config.auth.skipAuth,
         },
       };
     } catch (error) {
@@ -764,14 +807,13 @@ export class DrupalMcpServer {
    */
   private async executeAuthLogout(): Promise<unknown> {
     try {
-      await this.authMiddleware.logout();
+      await this.tokenManager.clearTokens();
       await this.mcpOAuthProvider.clearTokens();
-      this.sessionStore.clear();
       this.drupalClient.clearAccessToken();
 
       return {
         success: true,
-        message: 'Logout successful - cleared all tokens and sessions',
+        message: 'Logout successful - cleared all tokens (OAuth 2.1 stateless)',
       };
     } catch (error) {
       return {

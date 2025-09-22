@@ -1,9 +1,60 @@
 /**
- * Simplified authentication error definitions for MVP
+ * Simplified authentication error definitions for OAuth 2.1 stateless design
  */
 
 /**
- * Base MCP error class - simplified for MVP
+ * Simplified authentication context for OAuth 2.1 stateless design
+ */
+export interface AuthContext {
+  isAuthenticated: boolean;
+  userId?: string;
+  accessToken?: string;
+  scopes?: string[];
+  expiresAt?: number;
+}
+
+/**
+ * Simplified session interface for backward compatibility
+ */
+export interface Session {
+  id: string;
+  userId: string;
+  authContext: AuthContext;
+  createdAt: number;
+  lastAccessedAt: number;
+  expiresAt?: number;
+}
+
+/**
+ * Basic authentication error class for OAuth 2.1 stateless authentication
+ */
+export class AuthError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly statusCode: number = 401
+  ) {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
+/**
+ * Basic validation error class for input validation issues
+ */
+export class ValidationError extends Error {
+  constructor(
+    message: string,
+    public readonly field?: string,
+    public readonly statusCode: number = 400
+  ) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+/**
+ * Base MCP error class - simplified for MVP compatibility
  */
 export class MCPError extends Error {
   public readonly statusCode: number;
@@ -28,34 +79,55 @@ export class MCPError extends Error {
   }
 }
 
-/**
- * Authentication error - covers all auth-related issues
- */
-export class AuthError extends MCPError {
-  constructor(message: string) {
-    super(message, 401);
-    this.name = 'AuthError';
-  }
-}
-
-/**
- * Validation error - for input validation issues
- */
-export class ValidationError extends MCPError {
-  constructor(message: string) {
-    super(message, 400);
-    this.name = 'ValidationError';
-  }
-}
-
 // Legacy error class aliases for backward compatibility (removed complexity)
-export const AuthenticationRequiredError = AuthError;
-export const InvalidTokenError = AuthError;
-export const InsufficientScopesError = AuthError;
-export const OAuthFlowError = AuthError;
-export const TokenRefreshError = AuthError;
-export const SessionError = AuthError;
-export const AuthConfigError = AuthError;
+export class AuthenticationRequiredError extends AuthError {
+  constructor(message: string) {
+    super(message, 'AUTHENTICATION_REQUIRED', 401);
+    this.name = 'AuthenticationRequiredError';
+  }
+}
+
+export class InvalidTokenError extends AuthError {
+  constructor(message: string) {
+    super(message, 'INVALID_TOKEN', 401);
+    this.name = 'InvalidTokenError';
+  }
+}
+
+export class InsufficientScopesError extends AuthError {
+  constructor(message: string) {
+    super(message, 'INSUFFICIENT_SCOPES', 403);
+    this.name = 'InsufficientScopesError';
+  }
+}
+
+export class OAuthFlowError extends AuthError {
+  constructor(message: string) {
+    super(message, 'OAUTH_FLOW_ERROR', 400);
+    this.name = 'OAuthFlowError';
+  }
+}
+
+export class TokenRefreshError extends AuthError {
+  constructor(message: string) {
+    super(message, 'TOKEN_REFRESH_ERROR', 401);
+    this.name = 'TokenRefreshError';
+  }
+}
+
+export class SessionError extends AuthError {
+  constructor(message: string) {
+    super(message, 'SESSION_ERROR', 401);
+    this.name = 'SessionError';
+  }
+}
+
+export class AuthConfigError extends AuthError {
+  constructor(message: string) {
+    super(message, 'AUTH_CONFIG_ERROR', 500);
+    this.name = 'AuthConfigError';
+  }
+}
 
 /**
  * Simplified utility function to create MCP error response
