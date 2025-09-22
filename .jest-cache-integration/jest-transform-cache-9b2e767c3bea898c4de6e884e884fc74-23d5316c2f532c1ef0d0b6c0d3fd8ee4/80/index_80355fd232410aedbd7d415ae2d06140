@@ -1,0 +1,10 @@
+5cd6d8673cb10fc2848e61ab8ccee33e
+"use strict";
+/**
+ * Centralized type definitions export (simplified for MVP)
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+const tslib_1 = require("tslib");
+tslib_1.__exportStar(require("./core-types.js"), exports);
+tslib_1.__exportStar(require("./domain-types.js"), exports);
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL3dvcmtzcGFjZS9zcmMvdHlwZXMvaW5kZXgudHMiLCJtYXBwaW5ncyI6IjtBQUFBOztHQUVHOzs7QUFFSCwwREFBZ0M7QUFDaEMsNERBQWtDIiwibmFtZXMiOltdLCJzb3VyY2VzIjpbIi93b3Jrc3BhY2Uvc3JjL3R5cGVzL2luZGV4LnRzIl0sInNvdXJjZXNDb250ZW50IjpbIi8qKlxuICogQ2VudHJhbGl6ZWQgdHlwZSBkZWZpbml0aW9ucyBleHBvcnQgKHNpbXBsaWZpZWQgZm9yIE1WUClcbiAqL1xuXG5leHBvcnQgKiBmcm9tICcuL2NvcmUtdHlwZXMuanMnO1xuZXhwb3J0ICogZnJvbSAnLi9kb21haW4tdHlwZXMuanMnO1xuIl0sInZlcnNpb24iOjN9

@@ -1,6 +1,11 @@
 /**
- * Jest setup file for global test configuration
- * This file is executed once before all tests run
+ * DEPRECATED: Legacy Jest setup file
+ *
+ * This file is being phased out in favor of:
+ * - tests/unit/setup.ts (for unit tests)
+ * - tests/integration/setup.ts (for integration tests)
+ *
+ * TODO: Remove this file once migration is complete
  */
 
 // Set default environment variables for testing

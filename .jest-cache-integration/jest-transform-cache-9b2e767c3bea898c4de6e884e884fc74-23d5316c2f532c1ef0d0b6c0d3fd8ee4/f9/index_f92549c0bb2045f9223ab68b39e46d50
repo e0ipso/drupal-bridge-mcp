@@ -1,0 +1,39 @@
+1cca81664698bdcf59c227c77f21d056
+"use strict";
+/**
+ * Authentication module exports
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DiscoveryError = exports.getDiscoveryCacheStats = exports.cleanupDiscoveryCache = exports.clearDiscoveryCache = exports.discoverOAuthEndpoints = exports.extractMcpErrorDetails = exports.isAuthError = exports.createMcpErrorResponse = exports.AuthConfigError = exports.SessionError = exports.TokenRefreshError = exports.OAuthFlowError = exports.InsufficientScopesError = exports.InvalidTokenError = exports.AuthenticationRequiredError = exports.ValidationError = exports.AuthError = exports.McpOAuthProvider = exports.TokenManager = exports.OAuthClient = void 0;
+// Legacy OAuth client (deprecated)
+var oauth_client_js_1 = require("./oauth-client.js");
+Object.defineProperty(exports, "OAuthClient", { enumerable: true, get: function () { return oauth_client_js_1.OAuthClient; } });
+var token_manager_js_1 = require("./token-manager.js");
+Object.defineProperty(exports, "TokenManager", { enumerable: true, get: function () { return token_manager_js_1.TokenManager; } });
+// New MCP SDK-based OAuth provider (recommended)
+var oauth_provider_js_1 = require("./oauth-provider.js");
+Object.defineProperty(exports, "McpOAuthProvider", { enumerable: true, get: function () { return oauth_provider_js_1.McpOAuthProvider; } });
+// CryptoUtils removed for MVP simplification
+// Simplified authentication errors and types for OAuth 2.1 stateless design
+var auth_errors_js_1 = require("./auth-errors.js");
+Object.defineProperty(exports, "AuthError", { enumerable: true, get: function () { return auth_errors_js_1.AuthError; } });
+Object.defineProperty(exports, "ValidationError", { enumerable: true, get: function () { return auth_errors_js_1.ValidationError; } });
+Object.defineProperty(exports, "AuthenticationRequiredError", { enumerable: true, get: function () { return auth_errors_js_1.AuthenticationRequiredError; } });
+Object.defineProperty(exports, "InvalidTokenError", { enumerable: true, get: function () { return auth_errors_js_1.InvalidTokenError; } });
+Object.defineProperty(exports, "InsufficientScopesError", { enumerable: true, get: function () { return auth_errors_js_1.InsufficientScopesError; } });
+Object.defineProperty(exports, "OAuthFlowError", { enumerable: true, get: function () { return auth_errors_js_1.OAuthFlowError; } });
+Object.defineProperty(exports, "TokenRefreshError", { enumerable: true, get: function () { return auth_errors_js_1.TokenRefreshError; } });
+Object.defineProperty(exports, "SessionError", { enumerable: true, get: function () { return auth_errors_js_1.SessionError; } });
+Object.defineProperty(exports, "AuthConfigError", { enumerable: true, get: function () { return auth_errors_js_1.AuthConfigError; } });
+Object.defineProperty(exports, "createMcpErrorResponse", { enumerable: true, get: function () { return auth_errors_js_1.createMcpErrorResponse; } });
+Object.defineProperty(exports, "isAuthError", { enumerable: true, get: function () { return auth_errors_js_1.isAuthError; } });
+Object.defineProperty(exports, "extractMcpErrorDetails", { enumerable: true, get: function () { return auth_errors_js_1.extractMcpErrorDetails; } });
+// OAuth 2.1 endpoint discovery (RFC8414)
+var endpoint_discovery_js_1 = require("./endpoint-discovery.js");
+Object.defineProperty(exports, "discoverOAuthEndpoints", { enumerable: true, get: function () { return endpoint_discovery_js_1.discoverOAuthEndpoints; } });
+Object.defineProperty(exports, "clearDiscoveryCache", { enumerable: true, get: function () { return endpoint_discovery_js_1.clearDiscoveryCache; } });
+Object.defineProperty(exports, "cleanupDiscoveryCache", { enumerable: true, get: function () { return endpoint_discovery_js_1.cleanupDiscoveryCache; } });
+Object.defineProperty(exports, "getDiscoveryCacheStats", { enumerable: true, get: function () { return endpoint_discovery_js_1.getDiscoveryCacheStats; } });
+var types_js_1 = require("./types.js");
+Object.defineProperty(exports, "DiscoveryError", { enumerable: true, get: function () { return types_js_1.DiscoveryError; } });
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJmaWxlIjoiL3dvcmtzcGFjZS9zcmMvYXV0aC9pbmRleC50cyIsIm1hcHBpbmdzIjoiO0FBQUE7O0dBRUc7OztBQUVILG1DQUFtQztBQUNuQyxxREFJMkI7QUFIekIsOEdBQUEsV0FBVyxPQUFBO0FBSWIsdURBQXFFO0FBQTVELGdIQUFBLFlBQVksT0FBQTtBQUVyQixpREFBaUQ7QUFDakQseURBSzZCO0FBSjNCLHFIQUFBLGdCQUFnQixPQUFBO0FBS2xCLDZDQUE2QztBQUM3Qyw0RUFBNEU7QUFDNUUsbURBZTBCO0FBZHhCLDJHQUFBLFNBQVMsT0FBQTtBQUNULGlIQUFBLGVBQWUsT0FBQTtBQUNmLDZIQUFBLDJCQUEyQixPQUFBO0FBQzNCLG1IQUFBLGlCQUFpQixPQUFBO0FBQ2pCLHlIQUFBLHVCQUF1QixPQUFBO0FBQ3ZCLGdIQUFBLGNBQWMsT0FBQTtBQUNkLG1IQUFBLGlCQUFpQixPQUFBO0FBQ2pCLDhHQUFBLFlBQVksT0FBQTtBQUNaLGlIQUFBLGVBQWUsT0FBQTtBQUNmLHdIQUFBLHNCQUFzQixPQUFBO0FBQ3RCLDZHQUFBLFdBQVcsT0FBQTtBQUNYLHdIQUFBLHNCQUFzQixPQUFBO0FBS3hCLHlDQUF5QztBQUN6QyxpRUFLaUM7QUFKL0IsK0hBQUEsc0JBQXNCLE9BQUE7QUFDdEIsNEhBQUEsbUJBQW1CLE9BQUE7QUFDbkIsOEhBQUEscUJBQXFCLE9BQUE7QUFDckIsK0hBQUEsc0JBQXNCLE9BQUE7QUFTeEIsdUNBQTRDO0FBQW5DLDBHQUFBLGNBQWMsT0FBQSIsIm5hbWVzIjpbXSwic291cmNlcyI6WyIvd29ya3NwYWNlL3NyYy9hdXRoL2luZGV4LnRzIl0sInNvdXJjZXNDb250ZW50IjpbIi8qKlxuICogQXV0aGVudGljYXRpb24gbW9kdWxlIGV4cG9ydHNcbiAqL1xuXG4vLyBMZWdhY3kgT0F1dGggY2xpZW50IChkZXByZWNhdGVkKVxuZXhwb3J0IHtcbiAgT0F1dGhDbGllbnQsXG4gIHR5cGUgT0F1dGhDb25maWcsXG4gIHR5cGUgUEtDRUNoYWxsZW5nZSxcbn0gZnJvbSAnLi9vYXV0aC1jbGllbnQuanMnO1xuZXhwb3J0IHsgVG9rZW5NYW5hZ2VyLCB0eXBlIFN0b3JlZFRva2VucyB9IGZyb20gJy4vdG9rZW4tbWFuYWdlci5qcyc7XG5cbi8vIE5ldyBNQ1AgU0RLLWJhc2VkIE9BdXRoIHByb3ZpZGVyIChyZWNvbW1lbmRlZClcbmV4cG9ydCB7XG4gIE1jcE9BdXRoUHJvdmlkZXIsXG4gIHR5cGUgTWNwT0F1dGhDb25maWcsXG4gIHR5cGUgT0F1dGhUb2tlbnMsXG4gIHR5cGUgVG9rZW5WYWxpZGF0aW9uUmVzdWx0LFxufSBmcm9tICcuL29hdXRoLXByb3ZpZGVyLmpzJztcbi8vIENyeXB0b1V0aWxzIHJlbW92ZWQgZm9yIE1WUCBzaW1wbGlmaWNhdGlvblxuLy8gU2ltcGxpZmllZCBhdXRoZW50aWNhdGlvbiBlcnJvcnMgYW5kIHR5cGVzIGZvciBPQXV0aCAyLjEgc3RhdGVsZXNzIGRlc2lnblxuZXhwb3J0IHtcbiAgQXV0aEVycm9yLFxuICBWYWxpZGF0aW9uRXJyb3IsXG4gIEF1dGhlbnRpY2F0aW9uUmVxdWlyZWRFcnJvcixcbiAgSW52YWxpZFRva2VuRXJyb3IsXG4gIEluc3VmZmljaWVudFNjb3Blc0Vycm9yLFxuICBPQXV0aEZsb3dFcnJvcixcbiAgVG9rZW5SZWZyZXNoRXJyb3IsXG4gIFNlc3Npb25FcnJvcixcbiAgQXV0aENvbmZpZ0Vycm9yLFxuICBjcmVhdGVNY3BFcnJvclJlc3BvbnNlLFxuICBpc0F1dGhFcnJvcixcbiAgZXh0cmFjdE1jcEVycm9yRGV0YWlscyxcbiAgdHlwZSBBdXRoQ29udGV4dCxcbiAgdHlwZSBTZXNzaW9uLFxufSBmcm9tICcuL2F1dGgtZXJyb3JzLmpzJztcblxuLy8gT0F1dGggMi4xIGVuZHBvaW50IGRpc2NvdmVyeSAoUkZDODQxNClcbmV4cG9ydCB7XG4gIGRpc2NvdmVyT0F1dGhFbmRwb2ludHMsXG4gIGNsZWFyRGlzY292ZXJ5Q2FjaGUsXG4gIGNsZWFudXBEaXNjb3ZlcnlDYWNoZSxcbiAgZ2V0RGlzY292ZXJ5Q2FjaGVTdGF0cyxcbn0gZnJvbSAnLi9lbmRwb2ludC1kaXNjb3ZlcnkuanMnO1xuZXhwb3J0IHR5cGUge1xuICBPQXV0aFNlcnZlck1ldGFkYXRhLFxuICBPQXV0aEVuZHBvaW50cyxcbiAgRGlzY292ZXJ5Q29uZmlnLFxuICBDYWNoZUVudHJ5LFxuICBEaXNjb3ZlcnlFcnJvclR5cGUsXG59IGZyb20gJy4vdHlwZXMuanMnO1xuZXhwb3J0IHsgRGlzY292ZXJ5RXJyb3IgfSBmcm9tICcuL3R5cGVzLmpzJztcbiJdLCJ2ZXJzaW9uIjozfQ==

@@ -21,16 +21,14 @@
     "^(.*)\\.js$": "$1"
   },
   "testMatch": [
-    "**/__tests__/**/*.test.ts",
-    "**/__tests__/**/*.spec.ts",
-    "**/tests/**/*.test.ts",
-    "**/tests/**/*.spec.ts",
-    "**/*.test.ts",
-    "**/*.spec.ts"
+    "<rootDir>/src/**/*.test.ts",
+    "<rootDir>/src/**/*.spec.ts",
+    "<rootDir>/tests/unit/**/*.test.ts",
+    "<rootDir>/tests/unit/**/*.spec.ts"
   ],
-  "testPathIgnorePatterns": ["/node_modules/", "/dist/", "/coverage/"],
+  "testPathIgnorePatterns": ["/node_modules/", "/dist/", "/coverage/", "tests/integration/", "tests/mcp/"],
   "transformIgnorePatterns": ["node_modules/(?!(@modelcontextprotocol/sdk)/)"],
-  "setupFilesAfterEnv": ["<rootDir>/tests/setup.ts"],
+  "setupFilesAfterEnv": ["<rootDir>/tests/unit/setup.ts"],
   "collectCoverage": false,
   "coverageDirectory": "coverage",
   "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.d.ts", "!src/**/*.test.ts", "!src/**/*.spec.ts", "!src/index.ts"],
@@ -43,13 +41,13 @@
       "statements": 80
     }
   },
-  "maxWorkers": "50%",
+  "maxWorkers": "75%",
   "cache": true,
   "cacheDirectory": "<rootDir>/.jest-cache",
   "verbose": true,
   "silent": false,
-  "bail": false,
-  "testTimeout": 10000,
+  "bail": 1,
+  "testTimeout": 5000,
   "clearMocks": true,
   "resetMocks": true,
   "restoreMocks": true,
