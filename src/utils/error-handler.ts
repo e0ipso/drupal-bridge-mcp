@@ -5,6 +5,8 @@
 import { JsonRpcErrorCode, type JsonRpcErrorResponse } from '@/types/index.js';
 import { DrupalClientError } from '@/services/drupal-client.js';
 import { ValidationError } from '@/utils/validation.js';
+import { isLoggerInitialized, getLogger } from '@/utils/logger.js';
+import type { Logger } from 'pino';
 
 /**
  * Simplified error types for MVP
@@ -305,7 +307,7 @@ export function normalizeError(
 }
 
 /**
- * Simplified MCP error response formatting (supports legacy signature)
+ * Enhanced MCP error response formatting with integrated logging
  */
 export function formatMcpErrorResponse(
   error: IntegrationError,
@@ -313,6 +315,14 @@ export function formatMcpErrorResponse(
 ): {
   content: Array<{ type: string; text: string }>;
 } {
+  // Enhanced logging before returning response
+  const logData = formatErrorForLogging(error, { requestId });
+
+  if (isLoggerInitialized() && logData.logWithPino) {
+    const logger = getLogger().child({ component: 'error-handler' });
+    logData.logWithPino(logger);
+  }
+
   return {
     content: [
       {
@@ -341,7 +351,7 @@ export function formatMcpErrorResponse(
 }
 
 /**
- * Simplified error logging for MVP
+ * Enhanced error logging with Pino integration for MVP
  */
 export function formatErrorForLogging(
   error: IntegrationError,
@@ -350,23 +360,43 @@ export function formatErrorForLogging(
   level: 'error' | 'warn' | 'info';
   message: string;
   meta: Record<string, unknown>;
+  logWithPino?: (logger: Logger) => void;
 } {
   const level =
     error.errorType === IntegrationErrorType.VALIDATION_ERROR
       ? 'warn'
       : 'error';
 
+  const message = `[${error.errorType}] ${error.message}`;
+  const meta = {
+    type: error.errorType,
+    message: error.message,
+    code: error.code,
+    field: error.field,
+    context,
+    timestamp: new Date().toISOString(),
+    stack: error.stack,
+  };
+
   return {
     level,
-    message: `[${error.errorType}] ${error.message}`,
-    meta: {
-      type: error.errorType,
-      message: error.message,
-      code: error.code,
-      field: error.field,
-      context,
-      timestamp: new Date().toISOString(),
-      stack: error.stack,
+    message,
+    meta,
+    logWithPino: (logger: Logger) => {
+      const logMethod = logger[level] as (obj: any, msg?: string) => void;
+      logMethod.call(
+        logger,
+        {
+          err: error, // Use Pino's built-in error serialization
+          context,
+          errorType: error.errorType,
+          code: error.code,
+          field: error.field,
+          retryable: error.retryable,
+          details: error.details,
+        },
+        message
+      );
     },
   };
 }

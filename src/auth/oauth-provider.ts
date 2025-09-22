@@ -18,6 +18,7 @@ import {
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { isLoggerInitialized, getLogger } from '@/utils/logger.js';
 
 export interface McpOAuthConfig {
   clientId: string;
@@ -102,7 +103,12 @@ export class McpOAuthProvider implements OAuthClientProvider {
   }
 
   async redirectToAuthorization(url: URL): Promise<void> {
-    console.log(`Opening: ${url}`);
+    if (isLoggerInitialized()) {
+      const logger = getLogger().child({ component: 'oauth-provider' });
+      logger.info(`Opening authorization URL: ${url}`);
+    } else {
+      console.log(`Opening: ${url}`);
+    }
     try {
       (await import('open')).default(url.toString());
     } catch {

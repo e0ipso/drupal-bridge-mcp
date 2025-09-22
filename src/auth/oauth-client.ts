@@ -6,6 +6,7 @@ import { createHash, randomBytes } from 'crypto';
 import type { Server } from 'http';
 import { createServer } from 'http';
 import { parse } from 'url';
+import { isLoggerInitialized, getLogger } from '@/utils/logger.js';
 
 export interface OAuthConfig {
   clientId: string;
@@ -27,6 +28,31 @@ export interface PKCEChallenge {
   codeVerifier: string;
   codeChallenge: string;
   codeChallengeMethod: 'S256';
+}
+
+/**
+ * Helper function to log OAuth client messages
+ */
+function logOAuthClient(
+  level: 'info' | 'warn' | 'error',
+  message: string,
+  extra?: any
+): void {
+  if (isLoggerInitialized()) {
+    const logger = getLogger().child({ component: 'oauth-client' });
+    if (extra) {
+      logger[level]({ extra }, message);
+    } else {
+      logger[level](message);
+    }
+  } else {
+    // Fallback to console when logger not available
+    if (extra) {
+      console[level](`[OAuth Client] ${message}`, extra);
+    } else {
+      console[level](`[OAuth Client] ${message}`);
+    }
+  }
 }
 
 /**
@@ -68,7 +94,8 @@ export class OAuthClient {
       const authCode = await this.authorizeWithServer(pkce, state);
       return await this.exchangeCodeForTokens(authCode, pkce.codeVerifier);
     } catch (error) {
-      console.error(
+      logOAuthClient(
+        'error',
         'Localhost server failed, falling back to manual entry:',
         error
       );
@@ -96,12 +123,13 @@ export class OAuthClient {
           redirectUri: `http://127.0.0.1:${serverPort}/callback`,
         });
 
-        console.log(`Opening authorization URL: ${authUrl}`);
+        logOAuthClient('info', `Opening authorization URL: ${authUrl}`);
         try {
           const { default: open } = await import('open');
           await open(authUrl);
         } catch {
-          console.log(
+          logOAuthClient(
+            'info',
             'Browser auto-open failed. Please manually open the URL above.'
           );
         }
@@ -132,12 +160,12 @@ export class OAuthClient {
       redirectUri: this.config.redirectUri,
     });
 
-    console.log('\n=== Manual Authorization Required ===');
-    console.log('1. Open this URL in your browser:');
-    console.log(`   ${authUrl}`);
-    console.log('2. Complete authorization');
-    console.log('3. Copy the authorization code from the response');
-    console.log('=====================================\n');
+    logOAuthClient('info', '\n=== Manual Authorization Required ===');
+    logOAuthClient('info', '1. Open this URL in your browser:');
+    logOAuthClient('info', `   ${authUrl}`);
+    logOAuthClient('info', '2. Complete authorization');
+    logOAuthClient('info', '3. Copy the authorization code from the response');
+    logOAuthClient('info', '=====================================\n');
 
     // In a real implementation, you'd prompt for user input here
     // For this example, we'll throw an error to indicate manual intervention needed

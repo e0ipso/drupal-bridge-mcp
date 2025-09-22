@@ -9,6 +9,10 @@ import {
   McpOAuthProvider,
   type McpOAuthConfig,
 } from '@/auth/oauth-provider.js';
+import { createLogger } from '@/utils/logger.js';
+import createDebug from 'debug';
+
+const debug = createDebug('mcp:config');
 
 /**
  * Simplified OAuth configuration interface
@@ -172,29 +176,74 @@ const validateConfig = (config: AppConfig): void => {
  * Load and validate configuration with OAuth endpoint discovery
  */
 export const loadConfig = async (): Promise<AppConfig> => {
+  debug('Loading environment configuration...');
+  console.info('[Config] Loading environment configuration...');
+
   try {
     // Try to load .env file in development
     if (process.env.NODE_ENV !== 'production') {
+      debug('Development mode detected, attempting to load .env file...');
       await import('dotenv/config');
+      debug('✓ .env file loaded successfully');
     }
   } catch {
     // dotenv is optional, continue without it
+    debug('⚠ .env file not found or failed to load (this is optional)');
+    console.warn(
+      '[Config] ⚠ .env file not found or failed to load (this is optional)'
+    );
   }
 
+  debug('Parsing environment variables...');
   const config = getEnvConfig();
+
+  debug('Environment variables loaded:');
+  debug(`- DRUPAL_BASE_URL: ${config.drupal.baseUrl}`);
+  debug(`- DRUPAL_JSON_RPC_ENDPOINT: ${config.drupal.endpoint}`);
+  debug(`- NODE_ENV: ${config.environment}`);
+  debug(`- LOG_LEVEL: ${config.logging.level}`);
+  debug(`- AUTH_ENABLED: ${config.auth.enabled}`);
+  debug(`- AUTH_SKIP: ${config.auth.skipAuth}`);
+  debug(
+    `- OAUTH_CLIENT_ID: ${config.oauth.clientId ? '***set***' : 'NOT SET'}`
+  );
+
+  debug('Validating configuration...');
+  console.info('[Config] Validating configuration...');
   validateConfig(config);
+  debug('✓ Configuration validation passed');
+  console.info('[Config] ✓ Configuration validation passed');
+
+  // Initialize logger now that basic config is available
+  const logger = createLogger(config);
+  const configLogger = logger.child({ component: 'config' });
 
   // Perform OAuth endpoint discovery if authentication is enabled and endpoints are not explicitly configured
   if (config.auth.enabled && !process.env.OAUTH_SKIP_DISCOVERY) {
+    debug('Authentication enabled, checking OAuth configuration...');
+    configLogger.info(
+      'Authentication enabled, checking OAuth configuration...'
+    );
+
     // Only discover endpoints if legacy static configuration is not provided
     const hasStaticConfig =
       config.oauth.authorizationEndpoint && config.oauth.tokenEndpoint;
 
     if (!hasStaticConfig) {
+      debug('No static OAuth endpoints found, starting endpoint discovery...');
+      configLogger.info(
+        'No static OAuth endpoints found, starting endpoint discovery...'
+      );
+      debug(`Discovery target: ${config.discovery.baseUrl}`);
+      debug(`Discovery timeout: ${config.discovery.timeout}ms`);
+      debug(`Discovery retries: ${config.discovery.retries}`);
+
+      const discoveryStartTime = Date.now();
       try {
         const discoveredEndpoints = await discoverOAuthEndpoints(
           config.discovery
         );
+        const discoveryTime = Date.now() - discoveryStartTime;
 
         // Update OAuth config with discovered endpoints and store discovery result
         (config as { oauth: SimplifiedOAuthConfig }).oauth = {
@@ -204,24 +253,55 @@ export const loadConfig = async (): Promise<AppConfig> => {
           discoveredEndpoints,
         };
 
+        debug(`✓ OAuth endpoints discovered successfully (${discoveryTime}ms)`);
+        configLogger.info(
+          `✓ OAuth endpoints discovered successfully (${discoveryTime}ms)`
+        );
+        debug(`- Authorization: ${discoveredEndpoints.authorizationEndpoint}`);
+        debug(`- Token: ${discoveredEndpoints.tokenEndpoint}`);
+        debug(
+          `- Using fallback: ${discoveredEndpoints.isFallback ? 'YES' : 'NO'}`
+        );
+
         if (config.discovery.debug) {
-          console.log('[Config] OAuth endpoints discovered:', {
-            authorization: discoveredEndpoints.authorizationEndpoint,
-            token: discoveredEndpoints.tokenEndpoint,
-            isFallback: discoveredEndpoints.isFallback,
-          });
+          configLogger.debug(
+            {
+              authorization: discoveredEndpoints.authorizationEndpoint,
+              token: discoveredEndpoints.tokenEndpoint,
+              isFallback: discoveredEndpoints.isFallback,
+            },
+            'OAuth endpoints discovered'
+          );
         }
       } catch (error) {
+        const discoveryTime = Date.now() - discoveryStartTime;
+        debug(
+          `⚠ OAuth endpoint discovery failed (${discoveryTime}ms), using fallback endpoints`
+        );
+        configLogger.warn(
+          `⚠ OAuth endpoint discovery failed (${discoveryTime}ms), using fallback endpoints`
+        );
+        debug(
+          `Discovery error: ${error instanceof Error ? error.message : String(error)}`
+        );
+        configLogger.error(
+          { err: error },
+          `Discovery error: ${error instanceof Error ? error.message : String(error)}`
+        );
+
         if (config.discovery.debug) {
-          console.warn(
-            '[Config] OAuth endpoint discovery failed, using fallback endpoints:',
-            error
+          configLogger.warn(
+            { err: error },
+            'OAuth endpoint discovery failed, using fallback endpoints:'
           );
         }
 
         // Use fallback endpoints when discovery fails
         const fallbackAuthEndpoint = `${config.drupal.baseUrl}/oauth/authorize`;
         const fallbackTokenEndpoint = `${config.drupal.baseUrl}/oauth/token`;
+
+        debug(`- Fallback Authorization: ${fallbackAuthEndpoint}`);
+        debug(`- Fallback Token: ${fallbackTokenEndpoint}`);
 
         (config as { oauth: SimplifiedOAuthConfig }).oauth = {
           ...config.oauth,
@@ -230,11 +310,39 @@ export const loadConfig = async (): Promise<AppConfig> => {
         };
       }
     } else {
+      debug('✓ Using static OAuth endpoint configuration');
+      configLogger.info('✓ Using static OAuth endpoint configuration');
+      debug(`- Authorization: ${config.oauth.authorizationEndpoint}`);
+      debug(`- Token: ${config.oauth.tokenEndpoint}`);
+
       if (config.discovery.debug) {
-        console.log('[Config] Using static OAuth endpoint configuration');
+        configLogger.debug('Using static OAuth endpoint configuration');
       }
     }
+  } else if (!config.auth.enabled) {
+    debug('✓ Authentication disabled, skipping OAuth configuration');
+    configLogger.info(
+      '✓ Authentication disabled, skipping OAuth configuration'
+    );
+  } else {
+    debug('✓ OAuth discovery skipped (OAUTH_SKIP_DISCOVERY=true)');
+    configLogger.info('✓ OAuth discovery skipped (OAUTH_SKIP_DISCOVERY=true)');
   }
+
+  debug('✓ Configuration loading completed successfully');
+  configLogger.info('✓ Configuration loading completed successfully');
+  debug('Final configuration summary:');
+  debug(`- Environment: ${config.environment}`);
+  debug(`- Drupal URL: ${config.drupal.baseUrl}${config.drupal.endpoint}`);
+  debug(`- MCP Server: ${config.mcp.name} v${config.mcp.version}`);
+  debug(`- Auth enabled: ${config.auth.enabled}`);
+  if (config.auth.enabled) {
+    debug(
+      `- OAuth configured: ${config.oauth.authorizationEndpoint ? 'YES' : 'NO'}`
+    );
+    debug(`- Required scopes: ${config.auth.requiredScopes.join(', ')}`);
+  }
+  debug(`- Debug logging: ${process.env.DEBUG || 'not set'}`);
 
   return config;
 };

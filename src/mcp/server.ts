@@ -40,6 +40,9 @@ import {
   McpOAuthProvider,
   type AuthContext,
 } from '@/auth/index.js';
+import createDebug from 'debug';
+
+const debug = createDebug('mcp:server');
 
 /**
  * MCP server for Drupal integration
@@ -53,6 +56,11 @@ export class DrupalMcpServer {
   private requestCounter = 0;
 
   constructor(private readonly config: AppConfig) {
+    debug('Initializing Drupal MCP Server...');
+    console.info('[Server] Initializing Drupal MCP Server...');
+
+    debug('Step 1/5: Creating MCP Server instance...');
+    console.info('[Server] Step 1/5: Creating MCP Server instance...');
     this.server = new Server(
       {
         name: config.mcp.name,
@@ -66,11 +74,39 @@ export class DrupalMcpServer {
         },
       }
     );
+    debug(`✓ MCP Server created: ${config.mcp.name} v${config.mcp.version}`);
+    console.info(
+      `[Server] ✓ MCP Server created: ${config.mcp.name} v${config.mcp.version}`
+    );
+    debug(`- Protocol version: ${config.mcp.protocolVersion}`);
+    debug(
+      `- Resources enabled: ${config.mcp.capabilities.resources?.subscribe ? 'YES' : 'NO'}`
+    );
+    debug(
+      `- Tools enabled: ${config.mcp.capabilities.tools?.listChanged ? 'YES' : 'NO'}`
+    );
+    debug(
+      `- Prompts enabled: ${config.mcp.capabilities.prompts?.listChanged ? 'YES' : 'NO'}`
+    );
 
+    debug('Step 2/5: Initializing Drupal client...');
+    console.info('[Server] Step 2/5: Initializing Drupal client...');
     this.drupalClient = new DrupalClient(config.drupal);
+    debug(`✓ Drupal client initialized`);
+    console.info(`[Server] ✓ Drupal client initialized`);
+    debug(`- Base URL: ${config.drupal.baseUrl}`);
+    debug(`- Endpoint: ${config.drupal.endpoint}`);
+    debug(`- Timeout: ${config.drupal.timeout}ms`);
+    debug(`- Retries: ${config.drupal.retries}`);
 
+    debug('Step 3/5: Setting up OAuth providers...');
+    console.info('[Server] Step 3/5: Setting up OAuth providers...');
     // Initialize authentication components with new MCP OAuth provider (OAuth 2.1 stateless design)
     this.mcpOAuthProvider = createOAuthProvider(config);
+    debug('✓ MCP OAuth provider initialized (OAuth 2.1 stateless)');
+    console.info(
+      '[Server] ✓ MCP OAuth provider initialized (OAuth 2.1 stateless)'
+    );
 
     // Convert SimplifiedOAuthConfig to OAuthConfig for backward compatibility
     const legacyOAuthConfig = {
@@ -89,8 +125,24 @@ export class DrupalMcpServer {
 
     this.oauthClient = new OAuthClient(legacyOAuthConfig); // Keep for backward compatibility
     this.tokenManager = new TokenManager(this.oauthClient);
+    debug('✓ Legacy OAuth client initialized (backward compatibility)');
+    console.info(
+      '[Server] ✓ Legacy OAuth client initialized (backward compatibility)'
+    );
+    debug(`- Client ID: ${config.oauth.clientId ? '***set***' : 'NOT SET'}`);
+    debug(`- Redirect URI: ${config.oauth.redirectUri}`);
+    debug(`- Scopes: ${config.oauth.scopes.join(', ')}`);
 
+    debug('Step 4/5: Setting up request handlers...');
+    console.info('[Server] Step 4/5: Setting up request handlers...');
     this.setupHandlers();
+    debug('✓ Request handlers configured');
+    console.info('[Server] ✓ Request handlers configured');
+
+    debug('Step 5/5: Server initialization complete');
+    console.info('[Server] Step 5/5: Server initialization complete');
+    debug(`🎯 Server ready to accept connections`);
+    console.info(`[Server] 🎯 Server ready to accept connections`);
   }
 
   /**
@@ -156,7 +208,10 @@ export class DrupalMcpServer {
    * Setup MCP request handlers
    */
   private setupHandlers(): void {
+    debug('Registering MCP request handlers...');
+
     // List available resources
+    debug('- Registering ListResources handler');
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
       return {
         resources: await this.getResources(),
@@ -164,11 +219,13 @@ export class DrupalMcpServer {
     });
 
     // Read specific resource
+    debug('- Registering ReadResource handler');
     this.server.setRequestHandler(ReadResourceRequestSchema, async request => {
       return this.readResource(request.params.uri);
     });
 
     // List available tools
+    debug('- Registering ListTools handler');
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
         tools: this.getTools(),
@@ -176,6 +233,7 @@ export class DrupalMcpServer {
     });
 
     // Execute tool (with authentication)
+    debug('- Registering CallTool handler (with auth)');
     this.server.setRequestHandler(CallToolRequestSchema, async request => {
       return this.executeToolWithAuth(
         request.params.name,
@@ -184,6 +242,7 @@ export class DrupalMcpServer {
     });
 
     // List available prompts
+    debug('- Registering ListPrompts handler');
     this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
       return {
         prompts: this.getPrompts(),
@@ -191,9 +250,18 @@ export class DrupalMcpServer {
     });
 
     // Get prompt
+    debug('- Registering GetPrompt handler');
     this.server.setRequestHandler(GetPromptRequestSchema, async request => {
       return this.getPrompt(request.params.name, request.params.arguments);
     });
+
+    const toolCount = this.getTools().length;
+    const promptCount = this.getPrompts().length;
+
+    debug(`✓ All handlers registered successfully`);
+    debug(`- Available tools: ${toolCount}`);
+    debug(`- Available resources: 2 (nodes, entities)`);
+    debug(`- Available prompts: ${promptCount}`);
   }
 
   /**

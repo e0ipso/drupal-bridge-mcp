@@ -13,6 +13,7 @@ import type {
   CacheEntry,
 } from './types.js';
 import { DiscoveryError, DiscoveryErrorType } from './types.js';
+import { isLoggerInitialized, getLogger } from '@/utils/logger.js';
 
 /**
  * Default configuration values
@@ -82,6 +83,32 @@ class MetadataCache {
  * Global metadata cache instance
  */
 const metadataCache = new MetadataCache();
+
+/**
+ * Helper function to log discovery messages respecting debug flag and logger availability
+ */
+function logDiscovery(
+  level: 'info' | 'warn' | 'debug',
+  message: string,
+  extra?: any
+): void {
+  if (isLoggerInitialized()) {
+    const logger = getLogger().child({ component: 'discovery' });
+    if (extra) {
+      logger[level]({ extra }, message);
+    } else {
+      logger[level](message);
+    }
+  } else {
+    // Fallback to console when logger not available
+    const consoleLevel = level === 'debug' ? 'log' : level;
+    if (extra) {
+      console[consoleLevel](`[Discovery] ${message}`, extra);
+    } else {
+      console[consoleLevel](`[Discovery] ${message}`);
+    }
+  }
+}
 
 /**
  * Create a fetch function with timeout support
@@ -160,8 +187,9 @@ async function fetchMetadata(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       if (config.debug) {
-        console.log(
-          `[Discovery] Attempt ${attempt}/${maxAttempts}: ${wellKnownUrl}`
+        logDiscovery(
+          'debug',
+          `Attempt ${attempt}/${maxAttempts}: ${wellKnownUrl}`
         );
       }
 
@@ -192,8 +220,9 @@ async function fetchMetadata(
         // Exponential backoff: 1s, 2s, 4s...
         const delay = Math.pow(2, attempt - 1) * 1000;
         if (config.debug) {
-          console.log(
-            `[Discovery] Retry ${attempt} after ${delay}ms due to:`,
+          logDiscovery(
+            'debug',
+            `Retry ${attempt} after ${delay}ms due to:`,
             error
           );
         }
@@ -280,7 +309,7 @@ export async function discoverOAuthEndpoints(
   const cachedEndpoints = metadataCache.get(cacheKey);
   if (cachedEndpoints) {
     if (fullConfig.debug) {
-      console.log('[Discovery] Using cached endpoints');
+      logDiscovery('debug', 'Using cached endpoints');
     }
     return cachedEndpoints;
   }
@@ -293,8 +322,9 @@ export async function discoverOAuthEndpoints(
 
   try {
     if (fullConfig.debug) {
-      console.log(
-        `[Discovery] Discovering OAuth endpoints from: ${wellKnownUrl}`
+      logDiscovery(
+        'debug',
+        `Discovering OAuth endpoints from: ${wellKnownUrl}`
       );
     }
 
@@ -315,14 +345,15 @@ export async function discoverOAuthEndpoints(
     metadataCache.set(cacheKey, endpoints, fullConfig.cacheTtl);
 
     if (fullConfig.debug) {
-      console.log('[Discovery] Successfully discovered OAuth endpoints');
+      logDiscovery('debug', 'Successfully discovered OAuth endpoints');
     }
 
     return endpoints;
   } catch (error) {
     if (fullConfig.debug) {
-      console.warn(
-        '[Discovery] Failed to discover endpoints, using fallback:',
+      logDiscovery(
+        'warn',
+        'Failed to discover endpoints, using fallback:',
         error
       );
     }
