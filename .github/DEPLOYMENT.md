@@ -68,7 +68,13 @@ These are configured in Railway directly:
 
 - `NODE_ENV`: Set to `production`
 - `PORT`: Application port (Railway provides this automatically)
-- `LOG_LEVEL`: Logging level (`info`, `debug`, `warn`, `error`)
+
+### Logging Configuration
+
+- `LOG_LEVEL`: Logging level (`error`, `warn`, `info`, `debug`) - Default: `info`
+- `LOG_TO_FILE`: Force file logging (`true`/`false`) - Default: `true` in production
+- `LOG_DIR`: Log file directory - Default: `./logs`
+- `DISABLE_PRETTY_LOGS`: Disable pretty-printing (`true`/`false`) - Default: `true` in production
 
 ## Pipeline Features
 

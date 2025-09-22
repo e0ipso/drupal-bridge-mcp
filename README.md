@@ -36,9 +36,13 @@ DRUPAL_BASE_URL=https://your-drupal-site.com
 OAUTH_CLIENT_ID=your-client-id
 AUTH_ENABLED=true  # Set to false to skip authentication
 
-# Optional
+# Optional Configuration
 NODE_ENV=development
-DEBUG=mcp:*
+LOG_LEVEL=info              # error | warn | info | debug
+LOG_TO_FILE=false          # Force file logging
+LOG_DIR=./logs             # Log file directory
+DISABLE_PRETTY_LOGS=false  # Disable pretty-printing in development
+DEBUG=mcp:*                # Debug output patterns
 ```
 
 ### Usage
@@ -104,7 +108,8 @@ Add to your `claude_desktop_config.json`:
       "args": ["/path/to/your/project/dist/main.js"],
       "env": {
         "DRUPAL_BASE_URL": "http://localhost/drupal",
-        "NODE_ENV": "development"
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug"
       }
     }
   }
@@ -124,7 +129,8 @@ For live reloading during development:
       "cwd": "/path/to/your/project",
       "env": {
         "DRUPAL_BASE_URL": "http://localhost/drupal",
-        "NODE_ENV": "development"
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "debug"
       }
     }
   }
@@ -142,7 +148,15 @@ DRUPAL_JSON_RPC_ENDPOINT=/jsonrpc
 
 # Development settings
 NODE_ENV=development
-LOG_LEVEL=debug
+
+# Logging configuration
+LOG_LEVEL=debug           # error | warn | info | debug
+LOG_TO_FILE=false        # Force file logging (overrides environment defaults)
+LOG_DIR=./logs           # Directory for log files (production mode)
+DISABLE_PRETTY_LOGS=false # Disable pretty-printing in development
+
+# Debug output (structured text logs to console)
+DEBUG=mcp:*
 
 # OAuth (when available)
 # OAUTH_CLIENT_ID=your-client-id
@@ -206,6 +220,134 @@ The server exposes these MCP tools:
 | `npm run test:all`                  | Run both unit and integration tests |
 | `npm run lint`                      | Lint code                           |
 | `npm run format`                    | Format code                         |
+
+## 📋 Logging Infrastructure
+
+The application uses [Pino](https://getpino.io/) for structured, high-performance logging with
+automatic configuration based on the environment and comprehensive security features.
+
+### Logging Behavior by Environment
+
+#### Development Mode (`NODE_ENV=development`)
+
+- **Output**: Pretty-printed console logs with colors and timestamps
+- **Format**: Human-readable format optimized for development
+- **Level**: Configurable via `LOG_LEVEL` (default: `info`)
+- **Features**:
+  - Colored output for different log levels
+  - Component-based logging with child loggers
+  - Timestamp formatting (`HH:MM:ss`)
+  - Single-line format for readability
+
+#### Production Mode (`NODE_ENV=production`)
+
+- **Output**: Structured JSON logs to files
+- **Files**:
+  - `./logs/app.log` - All logs (info and above)
+  - `./logs/error.log` - Error logs only
+- **Format**: Machine-readable JSON for log aggregation
+- **Features**:
+  - Automatic log directory creation
+  - Structured logging for monitoring systems
+  - Performance optimized for high-throughput
+
+#### Test Mode (`NODE_ENV=test`)
+
+- **Output**: Minimal structured JSON to console
+- **Purpose**: Reduced noise during test execution
+- **Features**: Error serialization and basic structured logging
+
+### Configuration Options
+
+All logging behavior can be customized via environment variables:
+
+| Variable              | Default  | Description                                                             |
+| --------------------- | -------- | ----------------------------------------------------------------------- |
+| `LOG_LEVEL`           | `info`   | Minimum log level (`error`, `warn`, `info`, `debug`)                    |
+| `LOG_TO_FILE`         | `false`  | Force file logging (overrides environment-based defaults)               |
+| `LOG_DIR`             | `./logs` | Directory for log files (used in production or when `LOG_TO_FILE=true`) |
+| `DISABLE_PRETTY_LOGS` | `false`  | Disable pretty-printing in development mode                             |
+| `DEBUG`               | -        | Enable debug output for specific components (e.g., `mcp:*`)             |
+
+### Security Features
+
+The logging system automatically redacts sensitive information:
+
+#### Automatically Redacted Fields
+
+- `password`, `token`, `access_token`, `refresh_token`
+- `authorization`, `auth`, `secret`, `key`, `client_secret`, `bearer`
+- HTTP headers: `authorization`, `cookie`, `set-cookie`
+- OAuth fields: `oauth.client_secret`, `oauth.access_token`, `oauth.refresh_token`
+- Request/response bodies: `body.password`, `body.token`, `body.secret`
+
+Redacted fields show `***REDACTED***` instead of actual values.
+
+### Component-Based Logging
+
+The system supports child loggers for component-specific logging:
+
+```typescript
+import { createChildLogger } from '@/utils/logger.js';
+
+// Create a component-specific logger
+const logger = createChildLogger({ component: 'oauth', operation: 'token-refresh' });
+
+// Log with automatic context
+logger.info('Token refreshed successfully');
+// Output: {"level":30,"time":1234567890,"component":"oauth","operation":"token-refresh","msg":"Token refreshed successfully"}
+```
+
+### Development vs Production Examples
+
+#### Development Output
+
+```
+15:30:45 INFO (oauth): Starting OAuth authentication flow
+15:30:46 DEBUG (oauth): Discovering endpoints from https://example.com/.well-known/oauth-authorization-server
+15:30:47 INFO (oauth): ✓ OAuth endpoints discovered successfully (120ms)
+```
+
+#### Production Output
+
+```json
+{"level":30,"time":1625140245000,"component":"oauth","msg":"Starting OAuth authentication flow"}
+{"level":20,"time":1625140246000,"component":"oauth","msg":"Discovering endpoints from https://example.com/.well-known/oauth-authorization-server"}
+{"level":30,"time":1625140247000,"component":"oauth","discoveryTime":120,"msg":"✓ OAuth endpoints discovered successfully"}
+```
+
+### Accessing Production Logs
+
+In production environments, logs are written to files:
+
+```bash
+# View all application logs
+tail -f ./logs/app.log
+
+# View error logs only
+tail -f ./logs/error.log
+
+# Search for specific components
+grep "oauth" ./logs/app.log | jq '.'
+
+# Monitor log levels
+jq 'select(.level >= 40)' ./logs/app.log  # Errors only
+```
+
+### Integration with Monitoring
+
+The structured JSON format integrates seamlessly with log aggregation systems:
+
+- **ELK Stack**: Direct JSON ingestion
+- **Splunk**: Automatic field extraction
+- **CloudWatch**: JSON log parsing
+- **Grafana Loki**: Label-based querying
+
+Example log aggregation query:
+
+```
+{component="oauth"} |= "error" | json
+```
 
 ## 🧪 Testing Strategy
 
