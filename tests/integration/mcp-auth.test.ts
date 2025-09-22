@@ -15,7 +15,6 @@ import {
 } from '@jest/globals';
 import { DrupalMcpServer } from '@/mcp/server.js';
 import type { AppConfig } from '@/types/index.js';
-import { OAuthClient } from '@/auth/index.js';
 import { tmpdir } from 'os';
 
 describe('MCP Authentication Integration Tests', () => {

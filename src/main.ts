@@ -5,10 +5,41 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadConfig } from '@/config/index.js';
 import { DrupalMcpServer } from '@/mcp/server.js';
-import { initializeLogger, createChildLogger } from '@/utils/logger.js';
+import {
+  initializeLogger,
+  createChildLogger,
+  isLoggerInitialized,
+} from '@/utils/logger.js';
 import createDebug from 'debug';
 
 const debug = createDebug('mcp:bootstrap');
+
+/**
+ * Safe logging function that uses Pino logger when available
+ */
+function safeLog(
+  level: 'info' | 'warn' | 'error',
+  message: string,
+  ...args: any[]
+): void {
+  if (isLoggerInitialized()) {
+    const logger = createChildLogger({ component: 'bootstrap' });
+    switch (level) {
+      case 'info':
+        logger.info(message, ...args);
+        break;
+      case 'warn':
+        logger.warn(message, ...args);
+        break;
+      case 'error':
+        logger.error(message, ...args);
+        break;
+    }
+  } else {
+    // Logger not initialized, use debug as fallback to avoid console usage
+    debug(`[${level.toUpperCase()}] ${message}`, ...args);
+  }
+}
 
 /**
  * Main function to start the MCP server
@@ -86,24 +117,14 @@ async function main(): Promise<void> {
   } catch (error) {
     const totalTime = Date.now() - startTime;
 
-    // Use logger if available, fallback to console.error if not initialized
-    const logError = (message: string, ...args: any[]) => {
-      try {
-        const logger = createChildLogger({ component: 'bootstrap' });
-        logger.error({ err: error }, message, ...args);
-      } catch {
-        // Logger not initialized, use console.error as fallback
-        console.error(message, ...args);
-      }
-    };
-
-    logError(`Failed to start MCP server (${totalTime}ms):`, error);
+    // Log error using safe logging function
+    safeLog('error', `Failed to start MCP server (${totalTime}ms):`, error);
 
     if (error instanceof Error) {
       debug(`Error type: ${error.constructor.name}`);
       debug(`Error message: ${error.message}`);
-      logError(`Error type: ${error.constructor.name}`);
-      logError(`Error message: ${error.message}`);
+      safeLog('error', `Error type: ${error.constructor.name}`);
+      safeLog('error', `Error message: ${error.message}`);
       if (error.stack) {
         debug(`Stack trace:\n${error.stack}`);
       }
@@ -115,27 +136,29 @@ async function main(): Promise<void> {
     debug('- Check network connectivity');
     debug('- Review OAuth configuration');
 
-    try {
-      const logger = createChildLogger({ component: 'bootstrap' });
-      logger.warn('Troubleshooting hints:');
-      logger.warn(
-        '- Check environment variables (DRUPAL_BASE_URL, OAUTH_CLIENT_ID)'
-      );
-      logger.warn('- Verify Drupal server is accessible');
-      logger.warn('- Check network connectivity');
-      logger.warn('- Review OAuth configuration');
-    } catch {
-      // Logger not initialized, use console.warn as fallback
-      console.warn('Troubleshooting hints:');
-      console.warn(
-        '- Check environment variables (DRUPAL_BASE_URL, OAUTH_CLIENT_ID)'
-      );
-      console.warn('- Verify Drupal server is accessible');
-      console.warn('- Check network connectivity');
-      console.warn('- Review OAuth configuration');
-    }
+    safeLog('warn', 'Troubleshooting hints:');
+    safeLog(
+      'warn',
+      '- Check environment variables (DRUPAL_BASE_URL, OAUTH_CLIENT_ID)'
+    );
+    safeLog('warn', '- Verify Drupal server is accessible');
+    safeLog('warn', '- Check network connectivity');
+    safeLog('warn', '- Review OAuth configuration');
 
     process.exit(1);
+  }
+}
+
+/**
+ * Safe logging function for shutdown scenarios
+ */
+function safeShutdownLog(message: string): void {
+  if (isLoggerInitialized()) {
+    const logger = createChildLogger({ component: 'shutdown' });
+    logger.info(message);
+  } else {
+    // Logger not initialized, use debug as fallback to avoid console usage
+    debug(`[SHUTDOWN] ${message}`);
   }
 }
 
@@ -143,35 +166,17 @@ async function main(): Promise<void> {
  * Handle graceful shutdown
  */
 process.on('SIGINT', () => {
-  try {
-    const logger = createChildLogger({ component: 'shutdown' });
-    logger.info('Shutting down MCP server...');
-  } catch {
-    // Logger not initialized, use console.error as fallback
-    console.error('Shutting down MCP server...');
-  }
+  safeShutdownLog('Shutting down MCP server...');
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  try {
-    const logger = createChildLogger({ component: 'shutdown' });
-    logger.info('Shutting down MCP server...');
-  } catch {
-    // Logger not initialized, use console.error as fallback
-    console.error('Shutting down MCP server...');
-  }
+  safeShutdownLog('Shutting down MCP server...');
   process.exit(0);
 });
 
 // Start the server
 main().catch(error => {
-  try {
-    const logger = createChildLogger({ component: 'bootstrap' });
-    logger.error({ err: error }, 'Unhandled error:');
-  } catch {
-    // Logger not initialized, use console.error as fallback
-    console.error('Unhandled error:', error);
-  }
+  safeLog('error', 'Unhandled error:', error);
   process.exit(1);
 });

@@ -2,12 +2,7 @@
  * Authentication module exports
  */
 
-// Legacy OAuth client (deprecated)
-export {
-  OAuthClient,
-  type OAuthConfig,
-  type PKCEChallenge,
-} from './oauth-client.js';
+// Legacy OAuth client removed - use McpOAuthProvider instead
 export { TokenManager, type StoredTokens } from './token-manager.js';
 
 // New MCP SDK-based OAuth provider (recommended)

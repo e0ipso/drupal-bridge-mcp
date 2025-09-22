@@ -107,7 +107,8 @@ export class McpOAuthProvider implements OAuthClientProvider {
       const logger = getLogger().child({ component: 'oauth-provider' });
       logger.info(`Opening authorization URL: ${url}`);
     } else {
-      console.log(`Opening: ${url}`);
+      // Fallback for when logger is not initialized
+      console.log(`Opening authorization URL: ${url}`);
     }
     try {
       (await import('open')).default(url.toString());

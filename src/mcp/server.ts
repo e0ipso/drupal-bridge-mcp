@@ -33,7 +33,6 @@ import {
   formatErrorForLogging,
 } from '@/utils/error-handler.js';
 import {
-  OAuthClient,
   TokenManager,
   AuthenticationRequiredError,
   createMcpErrorResponse,
@@ -50,7 +49,6 @@ const debug = createDebug('mcp:server');
 export class DrupalMcpServer {
   private readonly server: Server;
   private readonly drupalClient: DrupalClient;
-  private readonly oauthClient: OAuthClient;
   private readonly mcpOAuthProvider: McpOAuthProvider;
   private readonly tokenManager: TokenManager;
   private requestCounter = 0;
@@ -108,30 +106,11 @@ export class DrupalMcpServer {
       '[Server] ✓ MCP OAuth provider initialized (OAuth 2.1 stateless)'
     );
 
-    // Convert SimplifiedOAuthConfig to OAuthConfig for backward compatibility
-    const legacyOAuthConfig = {
-      clientId: config.oauth.clientId,
-      authorizationEndpoint:
-        config.oauth.authorizationEndpoint ||
-        config.oauth.discoveredEndpoints?.authorizationEndpoint ||
-        '',
-      tokenEndpoint:
-        config.oauth.tokenEndpoint ||
-        config.oauth.discoveredEndpoints?.tokenEndpoint ||
-        '',
-      redirectUri: config.oauth.redirectUri,
-      scopes: config.oauth.scopes,
-    };
-
-    this.oauthClient = new OAuthClient(legacyOAuthConfig); // Keep for backward compatibility
-    this.tokenManager = new TokenManager(this.oauthClient);
-    debug('✓ Legacy OAuth client initialized (backward compatibility)');
+    this.tokenManager = new TokenManager();
+    debug('✓ Token manager initialized (legacy OAuth client removed)');
     console.info(
-      '[Server] ✓ Legacy OAuth client initialized (backward compatibility)'
+      '[Server] ✓ Token manager initialized (legacy OAuth client removed)'
     );
-    debug(`- Client ID: ${config.oauth.clientId ? '***set***' : 'NOT SET'}`);
-    debug(`- Redirect URI: ${config.oauth.redirectUri}`);
-    debug(`- Scopes: ${config.oauth.scopes.join(', ')}`);
 
     debug('Step 4/5: Setting up request handlers...');
     console.info('[Server] Step 4/5: Setting up request handlers...');

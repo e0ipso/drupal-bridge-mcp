@@ -7,7 +7,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import jwt from 'jsonwebtoken';
 import { createHash } from 'crypto';
-import type { OAuthTokens, OAuthClient } from './oauth-client.js';
+import type { OAuthTokens } from '@/types/domain-types.js';
 
 export interface StoredTokens extends OAuthTokens {
   expiresAt?: number;
@@ -31,10 +31,7 @@ export class TokenManager {
   private readonly tokenDir: string;
   private readonly tokenFile: string;
   private readonly userId: string;
-  private readonly oauthClient: OAuthClient;
-
-  constructor(oauthClient: OAuthClient, userId?: string) {
-    this.oauthClient = oauthClient;
+  constructor(userId?: string) {
     this.tokenDir = join(homedir(), '.drupal-bridge-mcp');
 
     // Create user fingerprint for file naming
@@ -135,23 +132,8 @@ export class TokenManager {
       return tokens.accessToken;
     }
 
-    // Try to refresh if token is expired but we have a refresh token
-    if (validation.needsRefresh && tokens.refreshToken) {
-      try {
-        const refreshedTokens = await this.oauthClient.refreshToken(
-          tokens.refreshToken
-        );
-
-        // Store refreshed tokens
-        await this.storeTokens(refreshedTokens, tokens.userId, tokens.scopes);
-
-        return refreshedTokens.accessToken;
-      } catch {
-        // Refresh failed - tokens are invalid
-        await this.clearTokens();
-        return null;
-      }
-    }
+    // Note: Token refresh functionality removed with legacy OAuth client
+    // Applications should handle token refresh using the new McpOAuthProvider
 
     return null;
   }
