@@ -345,11 +345,18 @@ export const getDrupalJsonRpcUrl = (config: AppConfig): string => {
 
 /**
  * Create McpOAuthProvider from simplified configuration
+ * Returns null when authentication is disabled
  */
 export const createOAuthProvider = (
   config: AppConfig,
   userId = 'default'
-): McpOAuthProvider => {
+): McpOAuthProvider | null => {
+  if (!config.auth.enabled) {
+    debug('Authentication disabled, skipping OAuth provider creation');
+    return null;
+  }
+
+  debug('Authentication enabled, creating OAuth provider');
   const oauthConfig: McpOAuthConfig = {
     clientId: config.oauth.clientId,
     authorizationEndpoint:

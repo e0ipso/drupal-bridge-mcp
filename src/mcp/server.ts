@@ -48,7 +48,7 @@ const debug = createDebug('mcp:server');
 export class DrupalMcpServer {
   private readonly server: Server;
   private readonly drupalClient: DrupalClient;
-  private readonly mcpOAuthProvider: McpOAuthProvider;
+  private readonly mcpOAuthProvider: McpOAuthProvider | null;
   private requestCounter = 0;
 
   constructor(private readonly config: AppConfig) {
@@ -99,13 +99,20 @@ export class DrupalMcpServer {
     console.info('[Server] Step 3/5: Setting up OAuth providers...');
     // Initialize authentication components with new MCP OAuth provider (OAuth 2.1 stateless design)
     this.mcpOAuthProvider = createOAuthProvider(config);
-    debug('✓ MCP OAuth provider initialized (OAuth 2.1 stateless)');
-    console.info(
-      '[Server] ✓ MCP OAuth provider initialized (OAuth 2.1 stateless)'
-    );
 
-    debug('✓ OAuth provider configured');
-    console.info('[Server] ✓ OAuth provider configured');
+    if (this.mcpOAuthProvider) {
+      debug('✓ MCP OAuth provider initialized (OAuth 2.1 stateless)');
+      console.info(
+        '[Server] ✓ MCP OAuth provider initialized (OAuth 2.1 stateless)'
+      );
+      debug('✓ OAuth provider configured');
+      console.info('[Server] ✓ OAuth provider configured');
+    } else {
+      debug('✓ Authentication disabled, OAuth provider skipped');
+      console.info(
+        '[Server] ✓ Authentication disabled, OAuth provider skipped'
+      );
+    }
 
     debug('Step 4/5: Setting up request handlers...');
     console.info('[Server] Step 4/5: Setting up request handlers...');
@@ -132,6 +139,11 @@ export class DrupalMcpServer {
   private async requireAuthentication(): Promise<AuthContext> {
     // Skip authentication if configured
     if (this.config.auth.skipAuth) {
+      return { isAuthenticated: true };
+    }
+
+    // If authentication is disabled entirely, allow access
+    if (!this.config.auth.enabled || !this.mcpOAuthProvider) {
       return { isAuthenticated: true };
     }
 
@@ -738,6 +750,15 @@ export class DrupalMcpServer {
    * Execute authentication login using new MCP OAuth provider
    */
   private async executeAuthLogin(): Promise<unknown> {
+    // If authentication is disabled, return success without doing anything
+    if (!this.config.auth.enabled || !this.mcpOAuthProvider) {
+      return {
+        success: true,
+        message: 'Authentication is disabled - access granted automatically',
+        authenticationDisabled: true,
+      };
+    }
+
     try {
       // Use the new MCP OAuth provider for authentication
       const tokens = await this.mcpOAuthProvider.authorize();
@@ -788,6 +809,20 @@ export class DrupalMcpServer {
    * Execute authentication status check
    */
   private async executeAuthStatus(): Promise<unknown> {
+    // If authentication is disabled, return status without checking tokens
+    if (!this.config.auth.enabled || !this.mcpOAuthProvider) {
+      const authContext = await this.requireAuthentication();
+      return {
+        isAuthenticated: authContext.isAuthenticated,
+        authenticationDisabled: true,
+        message: 'Authentication is disabled - access granted automatically',
+        configInfo: {
+          authEnabled: this.config.auth.enabled,
+          skipAuth: this.config.auth.skipAuth,
+        },
+      };
+    }
+
     try {
       const mcpTokenInfo = await this.mcpOAuthProvider.getTokenInfo();
       const hasValidTokens = await this.mcpOAuthProvider.hasValidTokens();
@@ -804,6 +839,7 @@ export class DrupalMcpServer {
         },
         provider: 'McpOAuthProvider (OAuth 2.1 Stateless)',
         configInfo: {
+          authEnabled: this.config.auth.enabled,
           endpointsDiscovered: !!this.config.oauth.discoveredEndpoints,
           authorizationEndpoint: this.config.oauth.authorizationEndpoint,
           tokenEndpoint: this.config.oauth.tokenEndpoint,
@@ -825,6 +861,15 @@ export class DrupalMcpServer {
    * Execute authentication logout
    */
   private async executeAuthLogout(): Promise<unknown> {
+    // If authentication is disabled, there's nothing to logout from
+    if (!this.config.auth.enabled || !this.mcpOAuthProvider) {
+      return {
+        success: true,
+        message: 'Authentication is disabled - no tokens to clear',
+        authenticationDisabled: true,
+      };
+    }
+
     try {
       await this.mcpOAuthProvider.clearTokens();
       this.drupalClient.clearAccessToken();
