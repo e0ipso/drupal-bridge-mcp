@@ -159,7 +159,7 @@ const validateConfig = (config: AppConfig): void => {
     }
 
     // For simplified configuration, only DRUPAL_BASE_URL and OAUTH_CLIENT_ID are required
-    // Endpoints will be discovered or fallback to defaults
+    // Endpoints will be discovered from OAuth server metadata
     if (!config.drupal.baseUrl) {
       throw new Error(
         'DRUPAL_BASE_URL is required for OAuth endpoint discovery'
@@ -259,16 +259,12 @@ export const loadConfig = async (): Promise<AppConfig> => {
         );
         debug(`- Authorization: ${discoveredEndpoints.authorizationEndpoint}`);
         debug(`- Token: ${discoveredEndpoints.tokenEndpoint}`);
-        debug(
-          `- Using fallback: ${discoveredEndpoints.isFallback ? 'YES' : 'NO'}`
-        );
 
         if (config.discovery.debug) {
           configLogger.debug(
             {
               authorization: discoveredEndpoints.authorizationEndpoint,
               token: discoveredEndpoints.tokenEndpoint,
-              isFallback: discoveredEndpoints.isFallback,
             },
             'OAuth endpoints discovered'
           );
@@ -276,10 +272,10 @@ export const loadConfig = async (): Promise<AppConfig> => {
       } catch (error) {
         const discoveryTime = Date.now() - discoveryStartTime;
         debug(
-          `⚠ OAuth endpoint discovery failed (${discoveryTime}ms), using fallback endpoints`
+          `⚠ OAuth endpoint discovery failed (${discoveryTime}ms). OAuth configuration is required.`
         );
-        configLogger.warn(
-          `⚠ OAuth endpoint discovery failed (${discoveryTime}ms), using fallback endpoints`
+        configLogger.error(
+          `⚠ OAuth endpoint discovery failed (${discoveryTime}ms). OAuth configuration is required.`
         );
         debug(
           `Discovery error: ${error instanceof Error ? error.message : String(error)}`
@@ -290,24 +286,16 @@ export const loadConfig = async (): Promise<AppConfig> => {
         );
 
         if (config.discovery.debug) {
-          configLogger.warn(
+          configLogger.error(
             { err: error },
-            'OAuth endpoint discovery failed, using fallback endpoints:'
+            'OAuth endpoint discovery failed. Ensure the OAuth server provides RFC 8414 discovery metadata.'
           );
         }
 
-        // Use fallback endpoints when discovery fails
-        const fallbackAuthEndpoint = `${config.drupal.baseUrl}/oauth/authorize`;
-        const fallbackTokenEndpoint = `${config.drupal.baseUrl}/oauth/token`;
-
-        debug(`- Fallback Authorization: ${fallbackAuthEndpoint}`);
-        debug(`- Fallback Token: ${fallbackTokenEndpoint}`);
-
-        (config as { oauth: SimplifiedOAuthConfig }).oauth = {
-          ...config.oauth,
-          authorizationEndpoint: fallbackAuthEndpoint,
-          tokenEndpoint: fallbackTokenEndpoint,
-        };
+        // OAuth discovery is mandatory - throw error instead of using fallbacks
+        throw new Error(
+          `OAuth endpoint discovery failed. Ensure the OAuth server at ${config.drupal.baseUrl} provides RFC 8414 discovery metadata at /.well-known/oauth-authorization-server. Error: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     } else {
       debug('✓ Using static OAuth endpoint configuration');

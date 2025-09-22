@@ -33,7 +33,6 @@ import {
   formatErrorForLogging,
 } from '@/utils/error-handler.js';
 import {
-  TokenManager,
   AuthenticationRequiredError,
   createMcpErrorResponse,
   McpOAuthProvider,
@@ -50,7 +49,6 @@ export class DrupalMcpServer {
   private readonly server: Server;
   private readonly drupalClient: DrupalClient;
   private readonly mcpOAuthProvider: McpOAuthProvider;
-  private readonly tokenManager: TokenManager;
   private requestCounter = 0;
 
   constructor(private readonly config: AppConfig) {
@@ -106,10 +104,9 @@ export class DrupalMcpServer {
       '[Server] ✓ MCP OAuth provider initialized (OAuth 2.1 stateless)'
     );
 
-    this.tokenManager = new TokenManager();
-    debug('✓ Token manager initialized (legacy OAuth client removed)');
+    debug('✓ Legacy token manager removed - using only MCP OAuth provider');
     console.info(
-      '[Server] ✓ Token manager initialized (legacy OAuth client removed)'
+      '[Server] ✓ Legacy token manager removed - using only MCP OAuth provider'
     );
 
     debug('Step 4/5: Setting up request handlers...');
@@ -154,27 +151,7 @@ export class DrupalMcpServer {
         };
       }
 
-      // Fall back to legacy token manager if needed
-      const accessToken = await this.tokenManager.getValidAccessToken(
-        undefined,
-        this.config.auth.requiredScopes
-      );
-
-      if (accessToken) {
-        const validation = await this.tokenManager.validateToken(
-          accessToken,
-          this.config.auth.requiredScopes
-        );
-
-        if (validation.isValid) {
-          return {
-            isAuthenticated: true,
-            userId: validation.userId || 'default',
-            scopes: validation.scopes,
-            accessToken,
-          };
-        }
-      }
+      // Legacy token manager removed - only using MCP OAuth provider
 
       return { isAuthenticated: false };
     } catch (error) {
@@ -768,21 +745,7 @@ export class DrupalMcpServer {
       const tokens = await this.mcpOAuthProvider.authorize();
       const userId = 'default'; // In production, derive from token or user input
 
-      // Convert MCP SDK tokens to legacy token format for compatibility
-      const legacyTokens = {
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        tokenType: tokens.token_type || 'Bearer',
-        expiresIn: tokens.expires_in,
-        scope: tokens.scope,
-      };
-
-      // Store tokens using both old and new systems for compatibility
-      await this.tokenManager.storeTokens(
-        legacyTokens,
-        userId,
-        this.config.auth.requiredScopes
-      );
+      // Store tokens using MCP OAuth provider only (legacy token manager removed)
       await this.mcpOAuthProvider.saveTokens(tokens);
 
       // Set access token on Drupal client for immediate use
@@ -796,7 +759,6 @@ export class DrupalMcpServer {
         scopes: this.config.auth.requiredScopes,
         provider: 'McpOAuthProvider',
         endpointsDiscovered: !!this.config.oauth.discoveredEndpoints,
-        isFallback: this.config.oauth.discoveredEndpoints?.isFallback,
         tokenExpiry: tokens.expires_in
           ? Date.now() + tokens.expires_in * 1000
           : undefined,
@@ -815,7 +777,6 @@ export class DrupalMcpServer {
    */
   private async executeAuthStatus(): Promise<unknown> {
     try {
-      const tokenInfo = await this.tokenManager.getTokenInfo();
       const mcpTokenInfo = await this.mcpOAuthProvider.getTokenInfo();
       const hasValidTokens = await this.mcpOAuthProvider.hasValidTokens();
       const authContext = await this.requireAuthentication();
@@ -824,7 +785,7 @@ export class DrupalMcpServer {
         isAuthenticated: authContext.isAuthenticated,
         userId: authContext.userId,
         scopes: authContext.scopes,
-        tokenInfo,
+        tokenInfo: mcpTokenInfo, // Using MCP provider token info only (legacy removed)
         mcpProvider: {
           hasValidTokens,
           tokenInfo: mcpTokenInfo,
@@ -832,7 +793,6 @@ export class DrupalMcpServer {
         provider: 'McpOAuthProvider (OAuth 2.1 Stateless)',
         configInfo: {
           endpointsDiscovered: !!this.config.oauth.discoveredEndpoints,
-          isFallback: this.config.oauth.discoveredEndpoints?.isFallback,
           authorizationEndpoint: this.config.oauth.authorizationEndpoint,
           tokenEndpoint: this.config.oauth.tokenEndpoint,
           skipAuth: this.config.auth.skipAuth,
@@ -854,8 +814,7 @@ export class DrupalMcpServer {
    */
   private async executeAuthLogout(): Promise<unknown> {
     try {
-      await this.tokenManager.clearTokens();
-      await this.mcpOAuthProvider.clearTokens();
+      await this.mcpOAuthProvider.clearTokens(); // Legacy token manager removed
       this.drupalClient.clearAccessToken();
 
       return {

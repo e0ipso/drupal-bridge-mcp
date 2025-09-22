@@ -2,8 +2,7 @@
  * Authentication module exports
  */
 
-// Legacy OAuth client removed - use McpOAuthProvider instead
-export { TokenManager, type StoredTokens } from './token-manager.js';
+// Legacy OAuth client and TokenManager removed - use McpOAuthProvider instead
 
 // New MCP SDK-based OAuth provider (recommended)
 export {

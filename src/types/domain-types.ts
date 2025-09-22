@@ -178,26 +178,8 @@ export interface PKCEChallenge {
   codeChallengeMethod: 'S256';
 }
 
-/**
- * Stored tokens with metadata (from token-manager.ts)
- */
-export interface StoredTokens extends OAuthTokens {
-  expiresAt?: number;
-  userId: string;
-  scopes: string[];
-  refreshExpiresAt?: number;
-}
-
-/**
- * Token validation result (from token-manager.ts)
- */
-export interface TokenValidationResult {
-  isValid: boolean;
-  isExpired: boolean;
-  needsRefresh: boolean;
-  scopes?: string[];
-  userId?: string;
-}
+// Legacy StoredTokens and TokenValidationResult interfaces removed
+// Use interfaces from oauth-provider.ts instead (MCP SDK-based)
 
 // Authentication types moved to auth-errors.ts for OAuth 2.1 stateless design
 // AuthMiddlewareConfig removed - simplified for MVP, use inline configuration

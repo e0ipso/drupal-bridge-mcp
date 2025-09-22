@@ -57,9 +57,6 @@ export interface OAuthEndpoints {
   /** When the endpoints were discovered */
   discoveredAt: Date;
 
-  /** Whether fallback endpoints were used due to discovery failure */
-  isFallback?: boolean;
-
   /** Additional metadata from discovery (optional) */
   metadata?: Partial<OAuthServerMetadata>;
 }
@@ -108,6 +105,7 @@ export enum DiscoveryErrorType {
   MISSING_REQUIRED_FIELDS = 'MISSING_REQUIRED_FIELDS',
   HTTPS_REQUIRED = 'HTTPS_REQUIRED',
   INVALID_URL = 'INVALID_URL',
+  DISCOVERY_FAILED = 'DISCOVERY_FAILED',
 }
 
 /**

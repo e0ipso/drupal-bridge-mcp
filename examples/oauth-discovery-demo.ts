@@ -62,7 +62,7 @@ async function demonstrateDiscovery() {
       console.log(`   Authorization: ${endpoints.authorizationEndpoint}`);
       console.log(`   Token: ${endpoints.tokenEndpoint}`);
       console.log(`   Issuer: ${endpoints.issuer}`);
-      console.log(`   Is Fallback: ${endpoints.isFallback ? '🔄' : '🎯'}`);
+      console.log(`   Discovery: 🎯 Successful`);
 
       if (endpoints.metadata) {
         console.log(

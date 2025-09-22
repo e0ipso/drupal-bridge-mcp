@@ -58,7 +58,6 @@ describe('OAuth Endpoint Discovery', () => {
         tokenEndpoint: 'https://example.com/oauth/token',
         issuer: 'https://example.com',
         discoveredAt: expect.any(Date),
-        isFallback: false,
         metadata: mockMetadata,
       });
 
@@ -109,24 +108,34 @@ describe('OAuth Endpoint Discovery', () => {
     });
   });
 
-  describe('fallback logic', () => {
-    it('should determine fallback behavior correctly for various failure types', async () => {
-      // Test network error fallback
+  describe('error handling', () => {
+    it('should throw DiscoveryError for network failures', async () => {
+      // Test network error - should throw, not fallback
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
-      const networkFailure = await discoverOAuthEndpoints({
-        baseUrl: 'https://example.com',
-        timeout: 1000,
-        retries: 0,
-      });
-      expect(networkFailure.isFallback).toBe(true);
-      expect(networkFailure.authorizationEndpoint).toBe(
-        'https://example.com/oauth/authorize'
+
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: 'https://example.com',
+          timeout: 1000,
+          retries: 0,
+        })
+      ).rejects.toThrow(DiscoveryError);
+
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: 'https://example.com',
+          timeout: 1000,
+          retries: 0,
+        })
+      ).rejects.toThrow(
+        expect.objectContaining({
+          type: DiscoveryErrorType.DISCOVERY_FAILED,
+        })
       );
+    });
 
-      clearDiscoveryCache();
-      jest.clearAllMocks();
-
-      // Test invalid JSON fallback
+    it('should throw DiscoveryError for invalid JSON responses', async () => {
+      // Test invalid JSON - should throw, not fallback
       mockFetch.mockResolvedValueOnce({
         ok: true,
         headers: {
@@ -134,16 +143,17 @@ describe('OAuth Endpoint Discovery', () => {
         },
         json: jest.fn().mockRejectedValue(new Error('Invalid JSON')),
       });
-      const jsonFailure = await discoverOAuthEndpoints({
-        baseUrl: 'https://example.com',
-        retries: 0,
-      });
-      expect(jsonFailure.isFallback).toBe(true);
 
-      clearDiscoveryCache();
-      jest.clearAllMocks();
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: 'https://example.com',
+          retries: 0,
+        })
+      ).rejects.toThrow(DiscoveryError);
+    });
 
-      // Test missing required fields fallback
+    it('should throw DiscoveryError for missing required fields', async () => {
+      // Test missing required fields - should throw, not fallback
       mockFetch.mockResolvedValueOnce({
         ok: true,
         headers: {
@@ -154,15 +164,15 @@ describe('OAuth Endpoint Discovery', () => {
           // Missing authorization_endpoint and token_endpoint
         }),
       });
-      const missingFieldsFailure = await discoverOAuthEndpoints({
-        baseUrl: 'https://example.com',
-        retries: 0,
-      });
-      expect(missingFieldsFailure.isFallback).toBe(true);
-    });
-  });
 
-  describe('error handling', () => {
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: 'https://example.com',
+          retries: 0,
+        })
+      ).rejects.toThrow(DiscoveryError);
+    });
+
     it('should throw DiscoveryError for HTTPS requirement in production', async () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';

@@ -3,7 +3,7 @@
  *
  * This module implements the OAuth 2.0 Authorization Server Metadata specification
  * (RFC 8414) to dynamically discover OAuth endpoints from the .well-known metadata
- * endpoint, with graceful fallback to standard endpoints.
+ * endpoint. OAuth discovery is mandatory and proper server configuration is required.
  */
 
 import type {
@@ -100,7 +100,7 @@ function logDiscovery(
       logger[level](message);
     }
   } else {
-    // Fallback to console when logger not available
+    // Use console when logger not available
     const consoleLevel = level === 'debug' ? 'log' : level;
     if (extra) {
       console[consoleLevel](`[Discovery] ${message}`, extra);
@@ -249,23 +249,6 @@ async function fetchMetadata(
 }
 
 /**
- * Create fallback endpoints when discovery fails
- */
-function createFallbackEndpoints(baseUrl: string): OAuthEndpoints {
-  const normalizedBaseUrl = baseUrl.endsWith('/')
-    ? baseUrl.slice(0, -1)
-    : baseUrl;
-
-  return {
-    authorizationEndpoint: `${normalizedBaseUrl}/oauth/authorize`,
-    tokenEndpoint: `${normalizedBaseUrl}/oauth/token`,
-    issuer: normalizedBaseUrl,
-    discoveredAt: new Date(),
-    isFallback: true,
-  };
-}
-
-/**
  * Discover OAuth endpoints using RFC8414 metadata discovery
  *
  * @param config Discovery configuration
@@ -337,7 +320,6 @@ export async function discoverOAuthEndpoints(
       tokenEndpoint: metadata.token_endpoint,
       issuer: metadata.issuer,
       discoveredAt: new Date(),
-      isFallback: false,
       metadata,
     };
 
@@ -351,24 +333,16 @@ export async function discoverOAuthEndpoints(
     return endpoints;
   } catch (error) {
     if (fullConfig.debug) {
-      logDiscovery(
-        'warn',
-        'Failed to discover endpoints, using fallback:',
-        error
-      );
+      logDiscovery('warn', 'OAuth endpoint discovery failed:', error);
     }
 
-    // Create fallback endpoints
-    const fallbackEndpoints = createFallbackEndpoints(normalizedBaseUrl);
-
-    // Cache fallback endpoints with shorter TTL
-    metadataCache.set(
-      cacheKey,
-      fallbackEndpoints,
-      Math.min(fullConfig.cacheTtl, 300000)
-    ); // 5 minutes max
-
-    return fallbackEndpoints;
+    // OAuth discovery is mandatory - throw descriptive error instead of using fallbacks
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new DiscoveryError(
+      `OAuth endpoint discovery failed. Ensure the OAuth server provides RFC 8414 discovery metadata at ${wellKnownUrl}. Error: ${errorMessage}`,
+      DiscoveryErrorType.DISCOVERY_FAILED,
+      error instanceof Error ? error : undefined
+    );
   }
 }
 
