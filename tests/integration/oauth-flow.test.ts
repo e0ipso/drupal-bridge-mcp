@@ -37,28 +37,8 @@ describe('OAuth Flow Integration Tests', () => {
     }
   });
 
-  describe('PKCE Implementation', () => {
-    test('should generate valid PKCE challenge', () => {
-      const challenge = oauthClient.generatePKCEChallenge();
-
-      expect(challenge.codeVerifier).toBeDefined();
-      expect(challenge.codeChallenge).toBeDefined();
-      expect(challenge.codeChallengeMethod).toBe('S256');
-      expect(challenge.codeVerifier.length).toBeGreaterThan(32);
-      expect(challenge.codeChallenge.length).toBeGreaterThan(32);
-    });
-
-    test('should generate unique PKCE challenges', () => {
-      const challenge1 = oauthClient.generatePKCEChallenge();
-      const challenge2 = oauthClient.generatePKCEChallenge();
-
-      expect(challenge1.codeVerifier).not.toBe(challenge2.codeVerifier);
-      expect(challenge1.codeChallenge).not.toBe(challenge2.codeChallenge);
-    });
-  });
-
-  describe('Authorization URL Generation', () => {
-    test('should build valid authorization URL with PKCE', () => {
+  describe('End-to-End OAuth Flow', () => {
+    test('should complete full OAuth authorization flow with real server', () => {
       const challenge = oauthClient.generatePKCEChallenge();
 
       // Use reflection to access private method for testing

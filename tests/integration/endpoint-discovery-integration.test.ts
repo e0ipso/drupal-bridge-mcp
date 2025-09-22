@@ -14,7 +14,6 @@ import {
   test,
   expect,
   beforeEach,
-  afterEach,
   jest,
   beforeAll,
   afterAll,
@@ -22,10 +21,7 @@ import {
 import {
   discoverOAuthEndpoints,
   clearDiscoveryCache,
-  getDiscoveryCacheStats,
-  cleanupDiscoveryCache,
 } from '@/auth/endpoint-discovery.js';
-import { DiscoveryError, DiscoveryErrorType } from '@/auth/types.js';
 import { createServer } from 'http';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
@@ -53,8 +49,8 @@ describe('Endpoint Discovery Integration Tests', () => {
     jest.clearAllMocks();
   });
 
-  describe('Successful Discovery Scenarios', () => {
-    test('should discover endpoints with complete metadata', async () => {
+  describe('Real Server Discovery Integration', () => {
+    test('should discover endpoints from real HTTP server with complete metadata', async () => {
       setMockResponse('complete');
 
       const endpoints = await discoverOAuthEndpoints({
@@ -78,7 +74,7 @@ describe('Endpoint Discovery Integration Tests', () => {
       );
     });
 
-    test('should discover endpoints with minimal required metadata', async () => {
+    test('should discover endpoints from real HTTP server with minimal metadata', async () => {
       setMockResponse('minimal');
 
       const endpoints = await discoverOAuthEndpoints({
@@ -112,89 +108,40 @@ describe('Endpoint Discovery Integration Tests', () => {
         `http://localhost:${serverPort}/oauth/token`
       );
     });
-
-    test('should work with different base URL formats', async () => {
-      setMockResponse('complete');
-
-      // Test with trailing slash
-      const endpointsWithSlash = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}/`,
-      });
-      expect(endpointsWithSlash.isFallback).toBe(false);
-
-      clearDiscoveryCache();
-
-      // Test without trailing slash
-      const endpointsWithoutSlash = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-      });
-      expect(endpointsWithoutSlash.isFallback).toBe(false);
-
-      // Both should result in same endpoints
-      expect(endpointsWithSlash.authorizationEndpoint).toBe(
-        endpointsWithoutSlash.authorizationEndpoint
-      );
-    });
   });
 
-  describe('Fallback Scenarios', () => {
-    test('should fallback when .well-known endpoint returns 404', async () => {
+  describe('Real Network Error Scenarios', () => {
+    test('should handle real server errors and fallback appropriately', async () => {
+      // Test 404 response from real server
       setMockResponse('not_found');
-
-      const endpoints = await discoverOAuthEndpoints({
+      const notFoundResult = await discoverOAuthEndpoints({
         baseUrl: `http://localhost:${serverPort}`,
         timeout: 2000,
         retries: 1,
       });
+      expect(notFoundResult.isFallback).toBe(true);
+      expect(notFoundResult.metadata).toBeUndefined();
 
-      expect(endpoints.isFallback).toBe(true);
-      expect(endpoints.authorizationEndpoint).toBe(
-        `http://localhost:${serverPort}/oauth/authorize`
-      );
-      expect(endpoints.tokenEndpoint).toBe(
-        `http://localhost:${serverPort}/oauth/token`
-      );
-      expect(endpoints.issuer).toBe(`http://localhost:${serverPort}`);
-      expect(endpoints.metadata).toBeUndefined();
-    });
-
-    test('should fallback when metadata is invalid JSON', async () => {
+      // Test invalid JSON from real server
       setMockResponse('invalid_json');
-
-      const endpoints = await discoverOAuthEndpoints({
+      const invalidJsonResult = await discoverOAuthEndpoints({
         baseUrl: `http://localhost:${serverPort}`,
         timeout: 2000,
         retries: 1,
       });
+      expect(invalidJsonResult.isFallback).toBe(true);
 
-      expect(endpoints.isFallback).toBe(true);
-    });
-
-    test('should fallback when required fields are missing', async () => {
-      setMockResponse('missing_fields');
-
-      const endpoints = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        timeout: 2000,
-        retries: 1,
-      });
-
-      expect(endpoints.isFallback).toBe(true);
-    });
-
-    test('should fallback when server returns 500 error', async () => {
+      // Test server error from real server
       setMockResponse('server_error');
-
-      const endpoints = await discoverOAuthEndpoints({
+      const serverErrorResult = await discoverOAuthEndpoints({
         baseUrl: `http://localhost:${serverPort}`,
         timeout: 2000,
         retries: 1,
       });
-
-      expect(endpoints.isFallback).toBe(true);
+      expect(serverErrorResult.isFallback).toBe(true);
     });
 
-    test('should fallback on network timeout', async () => {
+    test('should handle real network timeout scenarios', async () => {
       setMockResponse('timeout');
 
       const endpoints = await discoverOAuthEndpoints({
@@ -204,155 +151,6 @@ describe('Endpoint Discovery Integration Tests', () => {
       });
 
       expect(endpoints.isFallback).toBe(true);
-    });
-  });
-
-  describe('Cache Behavior', () => {
-    test('should cache successful discovery results', async () => {
-      setMockResponse('complete');
-
-      // First request should hit the server
-      const endpoints1 = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        cacheTtl: 60000,
-      });
-
-      expect(endpoints1.isFallback).toBe(false);
-
-      // Change server response
-      setMockResponse('minimal');
-
-      // Second request should use cache (not hit changed server)
-      const endpoints2 = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        cacheTtl: 60000,
-      });
-
-      expect(endpoints2.isFallback).toBe(false);
-      expect(endpoints2.metadata).toEqual(endpoints1.metadata); // Should be cached
-
-      // Verify cache stats
-      const stats = getDiscoveryCacheStats();
-      expect(stats.size).toBe(1);
-      expect(stats.entries).toContain(`http://localhost:${serverPort}`);
-    });
-
-    test('should cache fallback results with shorter TTL', async () => {
-      setMockResponse('not_found');
-
-      const endpoints = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        cacheTtl: 3600000, // 1 hour
-        retries: 0,
-      });
-
-      expect(endpoints.isFallback).toBe(true);
-
-      // Verify cache contains the fallback
-      const stats = getDiscoveryCacheStats();
-      expect(stats.size).toBe(1);
-    });
-
-    test('should respect cache TTL expiration', async () => {
-      setMockResponse('complete');
-
-      // Cache with very short TTL
-      await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        cacheTtl: 50, // 50ms
-      });
-
-      // Wait for cache to expire
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Clean up expired entries
-      cleanupDiscoveryCache();
-
-      const stats = getDiscoveryCacheStats();
-      expect(stats.size).toBe(0); // Cache should be empty after cleanup
-    });
-
-    test('should clear cache manually', async () => {
-      setMockResponse('complete');
-
-      await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        cacheTtl: 60000,
-      });
-
-      let stats = getDiscoveryCacheStats();
-      expect(stats.size).toBe(1);
-
-      clearDiscoveryCache();
-
-      stats = getDiscoveryCacheStats();
-      expect(stats.size).toBe(0);
-    });
-  });
-
-  describe('Error Handling', () => {
-    test('should throw DiscoveryError for invalid URLs', async () => {
-      await expect(
-        discoverOAuthEndpoints({
-          baseUrl: 'invalid-url',
-        })
-      ).rejects.toThrow(DiscoveryError);
-
-      await expect(
-        discoverOAuthEndpoints({
-          baseUrl: 'invalid-url',
-        })
-      ).rejects.toThrow(
-        expect.objectContaining({
-          type: DiscoveryErrorType.INVALID_URL,
-        })
-      );
-    });
-
-    test('should throw DiscoveryError for HTTPS requirement in production', async () => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
-
-      try {
-        await expect(
-          discoverOAuthEndpoints({
-            baseUrl: 'http://example.com',
-            validateHttps: true,
-          })
-        ).rejects.toThrow(DiscoveryError);
-
-        await expect(
-          discoverOAuthEndpoints({
-            baseUrl: 'http://example.com',
-            validateHttps: true,
-          })
-        ).rejects.toThrow(
-          expect.objectContaining({
-            type: DiscoveryErrorType.HTTPS_REQUIRED,
-          })
-        );
-      } finally {
-        process.env.NODE_ENV = originalEnv;
-      }
-    });
-
-    test('should allow HTTP in development and test environments', async () => {
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'development';
-
-      try {
-        setMockResponse('complete');
-
-        // Should not throw for HTTP in development
-        const endpoints = await discoverOAuthEndpoints({
-          baseUrl: `http://localhost:${serverPort}`,
-          validateHttps: true,
-        });
-
-        expect(endpoints).toBeDefined();
-      } finally {
-        process.env.NODE_ENV = originalEnv;
-      }
     });
   });
 

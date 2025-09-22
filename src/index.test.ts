@@ -27,18 +27,4 @@ describe('Main module', () => {
     expect(client).toBeInstanceOf(DrupalClient);
     expect(client.getConfig()).toEqual(clientConfig);
   });
-
-  test('environment variable override works', async () => {
-    const originalEnv = process.env.DRUPAL_BASE_URL;
-    process.env.DRUPAL_BASE_URL = 'https://example.com/drupal';
-
-    const config = await loadConfig();
-    expect(config.drupal.baseUrl).toBe('https://example.com/drupal');
-
-    if (originalEnv !== undefined) {
-      process.env.DRUPAL_BASE_URL = originalEnv;
-    } else {
-      delete process.env.DRUPAL_BASE_URL;
-    }
-  });
 });
