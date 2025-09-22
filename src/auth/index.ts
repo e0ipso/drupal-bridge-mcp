@@ -2,17 +2,15 @@
  * Authentication module exports
  */
 
-// Legacy OAuth client and TokenManager removed - use McpOAuthProvider instead
-
-// New MCP SDK-based OAuth provider (recommended)
+// MCP OAuth provider
 export {
   McpOAuthProvider,
   type McpOAuthConfig,
   type OAuthTokens,
   type TokenValidationResult,
 } from './oauth-provider.js';
-// CryptoUtils removed for MVP simplification
-// Simplified authentication errors and types for OAuth 2.1 stateless design
+
+// Authentication errors and types
 export {
   AuthError,
   ValidationError,

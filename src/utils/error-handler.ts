@@ -18,7 +18,7 @@ export enum IntegrationErrorType {
   DRUPAL_ERROR = 'DRUPAL_ERROR',
   TIMEOUT_ERROR = 'TIMEOUT_ERROR',
   AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
-  // Legacy compatibility (mapped to other types)
+  // Compatibility (mapped to other types)
   PARSE_ERROR = 'PARSE_ERROR',
   RATE_LIMIT_ERROR = 'RATE_LIMIT_ERROR',
   SERVER_UNAVAILABLE = 'SERVER_UNAVAILABLE',
@@ -149,7 +149,7 @@ function mapJsonRpcCodeToErrorType(code: number): IntegrationErrorType {
 }
 
 /**
- * Simplified error normalization (supports legacy signatures)
+ * Simplified error normalization (supports compatible signatures)
  */
 export function normalizeError(
   error: unknown,

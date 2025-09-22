@@ -104,10 +104,8 @@ export class DrupalMcpServer {
       '[Server] ✓ MCP OAuth provider initialized (OAuth 2.1 stateless)'
     );
 
-    debug('✓ Legacy token manager removed - using only MCP OAuth provider');
-    console.info(
-      '[Server] ✓ Legacy token manager removed - using only MCP OAuth provider'
-    );
+    debug('✓ OAuth provider configured');
+    console.info('[Server] ✓ OAuth provider configured');
 
     debug('Step 4/5: Setting up request handlers...');
     console.info('[Server] Step 4/5: Setting up request handlers...');
@@ -151,7 +149,7 @@ export class DrupalMcpServer {
         };
       }
 
-      // Legacy token manager removed - only using MCP OAuth provider
+      // Using MCP OAuth provider for authentication
 
       return { isAuthenticated: false };
     } catch (error) {
@@ -745,7 +743,7 @@ export class DrupalMcpServer {
       const tokens = await this.mcpOAuthProvider.authorize();
       const userId = 'default'; // In production, derive from token or user input
 
-      // Store tokens using MCP OAuth provider only (legacy token manager removed)
+      // Store tokens using MCP OAuth provider
       await this.mcpOAuthProvider.saveTokens(tokens);
 
       // Set access token on Drupal client for immediate use
@@ -785,7 +783,7 @@ export class DrupalMcpServer {
         isAuthenticated: authContext.isAuthenticated,
         userId: authContext.userId,
         scopes: authContext.scopes,
-        tokenInfo: mcpTokenInfo, // Using MCP provider token info only (legacy removed)
+        tokenInfo: mcpTokenInfo,
         mcpProvider: {
           hasValidTokens,
           tokenInfo: mcpTokenInfo,
@@ -814,12 +812,12 @@ export class DrupalMcpServer {
    */
   private async executeAuthLogout(): Promise<unknown> {
     try {
-      await this.mcpOAuthProvider.clearTokens(); // Legacy token manager removed
+      await this.mcpOAuthProvider.clearTokens();
       this.drupalClient.clearAccessToken();
 
       return {
         success: true,
-        message: 'Logout successful - cleared all tokens (OAuth 2.1 stateless)',
+        message: 'Logout successful - cleared all tokens',
       };
     } catch (error) {
       return {
@@ -951,7 +949,7 @@ export class DrupalMcpServer {
         id: '2',
         title: `Drupal 9 specific tutorial about ${processedParams.keywords}`,
         url: 'https://drupalize.me/tutorial/drupal9-tutorial',
-        description: `Legacy tutorial for ${processedParams.keywords} in Drupal 9`,
+        description: `Tutorial for ${processedParams.keywords} in Drupal 9`,
         drupal_version: ['9'],
         tags:
           processedParams.category && processedParams.category.length > 0

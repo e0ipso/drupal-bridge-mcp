@@ -14,7 +14,7 @@ export interface AuthContext {
 }
 
 /**
- * Simplified session interface for backward compatibility
+ * Simplified session interface for compatibility
  */
 export interface Session {
   id: string;
@@ -79,7 +79,7 @@ export class MCPError extends Error {
   }
 }
 
-// Legacy error class aliases for backward compatibility (removed complexity)
+// Error class aliases for compatibility
 export class AuthenticationRequiredError extends AuthError {
   constructor(message: string) {
     super(message, 'AUTHENTICATION_REQUIRED', 401);

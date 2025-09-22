@@ -178,7 +178,7 @@ export interface PKCEChallenge {
   codeChallengeMethod: 'S256';
 }
 
-// Legacy StoredTokens and TokenValidationResult interfaces removed
+// StoredTokens and TokenValidationResult interfaces removed
 // Use interfaces from oauth-provider.ts instead (MCP SDK-based)
 
 // Authentication types moved to auth-errors.ts for OAuth 2.1 stateless design

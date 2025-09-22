@@ -28,7 +28,7 @@ export interface McpOAuthConfig {
   serverUrl: string;
 }
 
-// Re-export types for backward compatibility
+// Re-export types for compatibility
 export { type OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
 export interface TokenValidationResult {
   isValid: boolean;
@@ -124,7 +124,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
     return this.codeVerifierValue!;
   }
 
-  // Backward compatible API methods
+  // Compatible API methods
   async authorize(): Promise<OAuthTokens> {
     const result = await auth(this, {
       serverUrl: this.config.serverUrl,
@@ -193,7 +193,7 @@ export class McpOAuthProvider implements OAuthClientProvider {
     return (await this.getValidAccessToken()) !== null;
   }
 
-  // Additional backward compatibility methods
+  // Additional compatibility methods
   async storeTokens(
     tokens: OAuthTokens,
     _userId: string,

@@ -16,7 +16,7 @@ const debug = createDebug('mcp:config');
 
 /**
  * Simplified OAuth configuration interface
- * Supports both legacy static configuration and new discovery-based configuration
+ * Supports both static configuration and discovery-based configuration
  */
 export interface SimplifiedOAuthConfig {
   readonly clientId: string;
@@ -72,7 +72,7 @@ const getEnvConfig = (): AppConfig => {
     },
     oauth: {
       clientId: process.env.OAUTH_CLIENT_ID ?? '',
-      // Support legacy static configuration for backward compatibility
+      // Support static configuration
       authorizationEndpoint: process.env.OAUTH_AUTHORIZATION_ENDPOINT,
       tokenEndpoint: process.env.OAUTH_TOKEN_ENDPOINT,
       redirectUri:
@@ -225,7 +225,7 @@ export const loadConfig = async (): Promise<AppConfig> => {
       'Authentication enabled, checking OAuth configuration...'
     );
 
-    // Only discover endpoints if legacy static configuration is not provided
+    // Only discover endpoints if static configuration is not provided
     const hasStaticConfig =
       config.oauth.authorizationEndpoint && config.oauth.tokenEndpoint;
 
