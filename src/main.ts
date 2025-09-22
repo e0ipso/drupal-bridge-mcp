@@ -114,6 +114,61 @@ async function main(): Promise<void> {
       );
       debug(`Required scopes: ${config.auth.requiredScopes.join(', ')}`);
     }
+
+    // Next steps guidance
+    logger.info('');
+    logger.info('🎉 MCP Server is ready! Next steps:');
+    logger.info('');
+    logger.info('📋 To use this server with Claude Desktop:');
+    logger.info(
+      '   1. Add this server configuration to claude_desktop_config.json:'
+    );
+    logger.info('   {');
+    logger.info('     "mcpServers": {');
+    logger.info(`       "drupal-bridge": {`);
+    logger.info(`         "command": "node",`);
+    logger.info(`         "args": ["${process.cwd()}/dist/main.js"],`);
+    logger.info('         "env": {');
+    logger.info(`           "DRUPAL_BASE_URL": "${config.drupal.baseUrl}",`);
+    if (config.auth.enabled && config.oauth.clientId) {
+      logger.info(`           "OAUTH_CLIENT_ID": "${config.oauth.clientId}"`);
+    }
+    logger.info('         }');
+    logger.info('       }');
+    logger.info('     }');
+    logger.info('   }');
+    logger.info('');
+    logger.info('🔗 Available tools once connected:');
+    logger.info('   • drupal_get_content - Retrieve Drupal content');
+    logger.info('   • drupal_search_content - Search through content');
+    logger.info('   • drupal_get_schema - Get content type schemas');
+    if (config.auth.enabled) {
+      logger.info('   • drupal_authenticate - Authenticate with OAuth');
+    }
+    logger.info('');
+    logger.info(
+      '📖 Documentation: https://github.com/e0ipso/drupal-bridge-mcp'
+    );
+    logger.info('');
+    debug(
+      'Server initialization complete. Waiting for MCP client connections...'
+    );
+    debug('💻 For development with Claude Code: Create .mcp.json with:');
+    debug('  {');
+    debug('    "mcpServers": {');
+    debug(`      "drupal-bridge": {`);
+    debug(`        "command": "npm",`);
+    debug(`        "args": ["run", "dev"],`);
+    debug(`        "cwd": "${process.cwd()}",`);
+    debug('        "env": {');
+    debug(`          "DRUPAL_BASE_URL": "${config.drupal.baseUrl}"`);
+    if (config.auth.enabled && config.oauth.clientId) {
+      debug(`          "OAUTH_CLIENT_ID": "${config.oauth.clientId}"`);
+    }
+    debug('        }');
+    debug('      }');
+    debug('    }');
+    debug('  }');
   } catch (error) {
     const totalTime = Date.now() - startTime;
 

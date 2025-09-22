@@ -3,7 +3,7 @@
  * OAuth 2.1 Endpoint Discovery Demonstration
  *
  * This script demonstrates the RFC8414-compliant OAuth endpoint discovery
- * functionality with various scenarios including success, fallback, and error handling.
+ * functionality with various scenarios including success and error handling.
  */
 
 import {
@@ -29,7 +29,7 @@ async function demonstrateDiscovery() {
       } satisfies DiscoveryConfig,
     },
     {
-      name: 'Local Development Fallback',
+      name: 'Local Development Discovery',
       config: {
         baseUrl: 'http://localhost:8080',
         timeout: 2000,
@@ -62,7 +62,7 @@ async function demonstrateDiscovery() {
       console.log(`   Authorization: ${endpoints.authorizationEndpoint}`);
       console.log(`   Token: ${endpoints.tokenEndpoint}`);
       console.log(`   Issuer: ${endpoints.issuer}`);
-      console.log(`   Discovery: 🎯 Successful`);
+      console.log(`   Discovery: 🎯 Successful from metadata`);
 
       if (endpoints.metadata) {
         console.log(
@@ -76,8 +76,9 @@ async function demonstrateDiscovery() {
       }
     } catch (error) {
       console.log(
-        `❌ Discovery failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `❌ Discovery failed with hard error: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
+      console.log('   No fallback endpoints will be provided');
     }
   }
 
@@ -113,7 +114,7 @@ async function demonstrateDiscovery() {
   console.log('\nKey Features Demonstrated:');
   console.log('• RFC8414 OAuth 2.0 Authorization Server Metadata discovery');
   console.log(
-    '• Graceful fallback to standard /oauth/authorize and /oauth/token endpoints'
+    '• Hard failure when OAuth server lacks RFC 8414 metadata (no fallbacks)'
   );
   console.log(
     '• Configurable timeout and retry logic with exponential backoff'
@@ -141,7 +142,7 @@ console.log(
 );
 console.log('• OAUTH_DISCOVERY_DEBUG=true          # Enable debug logging');
 console.log(
-  '• OAUTH_SKIP_DISCOVERY=true           # Skip discovery, use hardcoded endpoints'
+  '• OAUTH_SKIP_DISCOVERY=true           # Skip discovery (deprecated - not recommended)'
 );
 console.log('');
 

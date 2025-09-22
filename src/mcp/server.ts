@@ -762,10 +762,24 @@ export class DrupalMcpServer {
           : undefined,
       };
     } catch (error) {
+      // Construct authorization URL for user convenience
+      const baseUrl =
+        this.config.oauth.discoveredEndpoints?.authorizationEndpoint ||
+        `${this.config.oauth.serverUrl}/oauth/authorize`;
+      const authUrl = new URL(baseUrl);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('client_id', this.config.oauth.clientId);
+      authUrl.searchParams.set('redirect_uri', this.config.oauth.redirectUri);
+      authUrl.searchParams.set('scope', this.config.oauth.scopes.join(' '));
+      authUrl.searchParams.set('code_challenge_method', 'S256');
+
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Authentication failed',
         hint: 'Make sure to complete the OAuth flow in your browser. Check that DRUPAL_BASE_URL and OAUTH_CLIENT_ID are set correctly.',
+        authorizationUrl: authUrl.toString(),
+        instructions:
+          'Copy and paste the authorization URL above into your browser to complete authentication. Note: The code_challenge parameter will be generated automatically when you use the actual OAuth flow.',
       };
     }
   }

@@ -3,7 +3,7 @@
  *
  * Tests real-world endpoint discovery scenarios including:
  * - Successful discovery from .well-known endpoints
- * - Fallback to standard endpoints when discovery fails
+ * - Hard failures when discovery fails (no fallbacks)
  * - Network timeout and error handling
  * - Cache behavior and TTL validation
  * - Different server configurations and responses
@@ -22,6 +22,7 @@ import {
   discoverOAuthEndpoints,
   clearDiscoveryCache,
 } from '@/auth/endpoint-discovery.js';
+import { DiscoveryError, DiscoveryErrorType } from '@/auth/types.js';
 import { createServer } from 'http';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
@@ -59,7 +60,6 @@ describe('Endpoint Discovery Integration Tests', () => {
         debug: true,
       });
 
-      expect(endpoints.isFallback).toBe(false);
       expect(endpoints.authorizationEndpoint).toBe(
         `http://localhost:${serverPort}/oauth/authorize`
       );
@@ -82,7 +82,6 @@ describe('Endpoint Discovery Integration Tests', () => {
         timeout: 5000,
       });
 
-      expect(endpoints.isFallback).toBe(false);
       expect(endpoints.authorizationEndpoint).toBe(
         `http://localhost:${serverPort}/oauth/authorize`
       );
@@ -100,7 +99,6 @@ describe('Endpoint Discovery Integration Tests', () => {
         timeout: 5000,
       });
 
-      expect(endpoints.isFallback).toBe(false);
       expect(endpoints.authorizationEndpoint).toBe(
         `http://localhost:${serverPort}/oauth/authorize`
       );
@@ -111,46 +109,78 @@ describe('Endpoint Discovery Integration Tests', () => {
   });
 
   describe('Real Network Error Scenarios', () => {
-    test('should handle real server errors and fallback appropriately', async () => {
+    test('should throw DiscoveryError for server errors instead of falling back', async () => {
       // Test 404 response from real server
       setMockResponse('not_found');
-      const notFoundResult = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        timeout: 2000,
-        retries: 1,
-      });
-      expect(notFoundResult.isFallback).toBe(true);
-      expect(notFoundResult.metadata).toBeUndefined();
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: `http://localhost:${serverPort}`,
+          timeout: 2000,
+          retries: 1,
+        })
+      ).rejects.toThrow(DiscoveryError);
 
       // Test invalid JSON from real server
       setMockResponse('invalid_json');
-      const invalidJsonResult = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        timeout: 2000,
-        retries: 1,
-      });
-      expect(invalidJsonResult.isFallback).toBe(true);
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: `http://localhost:${serverPort}`,
+          timeout: 2000,
+          retries: 1,
+        })
+      ).rejects.toThrow(DiscoveryError);
 
       // Test server error from real server
       setMockResponse('server_error');
-      const serverErrorResult = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        timeout: 2000,
-        retries: 1,
-      });
-      expect(serverErrorResult.isFallback).toBe(true);
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: `http://localhost:${serverPort}`,
+          timeout: 2000,
+          retries: 1,
+        })
+      ).rejects.toThrow(DiscoveryError);
     });
 
-    test('should handle real network timeout scenarios', async () => {
+    test('should throw DiscoveryError for network timeout scenarios', async () => {
       setMockResponse('timeout');
 
-      const endpoints = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        timeout: 100, // Very short timeout
-        retries: 0,
-      });
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: `http://localhost:${serverPort}`,
+          timeout: 100, // Very short timeout
+          retries: 0,
+        })
+      ).rejects.toThrow(DiscoveryError);
+    });
 
-      expect(endpoints.isFallback).toBe(true);
+    test('should throw DiscoveryError with appropriate error types', async () => {
+      // Test missing required fields
+      setMockResponse('missing_fields');
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: `http://localhost:${serverPort}`,
+          timeout: 2000,
+          retries: 0,
+        })
+      ).rejects.toThrow(
+        error =>
+          error instanceof DiscoveryError &&
+          error.type === DiscoveryErrorType.MISSING_REQUIRED_FIELDS
+      );
+
+      // Test invalid JSON
+      setMockResponse('invalid_json');
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: `http://localhost:${serverPort}`,
+          timeout: 2000,
+          retries: 0,
+        })
+      ).rejects.toThrow(
+        error =>
+          error instanceof DiscoveryError &&
+          error.type === DiscoveryErrorType.INVALID_JSON
+      );
     });
   });
 
@@ -162,7 +192,8 @@ describe('Endpoint Discovery Integration Tests', () => {
         baseUrl: `http://localhost:${serverPort}`,
       });
 
-      expect(endpoints.isFallback).toBe(false);
+      expect(endpoints.authorizationEndpoint).toBeDefined();
+      expect(endpoints.tokenEndpoint).toBeDefined();
     });
 
     test('should handle extra metadata fields gracefully', async () => {
@@ -172,8 +203,9 @@ describe('Endpoint Discovery Integration Tests', () => {
         baseUrl: `http://localhost:${serverPort}`,
       });
 
-      expect(endpoints.isFallback).toBe(false);
       expect(endpoints.metadata).toBeDefined();
+      expect(endpoints.authorizationEndpoint).toBeDefined();
+      expect(endpoints.tokenEndpoint).toBeDefined();
     });
 
     test('should work with different endpoint path conventions', async () => {
@@ -183,7 +215,6 @@ describe('Endpoint Discovery Integration Tests', () => {
         baseUrl: `http://localhost:${serverPort}`,
       });
 
-      expect(endpoints.isFallback).toBe(false);
       expect(endpoints.authorizationEndpoint).toBe(
         `http://localhost:${serverPort}/auth/oauth2/authorize`
       );
@@ -197,13 +228,14 @@ describe('Endpoint Discovery Integration Tests', () => {
     test('should respect custom timeout settings', async () => {
       setMockResponse('slow_response');
 
-      // Short timeout should cause fallback
-      const endpointsShortTimeout = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        timeout: 100,
-        retries: 0,
-      });
-      expect(endpointsShortTimeout.isFallback).toBe(true);
+      // Short timeout should throw error
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: `http://localhost:${serverPort}`,
+          timeout: 100,
+          retries: 0,
+        })
+      ).rejects.toThrow(DiscoveryError);
 
       clearDiscoveryCache();
 
@@ -213,18 +245,20 @@ describe('Endpoint Discovery Integration Tests', () => {
         timeout: 2000,
         retries: 0,
       });
-      expect(endpointsLongTimeout.isFallback).toBe(false);
+      expect(endpointsLongTimeout.authorizationEndpoint).toBeDefined();
+      expect(endpointsLongTimeout.tokenEndpoint).toBeDefined();
     });
 
     test('should respect retry configuration', async () => {
       setMockResponse('intermittent_failure');
 
       // No retries should fail quickly
-      const endpointsNoRetry = await discoverOAuthEndpoints({
-        baseUrl: `http://localhost:${serverPort}`,
-        retries: 0,
-      });
-      expect(endpointsNoRetry.isFallback).toBe(true);
+      await expect(
+        discoverOAuthEndpoints({
+          baseUrl: `http://localhost:${serverPort}`,
+          retries: 0,
+        })
+      ).rejects.toThrow(DiscoveryError);
 
       clearDiscoveryCache();
 
@@ -233,7 +267,8 @@ describe('Endpoint Discovery Integration Tests', () => {
         baseUrl: `http://localhost:${serverPort}`,
         retries: 3,
       });
-      expect(endpointsWithRetry.isFallback).toBe(false);
+      expect(endpointsWithRetry.authorizationEndpoint).toBeDefined();
+      expect(endpointsWithRetry.tokenEndpoint).toBeDefined();
     });
 
     test('should support debug mode', async () => {

@@ -4,12 +4,12 @@ This document describes the OAuth 2.1 endpoint discovery implementation that rep
 
 ## Overview
 
-The OAuth endpoint discovery system automatically discovers OAuth authorization and token endpoints from the authorization server's metadata, providing better flexibility and reducing configuration maintenance. When discovery fails, the system gracefully falls back to standard OAuth endpoint paths.
+The OAuth endpoint discovery system automatically discovers OAuth authorization and token endpoints from the authorization server's metadata, providing better flexibility and reducing configuration maintenance. OAuth discovery is mandatory and will fail hard if the server does not provide proper RFC 8414 metadata.
 
 ## Key Features
 
 - **RFC8414 Compliance**: Full implementation of OAuth 2.0 Authorization Server Metadata specification
-- **Graceful Fallback**: Automatic fallback to `/oauth/authorize` and `/oauth/token` when discovery fails
+- **Mandatory Discovery**: Requires RFC 8414 compliant metadata - no fallbacks or defaults
 - **Performance Optimization**: In-memory caching with configurable TTL (default: 1 hour)
 - **Robust Error Handling**: Comprehensive error handling for network failures, timeouts, and malformed responses
 - **Retry Logic**: Exponential backoff retry mechanism for network failures
@@ -89,18 +89,9 @@ Optional fields are also processed when available:
 - `scopes_supported` - Supported OAuth scopes
 - `code_challenge_methods_supported` - Supported PKCE methods
 
-### 3. Fallback Strategy
+### 3. Failure Handling
 
-If discovery fails for any reason, the system automatically creates fallback endpoints:
-
-```typescript
-{
-  authorizationEndpoint: `${baseUrl}/oauth/authorize`,
-  tokenEndpoint: `${baseUrl}/oauth/token`,
-  issuer: baseUrl,
-  isFallback: true
-}
-```
+If discovery fails for any reason, the system throws a DiscoveryError with detailed information about the failure. No fallback endpoints are created.
 
 ## Error Handling
 
@@ -121,9 +112,9 @@ enum DiscoveryErrorType {
 
 - **Network Failures**: Automatic retry with exponential backoff
 - **Timeout Errors**: Retry with same timeout settings
-- **Invalid Responses**: Immediate fallback to standard endpoints
-- **Missing Fields**: Validation error with fallback
-- **URL Errors**: Immediate error (no fallback for invalid configuration)
+- **Invalid Responses**: Throws DiscoveryError with INVALID_JSON type
+- **Missing Fields**: Throws DiscoveryError with MISSING_REQUIRED_FIELDS type
+- **URL Errors**: Throws DiscoveryError with INVALID_URL type
 
 ## Caching
 
@@ -132,7 +123,7 @@ enum DiscoveryErrorType {
 - **Hit**: Returns cached endpoints immediately (< 1ms response time)
 - **Miss**: Performs discovery and caches successful results
 - **TTL**: Cached entries expire after configured TTL (default: 1 hour)
-- **Fallback Cache**: Fallback endpoints cached with shorter TTL (5 minutes)
+- **Error Cache**: Failed discovery attempts are not cached to allow immediate retry
 
 ### Cache Management
 
@@ -226,8 +217,8 @@ export const loadConfig = async (): Promise<AppConfig> => {
         tokenEndpoint: discoveredEndpoints.tokenEndpoint,
       };
     } catch (error) {
-      // Graceful fallback to default endpoints
-      console.warn('OAuth endpoint discovery failed, using defaults:', error);
+      // OAuth discovery is mandatory - throw error on failure
+      throw new Error(`OAuth endpoint discovery failed: ${error.message}`);
     }
   }
   
@@ -332,6 +323,6 @@ To migrate from hardcoded OAuth endpoints:
 1. **Enable Discovery**: Remove `OAUTH_SKIP_DISCOVERY=true` from environment
 2. **Configure Base URL**: Ensure `DRUPAL_BASE_URL` points to your OAuth server
 3. **Test Discovery**: Run with `OAUTH_DISCOVERY_DEBUG=true` to verify
-4. **Monitor Fallback**: Check logs for fallback usage indicating discovery issues
+4. **Monitor Failures**: Check logs for discovery failures indicating server configuration issues
 
-The system maintains backward compatibility - if discovery fails, it automatically falls back to the previous hardcoded endpoint behavior.
+The system requires proper OAuth server configuration with RFC 8414 metadata support. No fallback endpoints are provided.

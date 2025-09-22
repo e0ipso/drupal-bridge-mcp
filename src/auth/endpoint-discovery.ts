@@ -149,14 +149,14 @@ async function fetchWithTimeout(
         agent,
       } as any;
 
-      const response = await fetch(url, fetchOptions);
-      return response as Response;
+      const response = await fetch(url, fetchOptions as any);
+      return response as any;
     }
 
     // Use standard fetch for production or HTTP URLs
     const fetch = globalThis.fetch || (await import('node-fetch')).default;
-    const response = await fetch(url, fetchOptions);
-    return response as Response;
+    const response = await fetch(url, fetchOptions as any);
+    return response as any;
   } finally {
     clearTimeout(timeoutId);
   }

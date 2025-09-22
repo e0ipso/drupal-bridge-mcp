@@ -103,15 +103,24 @@ export class McpOAuthProvider implements OAuthClientProvider {
   }
 
   async redirectToAuthorization(url: URL): Promise<void> {
+    const urlString = url.toString();
+
     if (isLoggerInitialized()) {
       const logger = getLogger().child({ component: 'oauth-provider' });
-      logger.info(`Opening authorization URL: ${url}`);
+      logger.info(`Opening authorization URL: ${urlString}`);
     } else {
       // Fallback for when logger is not initialized
-      console.log(`Opening authorization URL: ${url}`);
+      console.log(`Opening authorization URL: ${urlString}`);
     }
+
+    // Make the URL easily visible and copyable
+    console.log('\n=== AUTHORIZATION URL ===');
+    console.log(`Please visit this URL to authorize the application:`);
+    console.log(`${urlString}`);
+    console.log('========================\n');
+
     try {
-      (await import('open')).default(url.toString());
+      (await import('open')).default(urlString);
     } catch {
       // Ignore import errors - open is optional
     }

@@ -168,7 +168,7 @@ DEBUG=mcp:*
 1. **Install Simple OAuth in Drupal**:
 
    ```bash
-   composer require drupal/simple_oauth:^5
+   composer require drupal/simple_oauth:^6
    drush en simple_oauth
    ```
 
