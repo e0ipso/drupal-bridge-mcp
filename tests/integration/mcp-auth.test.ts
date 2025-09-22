@@ -213,7 +213,7 @@ describe('MCP Authentication Integration Tests', () => {
       };
 
       jest
-        .spyOn((mcpServer as any).oauthClient, 'authorize')
+        .spyOn((mcpServer as any).mcpOAuthProvider, 'authorize')
         .mockResolvedValue(mockTokens);
 
       const response = await (mcpServer as any).executeAuthTool(
@@ -229,7 +229,7 @@ describe('MCP Authentication Integration Tests', () => {
     test('should handle authentication failure gracefully', async () => {
       // Mock the OAuth client to throw an error
       jest
-        .spyOn((mcpServer as any).oauthClient, 'authorize')
+        .spyOn((mcpServer as any).mcpOAuthProvider, 'authorize')
         .mockRejectedValue(new Error('Authentication failed'));
 
       const response = await (mcpServer as any).executeAuthTool(
@@ -254,7 +254,7 @@ describe('MCP Authentication Integration Tests', () => {
       };
 
       jest
-        .spyOn((mcpServer as any).oauthClient, 'authorize')
+        .spyOn((mcpServer as any).mcpOAuthProvider, 'authorize')
         .mockResolvedValue(mockTokens);
 
       jest.spyOn((mcpServer as any).drupalClient, 'setAccessToken');
@@ -306,7 +306,7 @@ describe('MCP Authentication Integration Tests', () => {
     test('should handle OAuth flow errors in auth tools', async () => {
       const oauthError = new Error('OAuth flow failed');
       jest
-        .spyOn((mcpServer as any).oauthClient, 'authorize')
+        .spyOn((mcpServer as any).mcpOAuthProvider, 'authorize')
         .mockRejectedValue(oauthError);
 
       const response = await (mcpServer as any).executeAuthTool(
