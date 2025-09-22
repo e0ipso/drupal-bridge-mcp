@@ -90,7 +90,7 @@ describe('Console Logging Replacement Integration', () => {
     initializeLogger(mockConfig);
 
     // Test auth component logging
-    const authLogger = createChildLogger({ component: 'oauth-client' });
+    const authLogger = createChildLogger({ component: 'mcp-oauth-provider' });
     const logSpy = jest.spyOn(authLogger, 'info');
 
     authLogger.info('OAuth authorization starting');
@@ -471,7 +471,7 @@ describe('Performance Integration', () => {
     const components = [
       'bootstrap',
       'config',
-      'oauth-client',
+      'mcp-oauth-provider',
       'oauth-provider',
       'error-handler',
     ];
