@@ -518,8 +518,8 @@ export class DrupalMcpServer {
         return await this.executeAuthTool(name, args);
       }
 
-      // For data tools, require authentication (unless skipped)
-      if (!this.config.auth.skipAuth) {
+      // For data tools, check if auth is required and provider exists
+      if (!this.config.auth.skipAuth && this.mcpOAuthProvider) {
         const authContext = await this.requireAuthentication();
 
         if (!authContext.isAuthenticated) {
