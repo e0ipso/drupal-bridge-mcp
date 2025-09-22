@@ -14,6 +14,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import type { AppConfig } from '@/config/index.js';
+import { createOAuthProvider } from '@/config/index.js';
 import type {
   McpResource,
   McpTool,
@@ -38,6 +39,7 @@ import {
   SessionStore,
   AuthenticationRequiredError,
   createMcpErrorResponse,
+  McpOAuthProvider,
 } from '@/auth/index.js';
 
 /**
@@ -47,6 +49,7 @@ export class DrupalMcpServer {
   private readonly server: Server;
   private readonly drupalClient: DrupalClient;
   private readonly oauthClient: OAuthClient;
+  private readonly mcpOAuthProvider: McpOAuthProvider;
   private readonly tokenManager: TokenManager;
   private readonly authMiddleware: AuthMiddleware;
   private readonly sessionStore: SessionStore;
@@ -69,8 +72,9 @@ export class DrupalMcpServer {
 
     this.drupalClient = new DrupalClient(config.drupal);
 
-    // Initialize authentication components
-    this.oauthClient = new OAuthClient(config.oauth);
+    // Initialize authentication components with new MCP OAuth provider
+    this.mcpOAuthProvider = createOAuthProvider(config);
+    this.oauthClient = new OAuthClient(config.oauth); // Keep for backward compatibility
     this.tokenManager = new TokenManager(this.oauthClient);
     this.authMiddleware = new AuthMiddleware({
       oauthClient: this.oauthClient,
@@ -424,17 +428,26 @@ export class DrupalMcpServer {
 
       // For data tools, require authentication (unless skipped)
       if (!this.config.auth.skipAuth) {
-        const authContext = await this.authMiddleware.requireAuthentication();
+        // Try to get valid access token from new MCP OAuth provider first
+        const validToken = await this.mcpOAuthProvider.getValidAccessToken();
 
-        if (!authContext.isAuthenticated) {
-          throw new AuthenticationRequiredError(
-            'Please authenticate first using auth_login tool'
-          );
-        }
+        if (validToken) {
+          // Use token from new provider
+          this.drupalClient.setAccessToken(validToken);
+        } else {
+          // Fall back to existing authentication middleware
+          const authContext = await this.authMiddleware.requireAuthentication();
 
-        // Update Drupal client with access token
-        if (authContext.accessToken) {
-          this.drupalClient.setAccessToken(authContext.accessToken);
+          if (!authContext.isAuthenticated) {
+            throw new AuthenticationRequiredError(
+              'Please authenticate first using auth_login tool'
+            );
+          }
+
+          // Update Drupal client with access token
+          if (authContext.accessToken) {
+            this.drupalClient.setAccessToken(authContext.accessToken);
+          }
         }
       }
 
@@ -651,44 +664,60 @@ export class DrupalMcpServer {
   }
 
   /**
-   * Execute authentication login
+   * Execute authentication login using new MCP OAuth provider
    */
   private async executeAuthLogin(): Promise<unknown> {
     try {
-      const tokens = await this.oauthClient.authorize();
+      // Use the new MCP OAuth provider for authentication
+      const tokens = await this.mcpOAuthProvider.authorize();
       const userId = 'default'; // In production, derive from token or user input
 
+      // Convert MCP SDK tokens to legacy token format for compatibility
+      const legacyTokens = {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        tokenType: tokens.token_type || 'Bearer',
+        expiresIn: tokens.expires_in,
+        scope: tokens.scope,
+      };
+
+      // Store tokens using both old and new systems for compatibility
       await this.tokenManager.storeTokens(
-        tokens,
+        legacyTokens,
         userId,
         this.config.auth.requiredScopes
       );
+      await this.mcpOAuthProvider.saveTokens(tokens);
 
       // Create session
       const authContext = {
         isAuthenticated: true,
         userId,
         scopes: this.config.auth.requiredScopes,
-        accessToken: tokens.accessToken,
+        accessToken: tokens.access_token,
       };
 
       const session = this.sessionStore.createSession(userId, authContext);
 
       // Set access token on Drupal client for immediate use
-      this.drupalClient.setAccessToken(tokens.accessToken);
+      this.drupalClient.setAccessToken(tokens.access_token);
 
       return {
         success: true,
-        message: 'Authentication successful',
+        message:
+          'Authentication successful using simplified OAuth configuration',
         sessionId: session.id,
         expiresAt: session.expiresAt,
         scopes: this.config.auth.requiredScopes,
+        provider: 'McpOAuthProvider',
+        endpointsDiscovered: !!this.config.oauth.discoveredEndpoints,
+        isFallback: this.config.oauth.discoveredEndpoints?.isFallback,
       };
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Authentication failed',
-        hint: 'Make sure to complete the OAuth flow in your browser',
+        hint: 'Make sure to complete the OAuth flow in your browser. Check that DRUPAL_BASE_URL and OAUTH_CLIENT_ID are set correctly.',
       };
     }
   }
@@ -700,11 +729,24 @@ export class DrupalMcpServer {
     try {
       const tokenInfo = await this.tokenManager.getTokenInfo();
       const authStatus = await this.authMiddleware.getAuthStatus();
+      const mcpTokenInfo = await this.mcpOAuthProvider.getTokenInfo();
+      const hasValidTokens = await this.mcpOAuthProvider.hasValidTokens();
 
       return {
         ...authStatus,
         tokenInfo,
+        mcpProvider: {
+          hasValidTokens,
+          tokenInfo: mcpTokenInfo,
+        },
         sessionStats: this.sessionStore.getStats(),
+        provider: 'McpOAuthProvider',
+        configInfo: {
+          endpointsDiscovered: !!this.config.oauth.discoveredEndpoints,
+          isFallback: this.config.oauth.discoveredEndpoints?.isFallback,
+          authorizationEndpoint: this.config.oauth.authorizationEndpoint,
+          tokenEndpoint: this.config.oauth.tokenEndpoint,
+        },
       };
     } catch (error) {
       return {
@@ -723,12 +765,13 @@ export class DrupalMcpServer {
   private async executeAuthLogout(): Promise<unknown> {
     try {
       await this.authMiddleware.logout();
+      await this.mcpOAuthProvider.clearTokens();
       this.sessionStore.clear();
       this.drupalClient.clearAccessToken();
 
       return {
         success: true,
-        message: 'Logout successful',
+        message: 'Logout successful - cleared all tokens and sessions',
       };
     } catch (error) {
       return {

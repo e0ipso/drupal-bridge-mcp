@@ -3,9 +3,26 @@
  */
 
 import type { DrupalClientConfig, McpServerInfo } from '@/types/index.js';
-import type { OAuthConfig } from '@/auth/index.js';
-import type { DiscoveryConfig } from '@/auth/types.js';
+import type { DiscoveryConfig, OAuthEndpoints } from '@/auth/types.js';
 import { discoverOAuthEndpoints } from '@/auth/endpoint-discovery.js';
+import {
+  McpOAuthProvider,
+  type McpOAuthConfig,
+} from '@/auth/oauth-provider.js';
+
+/**
+ * Simplified OAuth configuration interface
+ * Supports both legacy static configuration and new discovery-based configuration
+ */
+export interface SimplifiedOAuthConfig {
+  readonly clientId: string;
+  readonly authorizationEndpoint?: string; // Optional for discovery
+  readonly tokenEndpoint?: string; // Optional for discovery
+  readonly redirectUri: string;
+  readonly scopes: string[];
+  readonly serverUrl: string; // Base URL for MCP OAuth provider
+  readonly discoveredEndpoints?: OAuthEndpoints; // Populated during configuration loading
+}
 
 /**
  * Application configuration interface
@@ -13,7 +30,7 @@ import { discoverOAuthEndpoints } from '@/auth/endpoint-discovery.js';
 export interface AppConfig {
   readonly drupal: DrupalClientConfig;
   readonly mcp: McpServerInfo;
-  readonly oauth: OAuthConfig;
+  readonly oauth: SimplifiedOAuthConfig;
   readonly auth: {
     readonly enabled: boolean;
     readonly requiredScopes: string[];
@@ -51,14 +68,15 @@ const getEnvConfig = (): AppConfig => {
     },
     oauth: {
       clientId: process.env.OAUTH_CLIENT_ID ?? '',
-      // These will be populated by endpoint discovery or fallback to these defaults
-      authorizationEndpoint: `${drupalBaseUrl}/oauth/authorize`,
-      tokenEndpoint: `${drupalBaseUrl}/oauth/token`,
+      // Support legacy static configuration for backward compatibility
+      authorizationEndpoint: process.env.OAUTH_AUTHORIZATION_ENDPOINT,
+      tokenEndpoint: process.env.OAUTH_TOKEN_ENDPOINT,
       redirectUri:
         process.env.OAUTH_REDIRECT_URI ?? 'urn:ietf:wg:oauth:2.0:oob',
       scopes: (
         process.env.OAUTH_SCOPES ?? 'tutorial:read user:profile tutorial:search'
       ).split(' '),
+      serverUrl: drupalBaseUrl,
     },
     auth: {
       enabled: process.env.AUTH_ENABLED !== 'false',
@@ -129,10 +147,20 @@ const validateConfig = (config: AppConfig): void => {
     throw new Error('MCP_SERVER_VERSION is required');
   }
 
-  if (config.auth.enabled && !config.oauth.clientId) {
-    throw new Error(
-      'OAUTH_CLIENT_ID is required when authentication is enabled'
-    );
+  if (config.auth.enabled) {
+    if (!config.oauth.clientId) {
+      throw new Error(
+        'OAUTH_CLIENT_ID is required when authentication is enabled'
+      );
+    }
+
+    // For simplified configuration, only DRUPAL_BASE_URL and OAUTH_CLIENT_ID are required
+    // Endpoints will be discovered or fallback to defaults
+    if (!config.drupal.baseUrl) {
+      throw new Error(
+        'DRUPAL_BASE_URL is required for OAuth endpoint discovery'
+      );
+    }
   }
 
   if (config.server.port < 1 || config.server.port > 65535) {
@@ -156,35 +184,55 @@ export const loadConfig = async (): Promise<AppConfig> => {
   const config = getEnvConfig();
   validateConfig(config);
 
-  // Perform OAuth endpoint discovery if authentication is enabled
+  // Perform OAuth endpoint discovery if authentication is enabled and endpoints are not explicitly configured
   if (config.auth.enabled && !process.env.OAUTH_SKIP_DISCOVERY) {
-    try {
-      const discoveredEndpoints = await discoverOAuthEndpoints(
-        config.discovery
-      );
+    // Only discover endpoints if legacy static configuration is not provided
+    const hasStaticConfig =
+      config.oauth.authorizationEndpoint && config.oauth.tokenEndpoint;
 
-      // Update OAuth config with discovered endpoints
-      (config as { oauth: OAuthConfig }).oauth = {
-        ...config.oauth,
-        authorizationEndpoint: discoveredEndpoints.authorizationEndpoint,
-        tokenEndpoint: discoveredEndpoints.tokenEndpoint,
-      };
-
-      if (config.discovery.debug) {
-        console.log('[Config] OAuth endpoints discovered:', {
-          authorization: discoveredEndpoints.authorizationEndpoint,
-          token: discoveredEndpoints.tokenEndpoint,
-          isFallback: discoveredEndpoints.isFallback,
-        });
-      }
-    } catch (error) {
-      if (config.discovery.debug) {
-        console.warn(
-          '[Config] OAuth endpoint discovery failed, using defaults:',
-          error
+    if (!hasStaticConfig) {
+      try {
+        const discoveredEndpoints = await discoverOAuthEndpoints(
+          config.discovery
         );
+
+        // Update OAuth config with discovered endpoints and store discovery result
+        (config as { oauth: SimplifiedOAuthConfig }).oauth = {
+          ...config.oauth,
+          authorizationEndpoint: discoveredEndpoints.authorizationEndpoint,
+          tokenEndpoint: discoveredEndpoints.tokenEndpoint,
+          discoveredEndpoints,
+        };
+
+        if (config.discovery.debug) {
+          console.log('[Config] OAuth endpoints discovered:', {
+            authorization: discoveredEndpoints.authorizationEndpoint,
+            token: discoveredEndpoints.tokenEndpoint,
+            isFallback: discoveredEndpoints.isFallback,
+          });
+        }
+      } catch (error) {
+        if (config.discovery.debug) {
+          console.warn(
+            '[Config] OAuth endpoint discovery failed, using fallback endpoints:',
+            error
+          );
+        }
+
+        // Use fallback endpoints when discovery fails
+        const fallbackAuthEndpoint = `${config.drupal.baseUrl}/oauth/authorize`;
+        const fallbackTokenEndpoint = `${config.drupal.baseUrl}/oauth/token`;
+
+        (config as { oauth: SimplifiedOAuthConfig }).oauth = {
+          ...config.oauth,
+          authorizationEndpoint: fallbackAuthEndpoint,
+          tokenEndpoint: fallbackTokenEndpoint,
+        };
       }
-      // Continue with default endpoints from getEnvConfig
+    } else {
+      if (config.discovery.debug) {
+        console.log('[Config] Using static OAuth endpoint configuration');
+      }
     }
   }
 
@@ -197,4 +245,24 @@ export const loadConfig = async (): Promise<AppConfig> => {
 export const getDrupalJsonRpcUrl = (config: AppConfig): string => {
   const { baseUrl, endpoint } = config.drupal;
   return new URL(endpoint, baseUrl).toString();
+};
+
+/**
+ * Create McpOAuthProvider from simplified configuration
+ */
+export const createOAuthProvider = (
+  config: AppConfig,
+  userId = 'default'
+): McpOAuthProvider => {
+  const oauthConfig: McpOAuthConfig = {
+    clientId: config.oauth.clientId,
+    authorizationEndpoint:
+      config.oauth.authorizationEndpoint ||
+      `${config.oauth.serverUrl}/oauth/authorize`,
+    redirectUri: config.oauth.redirectUri,
+    scopes: config.oauth.scopes,
+    serverUrl: config.oauth.serverUrl,
+  };
+
+  return new McpOAuthProvider(oauthConfig, userId);
 };
