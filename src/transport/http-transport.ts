@@ -130,7 +130,12 @@ export class HttpTransport {
     return new Promise((resolve, reject) => {
       // Close all active connections
       for (const connection of this.connections) {
-        connection.destroy();
+        if (
+          'destroy' in connection &&
+          typeof connection.destroy === 'function'
+        ) {
+          connection.destroy();
+        }
       }
       this.connections.clear();
 
@@ -552,7 +557,7 @@ export class HttpTransport {
           writeHead: () => {},
           end: () => {},
           getHeader: () => undefined,
-        } as ServerResponse;
+        } as unknown as ServerResponse;
 
         await this.jsonRpcHandler!.handleJsonRpcRequest(
           modifiedReq,
@@ -933,7 +938,7 @@ export class HttpTransport {
     try {
       const sseEvent = {
         event:
-          'error' in response
+          'error' in (response as any)
             ? SseEventType.MCP_ERROR
             : SseEventType.MCP_RESPONSE,
         data: response,
