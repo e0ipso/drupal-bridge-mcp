@@ -1,11 +1,12 @@
 /**
- * Demonstration script for HttpTransport
+ * Demonstration script for HttpTransport with JSON-RPC MCP integration
  * Run with: npx tsx examples/http-transport-demo.ts
  */
 
 import { HttpTransport } from '../src/transport/http-transport.js';
+import { DrupalMcpServer } from '../src/mcp/server.js';
 import type { AppConfig } from '../src/config/index.js';
-import { createChildLogger } from '../src/utils/logger.js';
+import { initializeLogger, createChildLogger } from '../src/utils/logger.js';
 
 // Create a demo configuration
 const demoConfig: AppConfig = {
@@ -42,7 +43,18 @@ const demoConfig: AppConfig = {
     name: 'demo-http-transport',
     version: '1.0.0',
     protocolVersion: '2024-11-05',
-    capabilities: {},
+    capabilities: {
+      resources: {
+        subscribe: true,
+        listChanged: true,
+      },
+      tools: {
+        listChanged: true,
+      },
+      prompts: {
+        listChanged: true,
+      },
+    },
   },
   logging: {
     level: 'info',
@@ -59,14 +71,21 @@ const demoConfig: AppConfig = {
 };
 
 async function demo() {
-  console.log('🚀 HttpTransport Demo');
-  console.log('===================');
+  console.log('🚀 HttpTransport with JSON-RPC MCP Demo');
+  console.log('======================================');
+
+  // Initialize logger first
+  initializeLogger(demoConfig);
 
   // Create logger
   const logger = createChildLogger({ component: 'demo' });
 
-  // Create transport
-  const transport = new HttpTransport(demoConfig, logger);
+  // Create MCP server
+  console.log('\n🔧 Creating MCP server...');
+  const mcpServer = new DrupalMcpServer(demoConfig);
+
+  // Create transport with MCP server
+  const transport = new HttpTransport(demoConfig, mcpServer, logger);
 
   try {
     // Start the server
@@ -80,10 +99,27 @@ async function demo() {
     console.log('  • GET  /mcp    - Server-Sent Events (if enabled)');
     console.log('  • POST /mcp    - JSON-RPC requests');
     console.log('\n💡 Try these commands in another terminal:');
+    console.log(`  # Health check`);
     console.log(`  curl http://${status.host}:${status.port}/health`);
+    console.log(`  `);
+    console.log(`  # Initialize MCP session`);
     console.log(`  curl -X POST http://${status.host}:${status.port}/mcp \\`);
     console.log(`    -H "Content-Type: application/json" \\`);
-    console.log(`    -d '{"jsonrpc":"2.0","method":"ping","id":1}'`);
+    console.log(
+      `    -d '{"jsonrpc":"2.0","method":"initialize","params":{"capabilities":{}},"id":1}'`
+    );
+    console.log(`  `);
+    console.log(`  # List available tools`);
+    console.log(`  curl -X POST http://${status.host}:${status.port}/mcp \\`);
+    console.log(`    -H "Content-Type: application/json" \\`);
+    console.log(`    -d '{"jsonrpc":"2.0","method":"tools/list","id":2}'`);
+    console.log(`  `);
+    console.log(`  # Test connection tool`);
+    console.log(`  curl -X POST http://${status.host}:${status.port}/mcp \\`);
+    console.log(`    -H "Content-Type: application/json" \\`);
+    console.log(
+      `    -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"test_connection","arguments":{}},"id":3}'`
+    );
 
     // Wait for user input
     console.log('\n⏳ Press Enter to stop the server...');

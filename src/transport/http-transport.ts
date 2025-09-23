@@ -11,8 +11,10 @@ import {
 } from 'http';
 import { URL } from 'url';
 import type { AppConfig } from '@/config/index.js';
+import type { DrupalMcpServer } from '@/mcp/server.js';
 import { createChildLogger } from '@/utils/logger.js';
 import type { Logger } from 'pino';
+import { JsonRpcProtocolHandler } from './jsonrpc-protocol.js';
 
 /**
  * HTTP transport implementation for MCP over HTTP
@@ -23,9 +25,11 @@ export class HttpTransport {
   private readonly connections = new Set<any>();
   private isShuttingDown = false;
   private readonly mcpEndpoint: string;
+  private jsonRpcHandler?: JsonRpcProtocolHandler;
 
   constructor(
     private readonly config: AppConfig,
+    private readonly mcpServer?: DrupalMcpServer,
     parentLogger?: Logger
   ) {
     if (parentLogger) {
@@ -34,6 +38,11 @@ export class HttpTransport {
       this.logger = createChildLogger({ component: 'http-transport' });
     }
     this.mcpEndpoint = '/mcp';
+
+    // Initialize JSON-RPC handler if MCP server is provided
+    if (mcpServer) {
+      this.jsonRpcHandler = new JsonRpcProtocolHandler(mcpServer, this.logger);
+    }
   }
 
   /**
@@ -265,11 +274,11 @@ export class HttpTransport {
     const origin = req.headers.origin;
 
     if (this.isValidCorsOrigin(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Origin', origin!);
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.setHeader(
         'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, X-Requested-With'
+        'Content-Type, Authorization, X-Requested-With, Mcp-Session-Id'
       );
       res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
 
@@ -383,14 +392,42 @@ export class HttpTransport {
     res: ServerResponse,
     logger: Logger
   ): void {
+    if (!this.jsonRpcHandler) {
+      this.sendResponse(
+        res,
+        503,
+        {
+          error: 'JSON-RPC handler not available',
+          message: 'MCP server not configured for HTTP transport',
+        },
+        logger
+      );
+      return;
+    }
+
     let body = '';
 
     req.on('data', chunk => {
       body += chunk.toString();
     });
 
-    req.on('end', () => {
-      this.processJsonRpcRequest(body, res, logger);
+    req.on('end', async () => {
+      try {
+        await this.jsonRpcHandler!.handleJsonRpcRequest(req, res, body, logger);
+      } catch (error) {
+        logger.error({ err: error }, 'Error in JSON-RPC handler');
+        if (!res.headersSent) {
+          this.sendResponse(
+            res,
+            500,
+            {
+              error: 'Internal server error',
+              message: 'JSON-RPC processing failed',
+            },
+            logger
+          );
+        }
+      }
     });
 
     req.on('error', error => {
@@ -407,84 +444,6 @@ export class HttpTransport {
         );
       }
     });
-  }
-
-  /**
-   * Process JSON-RPC request body
-   */
-  private processJsonRpcRequest(
-    body: string,
-    res: ServerResponse,
-    logger: Logger
-  ): void {
-    try {
-      // Validate Content-Type (optional for now, but good practice)
-      // In a full implementation, this would be more strict
-
-      if (!body.trim()) {
-        this.sendResponse(
-          res,
-          400,
-          {
-            error: 'Empty request body',
-            message: 'Request body cannot be empty',
-          },
-          logger
-        );
-        return;
-      }
-
-      // Try to parse JSON
-      let jsonRequest;
-      try {
-        jsonRequest = JSON.parse(body);
-      } catch {
-        logger.warn(
-          { body: body.substring(0, 100) },
-          'Invalid JSON in request body'
-        );
-        this.sendResponse(
-          res,
-          400,
-          {
-            error: 'Invalid JSON',
-            message: 'Request body must be valid JSON',
-          },
-          logger
-        );
-        return;
-      }
-
-      logger.debug(
-        { method: jsonRequest.method, id: jsonRequest.id },
-        'JSON-RPC request received'
-      );
-
-      // For now, just echo back a basic response indicating the server is ready
-      // Real MCP handling will be implemented in subsequent tasks
-      const response = {
-        jsonrpc: '2.0',
-        result: {
-          message: 'HTTP transport ready',
-          endpoint: this.mcpEndpoint,
-          capabilities: ['json-rpc', 'sse'],
-        },
-        id: jsonRequest.id || null,
-      };
-
-      this.sendResponse(res, 200, response, logger);
-    } catch (error) {
-      logger.error({ err: error }, 'Error processing JSON-RPC request');
-      this.sendResponse(
-        res,
-        500,
-        {
-          error: 'Processing error',
-          message: 'Error processing request',
-        },
-        logger
-      );
-    }
   }
 
   /**

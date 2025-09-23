@@ -31,7 +31,7 @@ describe('HttpTransport', () => {
     jest.clearAllMocks();
 
     // Reset the mock logger
-    mockLogger.child = jest.fn(() => mockLogger);
+    mockLogger.child = jest.fn(() => mockLogger) as any;
 
     mockConfig = {
       drupal: {
@@ -83,7 +83,7 @@ describe('HttpTransport', () => {
       },
     } as AppConfig;
 
-    transport = new HttpTransport(mockConfig, mockLogger);
+    transport = new HttpTransport(mockConfig, undefined, mockLogger);
     global.testTransport = transport;
   });
 
@@ -128,7 +128,7 @@ describe('HttpTransport', () => {
       // Create another server on the same port to cause conflict
       const conflictServer = http.createServer();
       await new Promise<void>((resolve, reject) => {
-        conflictServer.listen(3001, 'localhost', (error: any) => {
+        conflictServer.listen(3001, 'localhost', (error?: Error) => {
           if (error) reject(error);
           else resolve();
         });
@@ -320,6 +320,7 @@ describe('HttpTransport', () => {
 
       const sseDisabledTransport = new HttpTransport(
         sseDisabledConfig,
+        undefined,
         mockLogger
       );
       await sseDisabledTransport.start();
@@ -353,7 +354,7 @@ describe('HttpTransport', () => {
         http: { ...mockConfig.http, corsOrigins: [] },
       };
 
-      const devTransport = new HttpTransport(devConfig, mockLogger);
+      const devTransport = new HttpTransport(devConfig, undefined, mockLogger);
       await devTransport.start();
 
       try {
@@ -382,7 +383,11 @@ describe('HttpTransport', () => {
         http: { ...mockConfig.http, corsOrigins: [] },
       };
 
-      const prodTransport = new HttpTransport(prodConfig, mockLogger);
+      const prodTransport = new HttpTransport(
+        prodConfig,
+        undefined,
+        mockLogger
+      );
       await prodTransport.start();
 
       try {
@@ -415,6 +420,7 @@ describe('HttpTransport', () => {
 
       const timeoutTransport = new HttpTransport(
         shortTimeoutConfig,
+        undefined,
         mockLogger
       );
       await timeoutTransport.start();

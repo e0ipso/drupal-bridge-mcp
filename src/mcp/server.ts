@@ -233,7 +233,7 @@ export class DrupalMcpServer {
   /**
    * Get available resources
    */
-  private async getResources(): Promise<McpResource[]> {
+  public async getResources(): Promise<McpResource[]> {
     const resources: McpResource[] = [
       {
         uri: 'drupal://nodes',
@@ -255,7 +255,7 @@ export class DrupalMcpServer {
   /**
    * Read a specific resource
    */
-  private async readResource(uri: string): Promise<{
+  public async readResource(uri: string): Promise<{
     contents: Array<{ uri: string; mimeType?: string; text?: string }>;
   }> {
     try {
@@ -332,7 +332,7 @@ export class DrupalMcpServer {
   /**
    * Get available tools
    */
-  private getTools(): McpTool[] {
+  public getTools(): McpTool[] {
     const authTools: McpTool[] = [
       {
         name: 'auth_login',
@@ -506,7 +506,7 @@ export class DrupalMcpServer {
   /**
    * Execute a tool with authentication
    */
-  private async executeToolWithAuth(
+  public async executeToolWithAuth(
     name: string,
     args: unknown
   ): Promise<{ content: Array<{ type: string; text: string }> }> {
@@ -1110,7 +1110,7 @@ export class DrupalMcpServer {
   /**
    * Get available prompts
    */
-  private getPrompts(): McpPrompt[] {
+  public getPrompts(): McpPrompt[] {
     return [
       {
         name: 'drupal_content_summary',
@@ -1134,7 +1134,7 @@ export class DrupalMcpServer {
   /**
    * Get a specific prompt
    */
-  private async getPrompt(
+  public async getPrompt(
     name: string,
     args?: Record<string, unknown>
   ): Promise<{
