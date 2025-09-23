@@ -448,13 +448,23 @@ export class HttpTransport {
     });
 
     req.on('error', error => {
-      logger.error({ err: error, connectionId }, 'SSE connection error');
+      this.handleSseConnectionError(
+        error,
+        connectionId,
+        logger,
+        'SSE connection error'
+      );
       this.closeSseConnection(connectionId, logger);
     });
 
     // Handle server shutdown
     res.on('error', error => {
-      logger.error({ err: error, connectionId }, 'SSE response error');
+      this.handleSseConnectionError(
+        error,
+        connectionId,
+        logger,
+        'SSE response error'
+      );
       this.closeSseConnection(connectionId, logger);
     });
   }
@@ -804,8 +814,10 @@ export class HttpTransport {
           connection.response.write(formatSseEvent(heartbeatEvent));
           connection.lastHeartbeat = now;
         } catch (error) {
-          this.logger.warn(
-            { err: error, connectionId },
+          this.handleSseConnectionError(
+            error as Error,
+            connectionId,
+            this.logger,
             'Failed to send heartbeat, closing connection'
           );
           this.closeSseConnection(connectionId, this.logger);
@@ -823,6 +835,38 @@ export class HttpTransport {
         );
         this.closeSseConnection(connectionId, this.logger);
       }
+    }
+  }
+
+  /**
+   * Handle SSE connection errors with appropriate logging level
+   */
+  private handleSseConnectionError(
+    error: Error,
+    connectionId: string,
+    logger: Logger,
+    context: string
+  ): void {
+    // Check if this is a normal client disconnection
+    const isNormalDisconnection =
+      error.message === 'aborted' ||
+      (error as NodeJS.ErrnoException).code === 'ECONNRESET' ||
+      (error as NodeJS.ErrnoException).code === 'EPIPE' ||
+      (error as NodeJS.ErrnoException).code === 'ECONNABORTED';
+
+    if (isNormalDisconnection) {
+      // Log as info for normal client disconnections
+      logger.info(
+        {
+          connectionId,
+          errorCode: (error as NodeJS.ErrnoException).code,
+          errorMessage: error.message,
+        },
+        `${context} - client disconnected normally`
+      );
+    } else {
+      // Log as error for actual problems
+      logger.error({ err: error, connectionId }, context);
     }
   }
 
@@ -899,8 +943,10 @@ export class HttpTransport {
       connection.response.write(formatSseEvent(sseEvent));
       return true;
     } catch (error) {
-      this.logger.warn(
-        { err: error, connectionId },
+      this.handleSseConnectionError(
+        error as Error,
+        connectionId,
+        this.logger,
         'Failed to send SSE response, closing connection'
       );
       this.closeSseConnection(connectionId, this.logger);

@@ -5,7 +5,7 @@
 
 import { setTimeout } from 'timers/promises';
 
-// Mock the logger - use the same pattern as the unit tests
+// Mock the logger module before any imports
 const mockLogger = {
   child: jest.fn(() => mockLogger),
   info: jest.fn(),
@@ -17,6 +17,13 @@ const mockLogger = {
   level: 'info',
   silent: false,
 } as any;
+
+jest.mock('@/utils/logger.js', () => ({
+  initializeLogger: jest.fn(),
+  getLogger: jest.fn(() => mockLogger),
+  createChildLogger: jest.fn(() => mockLogger),
+  isLoggerInitialized: jest.fn(() => true),
+}));
 
 // Now import the modules that depend on the mocked logger
 import { HttpTransport } from './http-transport.js';
@@ -50,7 +57,7 @@ describe('HttpTransport Integration', () => {
     // Reset the mock logger like in the unit tests
     mockLogger.child = jest.fn(() => mockLogger);
 
-    transport = new HttpTransport(config, mockLogger);
+    transport = new HttpTransport(config, undefined as any, mockLogger);
   });
 
   afterEach(async () => {
