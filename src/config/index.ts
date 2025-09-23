@@ -29,6 +29,17 @@ export interface SimplifiedOAuthConfig {
 }
 
 /**
+ * HTTP transport configuration interface
+ */
+export interface HttpTransportConfig {
+  readonly port: number;
+  readonly host: string;
+  readonly corsOrigins: string[];
+  readonly timeout: number;
+  readonly enableSSE: boolean;
+}
+
+/**
  * Application configuration interface
  */
 export interface AppConfig {
@@ -44,6 +55,7 @@ export interface AppConfig {
     readonly port: number;
     readonly host: string;
   };
+  readonly http: HttpTransportConfig;
   readonly logging: {
     readonly level: 'error' | 'warn' | 'info' | 'debug';
   };
@@ -52,12 +64,64 @@ export interface AppConfig {
 }
 
 /**
+ * Get HTTP transport configuration with environment-specific defaults
+ */
+const getHttpTransportConfig = (
+  environment: 'development' | 'test' | 'production'
+): HttpTransportConfig => {
+  const port = parseInt(process.env.HTTP_PORT ?? '3000', 10);
+  const host = process.env.HTTP_HOST ?? 'localhost';
+  const timeout = parseInt(process.env.HTTP_TIMEOUT ?? '30000', 10);
+  const enableSSE = process.env.HTTP_ENABLE_SSE !== 'false';
+
+  // Parse CORS origins from comma-separated string
+  const corsOriginsEnv = process.env.HTTP_CORS_ORIGINS;
+  let corsOrigins: string[];
+
+  if (corsOriginsEnv) {
+    corsOrigins = corsOriginsEnv
+      .split(',')
+      .map(origin => origin.trim())
+      .filter(Boolean);
+  } else {
+    // Environment-specific defaults
+    switch (environment) {
+      case 'development':
+        corsOrigins = [
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://127.0.0.1:3000',
+        ];
+        break;
+      case 'test':
+        corsOrigins = ['http://localhost:3000'];
+        break;
+      case 'production':
+        corsOrigins = []; // No default CORS origins in production - must be explicitly configured
+        break;
+      default:
+        corsOrigins = ['http://localhost:3000'];
+    }
+  }
+
+  return {
+    port,
+    host,
+    corsOrigins,
+    timeout,
+    enableSSE,
+  };
+};
+
+/**
  * Environment variables with defaults
  */
 const getEnvConfig = (): AppConfig => {
   const drupalBaseUrl =
     process.env.DRUPAL_BASE_URL ?? 'http://localhost/drupal';
   const drupalEndpoint = process.env.DRUPAL_JSON_RPC_ENDPOINT ?? '/jsonrpc';
+  const environment =
+    (process.env.NODE_ENV as AppConfig['environment']) ?? 'development';
 
   return {
     drupal: {
@@ -112,11 +176,11 @@ const getEnvConfig = (): AppConfig => {
       port: parseInt(process.env.PORT ?? '3000', 10),
       host: process.env.HOST ?? '0.0.0.0',
     },
+    http: getHttpTransportConfig(environment),
     logging: {
       level: (process.env.LOG_LEVEL as AppConfig['logging']['level']) ?? 'info',
     },
-    environment:
-      (process.env.NODE_ENV as AppConfig['environment']) ?? 'development',
+    environment,
     discovery: {
       baseUrl: drupalBaseUrl,
       timeout: parseInt(process.env.OAUTH_DISCOVERY_TIMEOUT ?? '5000', 10),
@@ -129,6 +193,35 @@ const getEnvConfig = (): AppConfig => {
       debug: process.env.OAUTH_DISCOVERY_DEBUG === 'true',
     },
   };
+};
+
+/**
+ * Validate HTTP transport configuration
+ */
+const validateHttpConfig = (httpConfig: HttpTransportConfig): void => {
+  // Validate port range
+  if (httpConfig.port < 1 || httpConfig.port > 65535) {
+    throw new Error('HTTP_PORT must be between 1 and 65535');
+  }
+
+  // Validate host format (basic check for valid hostname/IP)
+  if (!httpConfig.host || httpConfig.host.trim().length === 0) {
+    throw new Error('HTTP_HOST cannot be empty');
+  }
+
+  // Validate timeout
+  if (httpConfig.timeout <= 0) {
+    throw new Error('HTTP_TIMEOUT must be a positive number');
+  }
+
+  // Validate CORS origins format
+  for (const origin of httpConfig.corsOrigins) {
+    try {
+      new URL(origin);
+    } catch {
+      throw new Error(`Invalid CORS origin URL: ${origin}`);
+    }
+  }
 };
 
 /**
@@ -170,6 +263,9 @@ const validateConfig = (config: AppConfig): void => {
   if (config.server.port < 1 || config.server.port > 65535) {
     throw new Error('PORT must be between 1 and 65535');
   }
+
+  // Validate HTTP transport configuration
+  validateHttpConfig(config.http);
 };
 
 /**
@@ -207,6 +303,11 @@ export const loadConfig = async (): Promise<AppConfig> => {
   debug(
     `- OAUTH_CLIENT_ID: ${config.oauth.clientId ? '***set***' : 'NOT SET'}`
   );
+  debug(`- HTTP_PORT: ${config.http.port}`);
+  debug(`- HTTP_HOST: ${config.http.host}`);
+  debug(`- HTTP_CORS_ORIGINS: ${config.http.corsOrigins.length} origin(s)`);
+  debug(`- HTTP_TIMEOUT: ${config.http.timeout}ms`);
+  debug(`- HTTP_ENABLE_SSE: ${config.http.enableSSE}`);
 
   debug('Validating configuration...');
   console.info('[Config] Validating configuration...');
@@ -323,6 +424,12 @@ export const loadConfig = async (): Promise<AppConfig> => {
   debug(`- Environment: ${config.environment}`);
   debug(`- Drupal URL: ${config.drupal.baseUrl}${config.drupal.endpoint}`);
   debug(`- MCP Server: ${config.mcp.name} v${config.mcp.version}`);
+  debug(
+    `- HTTP Transport: ${config.http.host}:${config.http.port} (SSE: ${config.http.enableSSE ? 'enabled' : 'disabled'})`
+  );
+  debug(
+    `- CORS Origins: ${config.http.corsOrigins.length > 0 ? config.http.corsOrigins.join(', ') : 'none configured'}`
+  );
   debug(`- Auth enabled: ${config.auth.enabled}`);
   if (config.auth.enabled) {
     debug(
