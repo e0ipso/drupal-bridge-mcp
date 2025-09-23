@@ -5,6 +5,8 @@
  * used to transport MCP (Model Context Protocol) messages over HTTP.
  */
 
+import type { ServerResponse } from 'http';
+
 /**
  * JSON-RPC 2.0 Request object
  */
@@ -119,6 +121,40 @@ export interface ContentNegotiation {
 }
 
 /**
+ * SSE connection information
+ */
+export interface SseConnection {
+  id: string;
+  response: ServerResponse;
+  sessionId?: string;
+  createdAt: Date;
+  lastHeartbeat: Date;
+  isActive: boolean;
+}
+
+/**
+ * SSE event types for MCP streaming
+ */
+export enum SseEventType {
+  CONNECTION = 'connection',
+  MCP_RESPONSE = 'mcp-response',
+  MCP_ERROR = 'mcp-error',
+  MCP_NOTIFICATION = 'mcp-notification',
+  HEARTBEAT = 'heartbeat',
+  CLOSE = 'close',
+}
+
+/**
+ * SSE event data structure
+ */
+export interface SseEvent {
+  event: SseEventType;
+  data: unknown;
+  id?: string;
+  retry?: number;
+}
+
+/**
  * MCP over JSON-RPC request context
  */
 export interface McpJsonRpcContext {
@@ -127,6 +163,7 @@ export interface McpJsonRpcContext {
   contentType: ContentNegotiation['contentType'];
   method: string;
   params?: unknown;
+  sseConnection?: SseConnection;
 }
 
 /**
@@ -228,5 +265,79 @@ export function createJsonRpcErrorResponse(
       data,
     },
     id: id ?? null,
+  };
+}
+
+/**
+ * Helper to format SSE event for transmission
+ */
+export function formatSseEvent(event: SseEvent): string {
+  let sseString = '';
+
+  if (event.id) {
+    sseString += `id: ${event.id}\n`;
+  }
+
+  if (event.retry) {
+    sseString += `retry: ${event.retry}\n`;
+  }
+
+  sseString += `event: ${event.event}\n`;
+
+  // Handle multi-line data
+  const dataString =
+    typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
+
+  const dataLines = dataString.split('\n');
+  for (const line of dataLines) {
+    sseString += `data: ${line}\n`;
+  }
+
+  sseString += '\n'; // End with double newline
+
+  return sseString;
+}
+
+/**
+ * Helper to create SSE event for JSON-RPC response
+ */
+export function createSseResponseEvent(
+  response: JsonRpcResponse,
+  eventId?: string
+): SseEvent {
+  const eventType = isJsonRpcSuccessResponse(response)
+    ? SseEventType.MCP_RESPONSE
+    : SseEventType.MCP_ERROR;
+
+  return {
+    event: eventType,
+    data: response,
+    id: eventId,
+  };
+}
+
+/**
+ * Helper to create SSE heartbeat event
+ */
+export function createSseHeartbeatEvent(): SseEvent {
+  return {
+    event: SseEventType.HEARTBEAT,
+    data: {
+      timestamp: new Date().toISOString(),
+    },
+  };
+}
+
+/**
+ * Helper to create SSE connection event
+ */
+export function createSseConnectionEvent(status: string): SseEvent {
+  return {
+    event: SseEventType.CONNECTION,
+    data: {
+      type: 'connection',
+      status,
+      timestamp: new Date().toISOString(),
+    },
   };
 }

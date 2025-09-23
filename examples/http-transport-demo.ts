@@ -95,26 +95,42 @@ async function demo() {
     const status = transport.getStatus();
     console.log(`✅ Server running on ${status.host}:${status.port}`);
     console.log('\n🔗 Available endpoints:');
-    console.log('  • GET  /health - Health check');
-    console.log('  • GET  /mcp    - Server-Sent Events (if enabled)');
-    console.log('  • POST /mcp    - JSON-RPC requests');
+    console.log('  • GET  /health     - Health check');
+    console.log('  • GET  /mcp        - Server-Sent Events (if enabled)');
+    console.log('  • POST /mcp        - JSON-RPC requests');
+    console.log('  • POST /mcp/sse    - JSON-RPC over existing SSE connection');
     console.log('\n💡 Try these commands in another terminal:');
     console.log(`  # Health check`);
     console.log(`  curl http://${status.host}:${status.port}/health`);
     console.log(`  `);
-    console.log(`  # Initialize MCP session`);
+    console.log(`  # Start SSE connection (keep this running)`);
+    console.log(
+      `  curl -N -H "Accept: text/event-stream" http://${status.host}:${status.port}/mcp`
+    );
+    console.log(`  `);
+    console.log(`  # Initialize MCP session (standard HTTP)`);
     console.log(`  curl -X POST http://${status.host}:${status.port}/mcp \\`);
     console.log(`    -H "Content-Type: application/json" \\`);
     console.log(
       `    -d '{"jsonrpc":"2.0","method":"initialize","params":{"capabilities":{}},"id":1}'`
     );
     console.log(`  `);
-    console.log(`  # List available tools`);
+    console.log(
+      `  # Send JSON-RPC over SSE (use connection ID from SSE stream)`
+    );
+    console.log(
+      `  curl -X POST http://${status.host}:${status.port}/mcp/sse \\`
+    );
+    console.log(`    -H "Content-Type: application/json" \\`);
+    console.log(`    -H "X-SSE-Connection-Id: <connection_id_from_sse>" \\`);
+    console.log(`    -d '{"jsonrpc":"2.0","method":"tools/list","id":2}'`);
+    console.log(`  `);
+    console.log(`  # List available tools (standard HTTP)`);
     console.log(`  curl -X POST http://${status.host}:${status.port}/mcp \\`);
     console.log(`    -H "Content-Type: application/json" \\`);
     console.log(`    -d '{"jsonrpc":"2.0","method":"tools/list","id":2}'`);
     console.log(`  `);
-    console.log(`  # Test connection tool`);
+    console.log(`  # Test connection tool (standard HTTP)`);
     console.log(`  curl -X POST http://${status.host}:${status.port}/mcp \\`);
     console.log(`    -H "Content-Type: application/json" \\`);
     console.log(

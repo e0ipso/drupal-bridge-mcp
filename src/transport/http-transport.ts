@@ -15,6 +15,13 @@ import type { DrupalMcpServer } from '@/mcp/server.js';
 import { createChildLogger } from '@/utils/logger.js';
 import type { Logger } from 'pino';
 import { JsonRpcProtocolHandler } from './jsonrpc-protocol.js';
+import {
+  type SseConnection,
+  SseEventType,
+  formatSseEvent,
+  createSseConnectionEvent,
+  createSseHeartbeatEvent,
+} from './jsonrpc-types.js';
 
 /**
  * HTTP transport implementation for MCP over HTTP
@@ -22,10 +29,12 @@ import { JsonRpcProtocolHandler } from './jsonrpc-protocol.js';
 export class HttpTransport {
   private server: Server | null = null;
   private readonly logger: Logger;
-  private readonly connections = new Set<any>();
+  private readonly connections = new Set<NodeJS.Socket>();
+  private readonly sseConnections = new Map<string, SseConnection>();
   private isShuttingDown = false;
   private readonly mcpEndpoint: string;
   private jsonRpcHandler?: JsonRpcProtocolHandler;
+  private heartbeatInterval?: NodeJS.Timeout;
 
   constructor(
     private readonly config: AppConfig,
@@ -42,6 +51,7 @@ export class HttpTransport {
     // Initialize JSON-RPC handler if MCP server is provided
     if (mcpServer) {
       this.jsonRpcHandler = new JsonRpcProtocolHandler(mcpServer, this.logger);
+      this.jsonRpcHandler.setHttpTransport(this);
     }
   }
 
@@ -85,6 +95,12 @@ export class HttpTransport {
           },
           'HTTP server started successfully'
         );
+
+        // Start SSE heartbeat interval if SSE is enabled
+        if (this.config.http.enableSSE) {
+          this.startSseHeartbeat();
+        }
+
         resolve();
       });
     });
@@ -101,6 +117,15 @@ export class HttpTransport {
 
     this.logger.info('Stopping HTTP server...');
     this.isShuttingDown = true;
+
+    // Stop SSE heartbeat
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = undefined;
+    }
+
+    // Close all SSE connections gracefully
+    this.closeAllSseConnections();
 
     return new Promise((resolve, reject) => {
       // Close all active connections
@@ -251,6 +276,12 @@ export class HttpTransport {
       }
     }
 
+    // MCP SSE endpoint for JSON-RPC over existing SSE connections
+    if (pathname === `${this.mcpEndpoint}/sse` && method === 'POST') {
+      this.handleSseJsonRpcRequest(req, res, logger);
+      return;
+    }
+
     // 404 for all other routes
     this.sendResponse(
       res,
@@ -350,7 +381,24 @@ export class HttpTransport {
     res: ServerResponse,
     logger: Logger
   ): void {
-    logger.info('Setting up SSE connection');
+    const connectionId = this.generateConnectionId();
+
+    logger.info({ connectionId }, 'Setting up SSE connection');
+
+    // Check Accept header specifically for text/event-stream
+    const acceptHeader = req.headers.accept || '';
+    if (!acceptHeader.includes('text/event-stream')) {
+      this.sendResponse(
+        res,
+        406,
+        {
+          error: 'Not Acceptable',
+          message: 'Client must accept text/event-stream content type',
+        },
+        logger
+      );
+      return;
+    }
 
     // Set SSE headers
     res.writeHead(200, {
@@ -358,29 +406,196 @@ export class HttpTransport {
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
       'Access-Control-Allow-Origin': this.getCorsOrigin(req),
+      'X-Accel-Buffering': 'no', // Disable nginx buffering
     });
 
-    // Send initial event
-    res.write('data: {"type":"connection","status":"ready"}\n\n');
+    // Create SSE connection object
+    const sseConnection: SseConnection = {
+      id: connectionId,
+      response: res,
+      sessionId: req.headers['mcp-session-id'] as string,
+      createdAt: new Date(),
+      lastHeartbeat: new Date(),
+      isActive: true,
+    };
 
-    // Keep connection alive with periodic heartbeat
-    const heartbeat = setInterval(() => {
-      res.write(
-        'data: {"type":"heartbeat","timestamp":"' +
-          new Date().toISOString() +
-          '"}\n\n'
-      );
-    }, 30000);
+    // Store connection
+    this.sseConnections.set(connectionId, sseConnection);
+
+    // Send initial connection event with connection ID
+    const connectionEvent = createSseConnectionEvent('ready');
+    const initialEvent = {
+      ...connectionEvent,
+      data: {
+        ...(connectionEvent.data as Record<string, unknown>),
+        connectionId,
+      },
+    };
+    res.write(formatSseEvent(initialEvent));
+
+    logger.info(
+      {
+        connectionId,
+        sessionId: sseConnection.sessionId,
+        totalConnections: this.sseConnections.size,
+      },
+      'SSE connection established'
+    );
 
     // Clean up on client disconnect
     req.on('close', () => {
-      clearInterval(heartbeat);
-      logger.info('SSE connection closed');
+      this.closeSseConnection(connectionId, logger);
     });
 
     req.on('error', error => {
-      clearInterval(heartbeat);
-      logger.error({ err: error }, 'SSE connection error');
+      logger.error({ err: error, connectionId }, 'SSE connection error');
+      this.closeSseConnection(connectionId, logger);
+    });
+
+    // Handle server shutdown
+    res.on('error', error => {
+      logger.error({ err: error, connectionId }, 'SSE response error');
+      this.closeSseConnection(connectionId, logger);
+    });
+  }
+
+  /**
+   * Handle JSON-RPC requests over existing SSE connection
+   */
+  private handleSseJsonRpcRequest(
+    req: IncomingMessage,
+    res: ServerResponse,
+    logger: Logger
+  ): void {
+    if (!this.jsonRpcHandler) {
+      this.sendResponse(
+        res,
+        503,
+        {
+          error: 'JSON-RPC handler not available',
+          message: 'MCP server not configured for HTTP transport',
+        },
+        logger
+      );
+      return;
+    }
+
+    // Get SSE connection ID from header
+    const connectionId = req.headers['x-sse-connection-id'] as string;
+    if (!connectionId) {
+      this.sendResponse(
+        res,
+        400,
+        {
+          error: 'Missing SSE connection ID',
+          message: 'X-SSE-Connection-Id header is required',
+        },
+        logger
+      );
+      return;
+    }
+
+    // Verify SSE connection exists and is active
+    const sseConnection = this.getSseConnection(connectionId);
+    if (!sseConnection || !sseConnection.isActive) {
+      this.sendResponse(
+        res,
+        404,
+        {
+          error: 'SSE connection not found',
+          message: 'No active SSE connection with the provided ID',
+        },
+        logger
+      );
+      return;
+    }
+
+    logger.debug(
+      { connectionId, sessionId: sseConnection.sessionId },
+      'Processing JSON-RPC over SSE'
+    );
+
+    let body = '';
+
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+
+    req.on('end', async () => {
+      try {
+        // Create modified headers for SSE context
+        const modifiedHeaders = {
+          ...req.headers,
+          accept: 'text/event-stream', // Force SSE response
+          'mcp-session-id': sseConnection.sessionId,
+          'x-sse-connection-id': connectionId,
+        };
+
+        // Create a new request object with modified headers
+        const modifiedReq = Object.create(req);
+        modifiedReq.headers = modifiedHeaders;
+
+        // Create a dummy response that won't be used (SSE response goes through connection)
+        const dummyRes = {
+          headersSent: false,
+          setHeader: () => {},
+          writeHead: () => {},
+          end: () => {},
+          getHeader: () => undefined,
+        } as ServerResponse;
+
+        await this.jsonRpcHandler!.handleJsonRpcRequest(
+          modifiedReq,
+          dummyRes,
+          body,
+          logger
+        );
+
+        // Send acknowledgment that the request was received and processed
+        this.sendResponse(
+          res,
+          202,
+          {
+            message: 'Request accepted for SSE processing',
+            connectionId,
+          },
+          logger
+        );
+      } catch (error) {
+        logger.error(
+          { err: error, connectionId },
+          'Error in SSE JSON-RPC handler'
+        );
+        if (!res.headersSent) {
+          this.sendResponse(
+            res,
+            500,
+            {
+              error: 'Internal server error',
+              message: 'SSE JSON-RPC processing failed',
+            },
+            logger
+          );
+        }
+      }
+    });
+
+    req.on('error', error => {
+      logger.error(
+        { err: error, connectionId },
+        'Error reading SSE JSON-RPC request body'
+      );
+      if (!res.headersSent) {
+        this.sendResponse(
+          res,
+          400,
+          {
+            error: 'Bad request',
+            message: 'Error reading request body',
+          },
+          logger
+        );
+      }
     });
   }
 
@@ -465,7 +680,7 @@ export class HttpTransport {
   private sendResponse(
     res: ServerResponse,
     statusCode: number,
-    data: any,
+    data: unknown,
     logger: Logger
   ): void {
     if (res.headersSent) {
@@ -555,6 +770,158 @@ export class HttpTransport {
    */
   private generateRequestId(): string {
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Generate unique connection ID for SSE connections
+   */
+  private generateConnectionId(): string {
+    return `sse_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Start heartbeat interval for SSE connections
+   */
+  private startSseHeartbeat(): void {
+    // Send heartbeat every 30 seconds
+    this.heartbeatInterval = setInterval(() => {
+      this.sendHeartbeatToAllConnections();
+    }, 30000);
+
+    this.logger.debug('SSE heartbeat interval started');
+  }
+
+  /**
+   * Send heartbeat to all active SSE connections
+   */
+  private sendHeartbeatToAllConnections(): void {
+    const heartbeatEvent = createSseHeartbeatEvent();
+    const now = new Date();
+
+    for (const [connectionId, connection] of this.sseConnections.entries()) {
+      if (connection.isActive) {
+        try {
+          connection.response.write(formatSseEvent(heartbeatEvent));
+          connection.lastHeartbeat = now;
+        } catch (error) {
+          this.logger.warn(
+            { err: error, connectionId },
+            'Failed to send heartbeat, closing connection'
+          );
+          this.closeSseConnection(connectionId, this.logger);
+        }
+      }
+    }
+
+    // Clean up stale connections (older than 5 minutes without heartbeat)
+    const staleThreshold = new Date(now.getTime() - 5 * 60 * 1000);
+    for (const [connectionId, connection] of this.sseConnections.entries()) {
+      if (connection.lastHeartbeat < staleThreshold) {
+        this.logger.info(
+          { connectionId, lastHeartbeat: connection.lastHeartbeat },
+          'Closing stale SSE connection'
+        );
+        this.closeSseConnection(connectionId, this.logger);
+      }
+    }
+  }
+
+  /**
+   * Close a specific SSE connection
+   */
+  private closeSseConnection(connectionId: string, logger: Logger): void {
+    const connection = this.sseConnections.get(connectionId);
+    if (connection) {
+      connection.isActive = false;
+
+      try {
+        // Send close event before ending connection
+        const closeEvent = {
+          event: SseEventType.CLOSE,
+          data: { timestamp: new Date().toISOString() },
+        };
+        connection.response.write(formatSseEvent(closeEvent));
+        connection.response.end();
+      } catch {
+        // Ignore errors when closing
+      }
+
+      this.sseConnections.delete(connectionId);
+
+      logger.info(
+        {
+          connectionId,
+          totalConnections: this.sseConnections.size,
+          duration: Date.now() - connection.createdAt.getTime(),
+        },
+        'SSE connection closed'
+      );
+    }
+  }
+
+  /**
+   * Close all SSE connections gracefully
+   */
+  private closeAllSseConnections(): void {
+    this.logger.info(
+      { connectionCount: this.sseConnections.size },
+      'Closing all SSE connections'
+    );
+
+    for (const connectionId of this.sseConnections.keys()) {
+      this.closeSseConnection(connectionId, this.logger);
+    }
+  }
+
+  /**
+   * Send JSON-RPC response to SSE connection
+   */
+  public sendSseResponse(
+    connectionId: string,
+    response: unknown,
+    eventId?: string
+  ): boolean {
+    const connection = this.sseConnections.get(connectionId);
+    if (!connection || !connection.isActive) {
+      return false;
+    }
+
+    try {
+      const sseEvent = {
+        event:
+          'error' in response
+            ? SseEventType.MCP_ERROR
+            : SseEventType.MCP_RESPONSE,
+        data: response,
+        id: eventId,
+      };
+
+      connection.response.write(formatSseEvent(sseEvent));
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        { err: error, connectionId },
+        'Failed to send SSE response, closing connection'
+      );
+      this.closeSseConnection(connectionId, this.logger);
+      return false;
+    }
+  }
+
+  /**
+   * Get SSE connection by ID
+   */
+  public getSseConnection(connectionId: string): SseConnection | undefined {
+    return this.sseConnections.get(connectionId);
+  }
+
+  /**
+   * Get all active SSE connections
+   */
+  public getActiveSseConnections(): SseConnection[] {
+    return Array.from(this.sseConnections.values()).filter(
+      conn => conn.isActive
+    );
   }
 
   /**

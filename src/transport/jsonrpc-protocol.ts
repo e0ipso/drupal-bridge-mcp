@@ -17,6 +17,7 @@ import {
   type McpSession,
   type ContentNegotiation,
   type McpJsonRpcContext,
+  type SseConnection,
   JsonRpcErrorCode,
   isJsonRpcRequest,
   createJsonRpcErrorResponse,
@@ -113,6 +114,14 @@ export class JsonRpcProtocolHandler {
   private readonly sessionManager = new SessionManager();
   private readonly jsonRpcServer = new JSONRPCServer();
   private readonly mcpBridge: McpJsonRpcBridge;
+  private httpTransport?: {
+    getSseConnection: (id: string) => SseConnection | undefined;
+    sendSseResponse: (
+      connectionId: string,
+      response: unknown,
+      eventId?: string
+    ) => boolean;
+  }; // Forward reference to avoid circular imports
 
   constructor(
     private readonly mcpServer: DrupalMcpServer,
@@ -128,6 +137,20 @@ export class JsonRpcProtocolHandler {
       },
       5 * 60 * 1000
     );
+  }
+
+  /**
+   * Set HTTP transport reference for SSE support
+   */
+  setHttpTransport(transport: {
+    getSseConnection: (id: string) => SseConnection | undefined;
+    sendSseResponse: (
+      connectionId: string,
+      response: unknown,
+      eventId?: string
+    ) => boolean;
+  }): void {
+    this.httpTransport = transport;
   }
 
   /**
@@ -172,7 +195,9 @@ export class JsonRpcProtocolHandler {
             JsonRpcErrorCode.INVALID_REQUEST,
             validation.error?.message,
             validation.error?.data,
-            Array.isArray(jsonRequest) ? null : (jsonRequest as any)?.id
+            Array.isArray(jsonRequest)
+              ? null
+              : (jsonRequest as { id?: string | number | null })?.id
           ),
           requestLogger
         );
@@ -188,6 +213,20 @@ export class JsonRpcProtocolHandler {
       // Negotiate content type
       const contentNegotiation = this.negotiateContentType(req);
 
+      // Get SSE connection if using event-stream
+      let sseConnection: SseConnection | undefined;
+      if (
+        contentNegotiation.contentType === 'text/event-stream' &&
+        this.httpTransport
+      ) {
+        const connectionId = req.headers['x-sse-connection-id'] as
+          | string
+          | undefined;
+        if (connectionId) {
+          sseConnection = this.httpTransport.getSseConnection(connectionId);
+        }
+      }
+
       // Create request context
       const context: McpJsonRpcContext = {
         requestId,
@@ -195,6 +234,7 @@ export class JsonRpcProtocolHandler {
         contentType: contentNegotiation.contentType,
         method: validation.request!.method,
         params: validation.request!.params,
+        sseConnection,
       };
 
       requestLogger.debug(
@@ -224,7 +264,19 @@ export class JsonRpcProtocolHandler {
         res.setHeader('Mcp-Session-Id', context.session.id);
       }
 
-      this.sendJsonRpcResponse(res, response, requestLogger);
+      // Handle SSE response if content type is event-stream
+      if (
+        context.contentType === 'text/event-stream' &&
+        context.sseConnection
+      ) {
+        this.sendSseJsonRpcResponse(
+          context.sseConnection,
+          response,
+          requestLogger
+        );
+      } else {
+        this.sendJsonRpcResponse(res, response, requestLogger);
+      }
     } catch (error) {
       requestLogger.error({ err: error }, 'Error processing JSON-RPC request');
       this.sendJsonRpcResponse(
@@ -498,6 +550,70 @@ export class JsonRpcProtocolHandler {
       { responseSize: responseBody.length },
       'JSON-RPC response sent'
     );
+  }
+
+  /**
+   * Send JSON-RPC response via SSE
+   */
+  private sendSseJsonRpcResponse(
+    connection: SseConnection,
+    response: JsonRpcResponse | JsonRpcResponse[],
+    logger: Logger
+  ): void {
+    if (!this.httpTransport) {
+      logger.warn('Cannot send SSE response: HTTP transport not available');
+      return;
+    }
+
+    try {
+      if (Array.isArray(response)) {
+        // Send each response in the batch as a separate SSE event
+        for (const singleResponse of response) {
+          const eventId = this.generateRequestId();
+          const success = this.httpTransport.sendSseResponse(
+            connection.id,
+            singleResponse,
+            eventId
+          );
+
+          if (!success) {
+            logger.warn(
+              { connectionId: connection.id },
+              'Failed to send SSE batch response'
+            );
+            break;
+          }
+        }
+      } else {
+        // Send single response
+        const eventId = this.generateRequestId();
+        const success = this.httpTransport.sendSseResponse(
+          connection.id,
+          response,
+          eventId
+        );
+
+        if (!success) {
+          logger.warn(
+            { connectionId: connection.id },
+            'Failed to send SSE response'
+          );
+        }
+      }
+
+      logger.debug(
+        {
+          connectionId: connection.id,
+          responseType: Array.isArray(response) ? 'batch' : 'single',
+        },
+        'SSE JSON-RPC response sent'
+      );
+    } catch (error) {
+      logger.error(
+        { err: error, connectionId: connection.id },
+        'Error sending SSE JSON-RPC response'
+      );
+    }
   }
 
   /**

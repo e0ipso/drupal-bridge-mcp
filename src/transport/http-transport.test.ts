@@ -302,12 +302,19 @@ describe('HttpTransport', () => {
     });
 
     it('should handle SSE requests when enabled', async () => {
-      const response = await makeRequest('GET', '/mcp');
+      const response = await makeRequest('GET', '/mcp', undefined, {
+        Accept: 'text/event-stream',
+      });
 
       expect(response.statusCode).toBe(200);
       expect(response.headers['content-type']).toBe('text/event-stream');
       expect(response.headers['cache-control']).toBe('no-cache');
       expect(response.headers['connection']).toBe('keep-alive');
+
+      // Verify initial connection event is sent
+      expect(response.body).toContain('event: connection');
+      expect(response.body).toContain('data:');
+      expect(response.body).toContain('connectionId');
     });
 
     it('should reject SSE requests when disabled', async () => {
