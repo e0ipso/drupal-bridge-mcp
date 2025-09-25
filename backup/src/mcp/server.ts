@@ -381,7 +381,7 @@ export class DrupalMcpServer {
     const authTools: McpTool[] = [
       {
         name: 'auth_login',
-        description: 'Authenticate with Drupalize.me OAuth',
+        description: 'Authenticate with Drupal OAuth',
         inputSchema: {
           type: 'object',
           properties: {},

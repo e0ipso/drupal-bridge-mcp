@@ -48,35 +48,9 @@ export interface DrupalNodeAttributes {
 }
 
 /**
- * Drupal JSON-RPC method names for common operations
+ * Drupal JSON-RPC method type
  */
-export const DrupalJsonRpcMethod = {
-  // Entity operations
-  ENTITY_LOAD: 'entity.load',
-  ENTITY_CREATE: 'entity.create',
-  ENTITY_UPDATE: 'entity.update',
-  ENTITY_DELETE: 'entity.delete',
-  ENTITY_QUERY: 'entity.query',
-
-  // Node operations
-  NODE_LOAD: 'node.load',
-  NODE_CREATE: 'node.create',
-  NODE_UPDATE: 'node.update',
-  NODE_DELETE: 'node.delete',
-  NODE_INDEX: 'node.index',
-
-  // User operations
-  USER_LOAD: 'user.load',
-  USER_LOGIN: 'user.login',
-  USER_LOGOUT: 'user.logout',
-
-  // System operations
-  SYSTEM_CONNECT: 'system.connect',
-  SYSTEM_GET_VARIABLE: 'system.get_variable',
-} as const;
-
-export type DrupalJsonRpcMethod =
-  (typeof DrupalJsonRpcMethod)[keyof typeof DrupalJsonRpcMethod];
+export type DrupalJsonRpcMethod = string;
 
 /**
  * Parameters for entity load operations
@@ -118,19 +92,6 @@ export interface DrupalApiResponse<TData = unknown> {
   readonly links?: Record<string, string>;
 }
 
-/**
- * Drupal error response
- */
-export interface DrupalErrorResponse {
-  readonly errors: Array<{
-    readonly title: string;
-    readonly detail: string;
-    readonly status: string;
-    readonly source?: {
-      readonly pointer: string;
-    };
-  }>;
-}
 
 /**
  * Configuration for Drupal JSON-RPC client
@@ -147,19 +108,4 @@ export interface DrupalClientConfig {
 // Authentication Types (consolidated from auth modules)
 // =============================================================================
 
-/**
- * OAuth 2.0 token set
- */
-export interface OAuthTokens {
-  accessToken: string;
-  refreshToken?: string;
-  tokenType: string;
-  expiresIn?: number;
-  scope?: string;
-}
 
-// StoredTokens and TokenValidationResult interfaces removed
-// Use interfaces from oauth-provider.ts instead (MCP SDK-based)
-
-// Authentication types moved to auth-errors.ts for OAuth 2.1 stateless design
-// AuthMiddlewareConfig removed - simplified for MVP, use inline configuration

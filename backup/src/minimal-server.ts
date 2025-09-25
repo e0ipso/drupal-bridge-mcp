@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Minimal Drupal MCP Server - 336 lines vs 6000 lines
+ * Minimal Drupal MCP Server - 350 lines vs 6000 lines
  * Based on MCP TypeScript implementation research
  */
 
@@ -32,19 +32,14 @@ class SimpleOAuth {
     }
 
     // Get new token
-    const params = new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: this.clientId,
-    });
-
-    if (this.clientSecret) {
-      params.set('client_secret', this.clientSecret);
-    }
-
     const response = await fetch(`${this.baseUrl}/oauth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: this.clientId,
+        ...(this.clientSecret && { client_secret: this.clientSecret })
+      })
     });
 
     if (!response.ok) {
@@ -52,15 +47,10 @@ class SimpleOAuth {
     }
 
     const data = await response.json();
-
-    if (!data.access_token) {
-      throw new Error('No access token received from OAuth server');
-    }
-
     this.token = data.access_token;
     this.tokenExpiry = Date.now() + (data.expires_in * 1000) - 10000; // 10s buffer
 
-    return this.token!; // We just checked it exists above
+    return this.token;
   }
 
   clearToken(): void {

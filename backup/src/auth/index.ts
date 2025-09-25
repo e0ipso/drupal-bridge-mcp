@@ -13,17 +13,8 @@ export {
 // Authentication errors and types
 export {
   AuthError,
-  ValidationError,
   AuthenticationRequiredError,
-  InvalidTokenError,
-  InsufficientScopesError,
-  OAuthFlowError,
-  TokenRefreshError,
-  SessionError,
-  AuthConfigError,
   createMcpErrorResponse,
-  isAuthError,
-  extractMcpErrorDetails,
   type AuthContext,
 } from './auth-errors.js';
 

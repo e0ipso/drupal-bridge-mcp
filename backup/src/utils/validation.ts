@@ -20,7 +20,7 @@ export class ValidationError extends Error {
 /**
  * Validate string parameter with optional constraints
  */
-export function validateStringParam(
+function validateStringParam(
   value: unknown,
   fieldName: string,
   options: {
@@ -72,7 +72,7 @@ export function validateStringParam(
 /**
  * Validate array parameter with type checking
  */
-export function validateArrayParam<T>(
+function validateArrayParam<T>(
   value: unknown,
   fieldName: string,
   itemValidator: (item: unknown, index: number) => T,
@@ -120,7 +120,7 @@ export function validateArrayParam<T>(
 /**
  * Sanitize tag strings for consistent processing
  */
-export function sanitizeTag(tag: string): string {
+function sanitizeTag(tag: string): string {
   return tag
     .trim()
     .toLowerCase()

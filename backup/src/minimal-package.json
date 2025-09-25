@@ -1,0 +1,26 @@
+{
+  "name": "minimal-drupal-mcp",
+  "version": "1.0.0",
+  "description": "Minimal Drupal MCP Server - 336 lines vs 6000 lines",
+  "main": "dist/minimal-server.js",
+  "bin": {
+    "minimal-drupal-mcp": "dist/minimal-server.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/minimal-server.js",
+    "dev": "tsx src/minimal-server.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "tsx": "^4.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "keywords": ["mcp", "drupal", "ai", "claude", "minimal"],
+  "author": "Your Name",
+  "license": "MIT"
+}
