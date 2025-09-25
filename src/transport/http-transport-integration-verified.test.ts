@@ -332,8 +332,8 @@ describe('HTTP Transport Integration - Verified', () => {
       expect(transport.getStatus().running).toBe(true);
 
       // MCP server should have been initialized with capabilities
-      expect(config.mcp.capabilities.tools.listChanged).toBe(true);
-      expect(config.mcp.capabilities.resources.subscribe).toBe(true);
+      expect(config.mcp.capabilities.tools?.listChanged).toBe(true);
+      expect(config.mcp.capabilities.resources?.subscribe).toBe(true);
     });
   });
 });

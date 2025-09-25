@@ -1025,30 +1025,28 @@ export class DrupalMcpServer {
     const allMockResults: TutorialSearchResult[] = [
       {
         id: '1',
+        score: 50.1,
         title: `Tutorial about ${processedParams.keywords}`,
+        bundle: 'tutorial',
         url: 'https://drupalize.me/tutorial/sample-tutorial',
-        description: `A comprehensive tutorial covering ${processedParams.keywords} concepts`,
-        drupal_version: ['10', '11'],
-        tags:
-          processedParams.category && processedParams.category.length > 0
-            ? processedParams.category
-            : ['tutorial', 'drupal'],
-        difficulty: 'intermediate',
+        summary: `A comprehensive tutorial covering ${processedParams.keywords} concepts`,
+        excerpt: ` ... A comprehensive tutorial covering ${processedParams.keywords} concepts`,
+        drupal_version: ['Drupal 10', 'Drupal 11'],
+        category: 'Module Development',
         created: '2024-01-01T00:00:00Z',
         updated: '2024-06-01T00:00:00Z',
       },
       // Add a Drupal 9 specific tutorial for testing filtering
       {
         id: '2',
+        score: 42.2,
+        bundle: 'tutorial',
         title: `Drupal 9 specific tutorial about ${processedParams.keywords}`,
         url: 'https://drupalize.me/tutorial/drupal9-tutorial',
-        description: `Tutorial for ${processedParams.keywords} in Drupal 9`,
-        drupal_version: ['9'],
-        tags:
-          processedParams.category && processedParams.category.length > 0
-            ? [...processedParams.category, 'drupal-9']
-            : ['tutorial', 'drupal', 'drupal-9'],
-        difficulty: 'intermediate',
+        summary: `Tutorial for ${processedParams.keywords} in Drupal 9`,
+        excerpt: ` ... A comprehensive tutorial covering ${processedParams.keywords} concepts`,
+        drupal_version: ['Drupal 9'],
+        category: 'Theming',
         created: '2023-01-01T00:00:00Z',
         updated: '2023-06-01T00:00:00Z',
       },
