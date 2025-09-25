@@ -439,6 +439,7 @@ export class JsonRpcProtocolHandler {
 
     // Return MCP server capabilities
     const capabilities = {
+      protocolVersion: '2024-11-05',
       capabilities: {
         resources: { subscribe: true, listChanged: true },
         tools: { listChanged: true },
@@ -447,7 +448,6 @@ export class JsonRpcProtocolHandler {
       serverInfo: {
         name: 'drupal-bridge-mcp',
         version: '1.0.0',
-        protocolVersion: '2024-11-05',
       },
       instructions: 'Connected to Drupal MCP Server via JSON-RPC transport',
     };
