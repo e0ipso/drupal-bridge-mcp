@@ -83,8 +83,7 @@ async function demonstrateDiscovery() {
 
   // Demonstrate caching
   console.log('\n🗄️  Cache Statistics');
-  // Note: Cache statistics function was removed during cleanup
-  console.log('   Cache statistics are not available');
+  console.log('   Cache statistics are not available in this implementation');
 
   // Test cache hit
   console.log('\n🚀 Testing Cache Performance');
