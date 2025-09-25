@@ -383,7 +383,10 @@ export function formatErrorForLogging(
     message,
     meta,
     logWithPino: (logger: Logger) => {
-      const logMethod = logger[level] as (obj: any, msg?: string) => void;
+      const logMethod = logger[level] as (
+        obj: Record<string, unknown>,
+        msg?: string
+      ) => void;
       logMethod.call(
         logger,
         {

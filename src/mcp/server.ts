@@ -19,7 +19,6 @@ import type {
   McpResource,
   McpTool,
   McpPrompt,
-  ProcessedSearchContentParams,
   SearchContentResponse,
   TutorialSearchResult,
 } from '@/types/index.js';

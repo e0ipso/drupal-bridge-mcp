@@ -90,7 +90,7 @@ const metadataCache = new MetadataCache();
 function logDiscovery(
   level: 'info' | 'warn' | 'debug',
   message: string,
-  extra?: any
+  extra?: Record<string, unknown>
 ): void {
   if (isLoggerInitialized()) {
     const logger = getLogger().child({ component: 'discovery' });
@@ -131,8 +131,8 @@ async function fetchWithTimeout(
     };
 
     const fetch = globalThis.fetch || (await import('node-fetch')).default;
-    const response = await fetch(url, fetchOptions as any);
-    return response as any;
+    const response = await fetch(url, fetchOptions as RequestInit);
+    return response as Response;
   } finally {
     clearTimeout(timeoutId);
   }

@@ -23,7 +23,7 @@ let globalTransport: HttpTransport | null = null;
 function safeLog(
   level: 'info' | 'warn' | 'error',
   message: string,
-  ...args: any[]
+  ...args: unknown[]
 ): void {
   if (isLoggerInitialized()) {
     const logger = createChildLogger({ component: 'bootstrap' });

@@ -5,8 +5,6 @@
  * used to transport MCP (Model Context Protocol) messages over HTTP.
  */
 
-import type { ServerResponse } from 'http';
-
 /**
  * JSON-RPC 2.0 Request object
  */

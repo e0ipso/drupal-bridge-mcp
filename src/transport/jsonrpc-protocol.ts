@@ -9,6 +9,7 @@ import type { IncomingMessage, ServerResponse } from 'http';
 import type { Logger } from 'pino';
 import { JSONRPCServer, JSONRPCErrorException } from 'json-rpc-2.0';
 import type { DrupalMcpServer } from '@/mcp/server.js';
+import type { HttpTransport } from './http-transport.js';
 import { McpJsonRpcBridge } from './mcp-jsonrpc-bridge.js';
 import {
   type JsonRpcRequest,
@@ -113,7 +114,7 @@ export class JsonRpcProtocolHandler {
   private readonly sessionManager = new SessionManager();
   private readonly jsonRpcServer = new JSONRPCServer();
   private readonly mcpBridge: McpJsonRpcBridge;
-  private httpTransport?: any; // Forward reference to avoid circular imports
+  private httpTransport?: HttpTransport; // Forward reference to avoid circular imports
   private cleanupInterval: NodeJS.Timeout;
 
   constructor(
@@ -135,7 +136,7 @@ export class JsonRpcProtocolHandler {
   /**
    * Set HTTP transport reference for SSE support
    */
-  setHttpTransport(transport: any): void {
+  setHttpTransport(transport: HttpTransport): void {
     this.httpTransport = transport;
   }
 
