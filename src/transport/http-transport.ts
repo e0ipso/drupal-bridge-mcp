@@ -3,13 +3,20 @@
  * Provides basic HTTP server infrastructure with CORS support and graceful shutdown
  */
 
+import express, {
+  type Express,
+  type Request,
+  type Response,
+  type NextFunction,
+} from 'express';
 import {
   createServer,
   type IncomingMessage,
   type ServerResponse,
   type Server,
 } from 'http';
-import { URL } from 'url';
+import { discoverOAuthEndpoints } from '@/auth/endpoint-discovery.js';
+import { DiscoveryError } from '@/auth/types.js';
 import type { AppConfig } from '@/config/index.js';
 import type { DrupalMcpServer } from '@/mcp/server.js';
 import { createChildLogger } from '@/utils/logger.js';
@@ -28,6 +35,7 @@ import {
  */
 export class HttpTransport {
   private server: Server | null = null;
+  private readonly app: Express;
   private readonly logger: Logger;
   private readonly connections = new Set<NodeJS.Socket>();
   private readonly sseConnections = new Map<string, SseConnection>();
@@ -46,6 +54,7 @@ export class HttpTransport {
     } else {
       this.logger = createChildLogger({ component: 'http-transport' });
     }
+    this.app = express();
     this.mcpEndpoint = '/mcp';
 
     // Initialize JSON-RPC handler if MCP server is provided
@@ -53,6 +62,8 @@ export class HttpTransport {
       this.jsonRpcHandler = new JsonRpcProtocolHandler(mcpServer, this.logger);
       this.jsonRpcHandler.setHttpTransport(this);
     }
+
+    this.configureExpressApp();
   }
 
   /**
@@ -66,9 +77,7 @@ export class HttpTransport {
     this.logger.info('Starting HTTP server...');
 
     return new Promise((resolve, reject) => {
-      this.server = createServer((req, res) => {
-        this.handleRequest(req, res);
-      });
+      this.server = createServer(this.app);
 
       // Track connections for graceful shutdown
       this.server.on('connection', socket => {
@@ -155,156 +164,227 @@ export class HttpTransport {
   }
 
   /**
-   * Handle incoming HTTP requests
+   * Configure Express application with middleware and routes
    */
-  private handleRequest(req: IncomingMessage, res: ServerResponse): void {
-    const startTime = Date.now();
-    const requestId = this.generateRequestId();
-    const method = req.method?.toUpperCase() || 'UNKNOWN';
-    const url = req.url || '/';
+  private configureExpressApp(): void {
+    this.app.use((req: Request, res: Response, next: NextFunction) => {
+      const startTime = Date.now();
+      const requestId = this.generateRequestId();
+      const method = req.method?.toUpperCase() || 'UNKNOWN';
+      const url = req.originalUrl || req.url || '/';
 
-    const requestLogger = this.logger.child({
-      requestId,
-      method,
-      url,
-      userAgent: req.headers['user-agent'],
+      const requestLogger = this.logger.child({
+        requestId,
+        method,
+        url,
+        userAgent: req.headers['user-agent'],
+      });
+
+      res.locals.requestLogger = requestLogger;
+      res.locals.requestStartTime = startTime;
+
+      requestLogger.debug('Incoming HTTP request');
+
+      this.setCommonHeaders(res);
+
+      const origin = req.headers.origin;
+      if (this.isValidCorsOrigin(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin as string);
+      }
+
+      if (this.isShuttingDown) {
+        this.sendResponse(
+          res,
+          503,
+          {
+            error: 'Server is shutting down',
+            message: 'Please retry your request',
+          },
+          requestLogger
+        );
+        return;
+      }
+
+      const timeoutId = setTimeout(() => {
+        if (!res.headersSent) {
+          requestLogger.warn(
+            { timeout: this.config.http.timeout },
+            'Request timeout'
+          );
+          this.sendResponse(
+            res,
+            408,
+            {
+              error: 'Request timeout',
+              message: 'Request took too long to process',
+            },
+            requestLogger
+          );
+        }
+      }, this.config.http.timeout);
+
+      const clearRequestTimeout = () => {
+        clearTimeout(timeoutId);
+      };
+
+      res.on('finish', () => {
+        clearRequestTimeout();
+        const duration = Date.now() - startTime;
+        requestLogger.info(
+          { duration, statusCode: res.statusCode },
+          'Request completed'
+        );
+      });
+
+      res.on('close', clearRequestTimeout);
+
+      next();
     });
 
-    requestLogger.debug('Incoming HTTP request');
+    this.registerRoutes();
 
-    // Set common headers
-    this.setCommonHeaders(res);
-
-    // Handle server shutdown
-    if (this.isShuttingDown) {
+    this.app.use((req: Request, res: Response) => {
+      const logger = this.getRequestLogger(res);
       this.sendResponse(
         res,
-        503,
+        404,
         {
-          error: 'Server is shutting down',
-          message: 'Please retry your request',
+          error: 'Not found',
+          message: `Path ${req.originalUrl || req.url || '/'} not found`,
         },
-        requestLogger
-      );
-      return;
-    }
-
-    // Set up request timeout
-    const timeoutId = setTimeout(() => {
-      if (!res.headersSent) {
-        requestLogger.warn(
-          { timeout: this.config.http.timeout },
-          'Request timeout'
-        );
-        this.sendResponse(
-          res,
-          408,
-          {
-            error: 'Request timeout',
-            message: 'Request took too long to process',
-          },
-          requestLogger
-        );
-      }
-    }, this.config.http.timeout);
-
-    // Clean up timeout when response finishes
-    res.on('finish', () => {
-      clearTimeout(timeoutId);
-      const duration = Date.now() - startTime;
-      requestLogger.info(
-        { duration, statusCode: res.statusCode },
-        'Request completed'
+        logger
       );
     });
 
-    try {
-      this.routeRequest(req, res, requestLogger);
-    } catch (error) {
-      clearTimeout(timeoutId);
-      requestLogger.error({ err: error }, 'Error handling request');
-      if (!res.headersSent) {
-        this.sendResponse(
-          res,
-          500,
-          {
-            error: 'Internal server error',
-            message: 'An unexpected error occurred',
-          },
-          requestLogger
-        );
+    this.app.use(
+      (error: Error, req: Request, res: Response, next: NextFunction) => {
+        const logger = this.getRequestLogger(res);
+        logger.error({ err: error }, 'Unhandled error in request pipeline');
+        if (!res.headersSent) {
+          this.sendResponse(
+            res,
+            500,
+            {
+              error: 'Internal server error',
+              message: 'An unexpected error occurred',
+            },
+            logger
+          );
+        }
+        next(error);
       }
-    }
+    );
   }
 
   /**
-   * Route requests to appropriate handlers
+   * Register Express routes
    */
-  private routeRequest(
-    req: IncomingMessage,
-    res: ServerResponse,
-    logger: Logger
-  ): void {
-    const method = req.method?.toUpperCase();
-    const url = new URL(req.url || '/', `http://${req.headers.host}`);
-    const pathname = url.pathname;
+  private registerRoutes(): void {
+    this.app.options(
+      '*',
+      this.createExpressHandler((req, res, logger) => {
+        this.handleCorsPreflightRequest(req, res, logger);
+      })
+    );
 
-    // Handle CORS preflight requests
-    if (method === 'OPTIONS') {
-      this.handleCorsPreflightRequest(req, res, logger);
-      return;
-    }
+    this.app.get(
+      '/health',
+      this.createExpressHandler((req, res, logger) => {
+        this.handleHealthCheck(req, res, logger);
+      })
+    );
 
-    // Health check endpoint
-    if (pathname === '/health' && method === 'GET') {
-      this.handleHealthCheck(req, res, logger);
-      return;
-    }
-
-    // MCP endpoint
-    if (pathname === this.mcpEndpoint) {
-      if (method === 'GET' || method === 'POST') {
+    this.app.get(
+      this.mcpEndpoint,
+      this.createExpressHandler((req, res, logger) => {
         this.handleMcpRequest(req, res, logger);
-        return;
-      } else {
+      })
+    );
+
+    this.app.get(
+      '/.well-known/oauth-authorization-server',
+      this.createExpressHandler((req, res, logger) => {
+        return this.handleOAuthWellKnownMetadata(
+          req,
+          res,
+          logger,
+          '/.well-known/oauth-authorization-server'
+        );
+      })
+    );
+
+    this.app.post(
+      this.mcpEndpoint,
+      this.createExpressHandler((req, res, logger) => {
+        this.handleMcpRequest(req, res, logger);
+      })
+    );
+
+    this.app.all(
+      this.mcpEndpoint,
+      this.createExpressHandler((req, res, logger) => {
+        const method = req.method?.toUpperCase() || 'UNKNOWN';
         this.sendResponse(
           res,
           405,
           {
             error: 'Method not allowed',
-            message: `Method ${method} is not allowed for ${pathname}`,
+            message: `Method ${method} is not allowed for ${this.mcpEndpoint}`,
             allowed: ['GET', 'POST', 'OPTIONS'],
           },
           logger
         );
-        return;
-      }
-    }
-
-    // MCP SSE endpoint for JSON-RPC over existing SSE connections
-    if (pathname === `${this.mcpEndpoint}/sse` && method === 'POST') {
-      this.handleSseJsonRpcRequest(req, res, logger);
-      return;
-    }
-
-    // 404 for all other routes
-    this.sendResponse(
-      res,
-      404,
-      {
-        error: 'Not found',
-        message: `Path ${pathname} not found`,
-      },
-      logger
+      })
     );
+
+    this.app.post(
+      `${this.mcpEndpoint}/sse`,
+      this.createExpressHandler((req, res, logger) => {
+        this.handleSseJsonRpcRequest(req, res, logger);
+      })
+    );
+  }
+
+  /**
+   * Wrap route handlers to provide consistent error handling
+   */
+  private createExpressHandler(
+    handler: (
+      req: Request,
+      res: Response,
+      logger: Logger
+    ) => void | Promise<void>
+  ): (req: Request, res: Response, next: NextFunction) => void {
+    return (req, res, next) => {
+      const logger = this.getRequestLogger(res);
+      try {
+        const result = handler.call(this, req, res, logger);
+        if (result instanceof Promise) {
+          result.catch(error => {
+            logger.error({ err: error }, 'Error handling request');
+            next(error);
+          });
+        }
+      } catch (error) {
+        logger.error({ err: error }, 'Error handling request');
+        next(error);
+      }
+    };
+  }
+
+  /**
+   * Helper to read request-scoped logger
+   */
+  private getRequestLogger(res: Response): Logger {
+    return (res.locals.requestLogger as Logger) ?? this.logger;
   }
 
   /**
    * Handle CORS preflight requests
    */
   private handleCorsPreflightRequest(
-    req: IncomingMessage,
-    res: ServerResponse,
+    req: Request,
+    res: Response,
     logger: Logger
   ): void {
     const origin = req.headers.origin;
@@ -314,7 +394,7 @@ export class HttpTransport {
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       res.setHeader(
         'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, X-Requested-With, Mcp-Session-Id'
+        'Content-Type, Authorization, X-Requested-With, Mcp-Session-Id, Mcp-Protocol-Version'
       );
       res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
 
@@ -332,11 +412,7 @@ export class HttpTransport {
   /**
    * Handle health check requests
    */
-  private handleHealthCheck(
-    req: IncomingMessage,
-    res: ServerResponse,
-    logger: Logger
-  ): void {
+  private handleHealthCheck(req: Request, res: Response, logger: Logger): void {
     const health = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
@@ -350,13 +426,60 @@ export class HttpTransport {
   }
 
   /**
+   * Proxy OAuth well-known documents from the upstream Drupal site
+   */
+  private async handleOAuthWellKnownMetadata(
+    _req: Request,
+    res: Response,
+    logger: Logger,
+    wellKnownPath: string
+  ): Promise<void> {
+    try {
+      if (wellKnownPath === '/.well-known/oauth-authorization-server') {
+        const endpoints = await discoverOAuthEndpoints(this.config.discovery);
+        const metadata = endpoints.metadata;
+
+        if (!metadata) {
+          throw new Error('Authorization server metadata not available');
+        }
+
+        logger.debug(
+          { wellKnownPath },
+          'Serving authorization server metadata'
+        );
+        this.sendResponse(res, 200, metadata, logger);
+        return;
+      }
+
+      throw new Error(`Unsupported well-known path: ${wellKnownPath}`);
+    } catch (error) {
+      const isDiscoveryError = error instanceof DiscoveryError;
+      const statusCode = isDiscoveryError ? 502 : 500;
+
+      logger.error(
+        { err: error, wellKnownPath },
+        'Failed to provide OAuth well-known metadata'
+      );
+
+      this.sendResponse(
+        res,
+        statusCode,
+        {
+          error: 'OAuth provider metadata unavailable',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Failed to retrieve OAuth metadata from discovery',
+        },
+        logger
+      );
+    }
+  }
+
+  /**
    * Handle MCP requests (GET for SSE, POST for JSON-RPC)
    */
-  private handleMcpRequest(
-    req: IncomingMessage,
-    res: ServerResponse,
-    logger: Logger
-  ): void {
+  private handleMcpRequest(req: Request, res: Response, logger: Logger): void {
     const method = req.method?.toUpperCase();
 
     if (method === 'GET') {
@@ -381,11 +504,7 @@ export class HttpTransport {
   /**
    * Handle Server-Sent Events requests
    */
-  private handleSseRequest(
-    req: IncomingMessage,
-    res: ServerResponse,
-    logger: Logger
-  ): void {
+  private handleSseRequest(req: Request, res: Response, logger: Logger): void {
     const connectionId = this.generateConnectionId();
 
     logger.info({ connectionId }, 'Setting up SSE connection');
@@ -478,8 +597,8 @@ export class HttpTransport {
    * Handle JSON-RPC requests over existing SSE connection
    */
   private handleSseJsonRpcRequest(
-    req: IncomingMessage,
-    res: ServerResponse,
+    req: Request,
+    res: Response,
     logger: Logger
   ): void {
     if (!this.jsonRpcHandler) {
@@ -618,8 +737,8 @@ export class HttpTransport {
    * Handle JSON-RPC requests
    */
   private handleJsonRpcRequest(
-    req: IncomingMessage,
-    res: ServerResponse,
+    req: Request,
+    res: Response,
     logger: Logger
   ): void {
     if (!this.jsonRpcHandler) {
