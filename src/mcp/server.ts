@@ -23,7 +23,10 @@ import type {
   TutorialSearchResult,
 } from '@/types/index.js';
 import { DrupalClient, DrupalClientError } from '@/services/drupal-client.js';
-import { validateSearchContentParams, ValidationError } from '@/utils/index.js';
+import {
+  validateSearchContentParams,
+  ValidationError,
+} from '@/utils/validation.js';
 import {
   IntegrationError,
   IntegrationErrorType,
