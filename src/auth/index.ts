@@ -25,7 +25,6 @@ export {
   isAuthError,
   extractMcpErrorDetails,
   type AuthContext,
-  type Session,
 } from './auth-errors.js';
 
 // OAuth 2.1 endpoint discovery (RFC8414)
@@ -33,7 +32,6 @@ export {
   discoverOAuthEndpoints,
   clearDiscoveryCache,
   cleanupDiscoveryCache,
-  getDiscoveryCacheStats,
 } from './endpoint-discovery.js';
 export type {
   OAuthServerMetadata,

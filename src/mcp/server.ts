@@ -37,6 +37,7 @@ import {
   McpOAuthProvider,
   type AuthContext,
 } from '@/auth/index.js';
+import { createChildLogger, isLoggerInitialized } from '@/utils/logger.js';
 import createDebug from 'debug';
 
 const debug = createDebug('mcp:server');
@@ -52,10 +53,13 @@ export class DrupalMcpServer {
 
   constructor(private readonly config: AppConfig) {
     debug('Initializing Drupal MCP Server...');
-    console.info('[Server] Initializing Drupal MCP Server...');
+    const logger = isLoggerInitialized()
+      ? createChildLogger({ component: 'server' })
+      : null;
+    logger?.info('Initializing Drupal MCP Server...');
 
     debug('Step 1/5: Creating MCP Server instance...');
-    console.info('[Server] Step 1/5: Creating MCP Server instance...');
+    logger?.info('Step 1/5: Creating MCP Server instance...');
     this.server = new Server(
       {
         name: config.mcp.name,
@@ -70,9 +74,10 @@ export class DrupalMcpServer {
       }
     );
     debug(`✓ MCP Server created: ${config.mcp.name} v${config.mcp.version}`);
-    console.info(
-      `[Server] ✓ MCP Server created: ${config.mcp.name} v${config.mcp.version}`
-    );
+    logger?.info('MCP Server created', {
+      name: config.mcp.name,
+      version: config.mcp.version,
+    });
     debug(`- Protocol version: ${config.mcp.protocolVersion}`);
     debug(
       `- Resources enabled: ${config.mcp.capabilities.resources?.subscribe ? 'YES' : 'NO'}`
@@ -85,44 +90,45 @@ export class DrupalMcpServer {
     );
 
     debug('Step 2/5: Initializing Drupal client...');
-    console.info('[Server] Step 2/5: Initializing Drupal client...');
+    logger?.info('Step 2/5: Initializing Drupal client...');
     this.drupalClient = new DrupalClient(config.drupal);
     debug(`✓ Drupal client initialized`);
-    console.info(`[Server] ✓ Drupal client initialized`);
+    logger?.info('Drupal client initialized', {
+      baseUrl: config.drupal.baseUrl,
+      endpoint: config.drupal.endpoint,
+      timeout: config.drupal.timeout,
+      retries: config.drupal.retries,
+    });
     debug(`- Base URL: ${config.drupal.baseUrl}`);
     debug(`- Endpoint: ${config.drupal.endpoint}`);
     debug(`- Timeout: ${config.drupal.timeout}ms`);
     debug(`- Retries: ${config.drupal.retries}`);
 
     debug('Step 3/5: Setting up OAuth providers...');
-    console.info('[Server] Step 3/5: Setting up OAuth providers...');
+    logger?.info('Step 3/5: Setting up OAuth providers...');
     // Initialize authentication components with new MCP OAuth provider (OAuth 2.1 stateless design)
     this.mcpOAuthProvider = createOAuthProvider(config);
 
     if (this.mcpOAuthProvider) {
       debug('✓ MCP OAuth provider initialized (OAuth 2.1 stateless)');
-      console.info(
-        '[Server] ✓ MCP OAuth provider initialized (OAuth 2.1 stateless)'
-      );
+      logger?.info('MCP OAuth provider initialized (OAuth 2.1 stateless)');
       debug('✓ OAuth provider configured');
-      console.info('[Server] ✓ OAuth provider configured');
+      logger?.info('OAuth provider configured');
     } else {
       debug('✓ Authentication disabled, OAuth provider skipped');
-      console.info(
-        '[Server] ✓ Authentication disabled, OAuth provider skipped'
-      );
+      logger?.info('Authentication disabled, OAuth provider skipped');
     }
 
     debug('Step 4/5: Setting up request handlers...');
-    console.info('[Server] Step 4/5: Setting up request handlers...');
+    logger?.info('Step 4/5: Setting up request handlers...');
     this.setupHandlers();
     debug('✓ Request handlers configured');
-    console.info('[Server] ✓ Request handlers configured');
+    logger?.info('Request handlers configured');
 
     debug('Step 5/5: Server initialization complete');
-    console.info('[Server] Step 5/5: Server initialization complete');
+    logger?.info('Step 5/5: Server initialization complete');
     debug(`🎯 Server ready to accept connections`);
-    console.info(`[Server] 🎯 Server ready to accept connections`);
+    logger?.info('Server ready to accept connections');
   }
 
   /**
@@ -130,6 +136,45 @@ export class DrupalMcpServer {
    */
   private generateRequestId(): string {
     return `mcp-req-${Date.now()}-${++this.requestCounter}`;
+  }
+
+  /**
+   * Format standard auth response structure
+   */
+  private formatAuthResponse(
+    success: boolean,
+    data: Record<string, unknown>,
+    error?: string
+  ): Record<string, unknown> {
+    const baseResponse: Record<string, unknown> = { success };
+
+    if (success) {
+      return { ...baseResponse, ...data };
+    } else {
+      return { ...baseResponse, error, ...data };
+    }
+  }
+
+  /**
+   * Format auth status response with consistent structure
+   */
+  private formatAuthStatusResponse(
+    authContext: AuthContext,
+    tokenInfo: unknown
+  ): Record<string, unknown> {
+    return {
+      isAuthenticated: authContext.isAuthenticated,
+      userId: authContext.userId,
+      scopes: authContext.scopes,
+      tokenInfo,
+      provider: 'McpOAuthProvider (OAuth 2.1 Stateless)',
+      configInfo: {
+        authEnabled: this.config.auth.enabled,
+        endpointsDiscovered: !!this.config.oauth.discoveredEndpoints,
+        authorizationEndpoint: this.config.oauth.authorizationEndpoint,
+        tokenEndpoint: this.config.oauth.tokenEndpoint,
+      },
+    };
   }
 
   /**
@@ -159,7 +204,10 @@ export class DrupalMcpServer {
 
       return { isAuthenticated: false };
     } catch (error) {
-      console.error('Authentication error:', error);
+      const logger = isLoggerInitialized()
+        ? createChildLogger({ component: 'server' })
+        : null;
+      logger?.error({ err: error }, 'Authentication error');
       return { isAuthenticated: false };
     }
   }
@@ -559,9 +607,12 @@ export class DrupalMcpServer {
     // Check if authentication is disabled first
     if (!this.config.auth.enabled) {
       debug(`Auth tool called with authentication disabled: ${name}`);
-      console.info(
-        `[Server] Auth tool called with authentication disabled: ${name}`
-      );
+      const logger = isLoggerInitialized()
+        ? createChildLogger({ component: 'server' })
+        : null;
+      logger?.info('Auth tool called with authentication disabled', {
+        toolName: name,
+      });
       return this.getAuthDisabledResponse(name);
     }
 
@@ -814,8 +865,7 @@ export class DrupalMcpServer {
       // Set access token on Drupal client for immediate use
       this.drupalClient.setAccessToken(tokens.access_token);
 
-      return {
-        success: true,
+      return this.formatAuthResponse(true, {
         message:
           'Authentication successful using OAuth 2.1 stateless configuration',
         userId,
@@ -825,7 +875,7 @@ export class DrupalMcpServer {
         tokenExpiry: tokens.expires_in
           ? Date.now() + tokens.expires_in * 1000
           : undefined,
-      };
+      });
     } catch (error) {
       // Construct authorization URL for user convenience
       const baseUrl =
@@ -838,14 +888,16 @@ export class DrupalMcpServer {
       authUrl.searchParams.set('scope', this.config.oauth.scopes.join(' '));
       authUrl.searchParams.set('code_challenge_method', 'S256');
 
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Authentication failed',
-        hint: 'Make sure to complete the OAuth flow in your browser. Check that DRUPAL_BASE_URL and OAUTH_CLIENT_ID are set correctly.',
-        authorizationUrl: authUrl.toString(),
-        instructions:
-          'Copy and paste the authorization URL above into your browser to complete authentication. Note: The code_challenge parameter will be generated automatically when you use the actual OAuth flow.',
-      };
+      return this.formatAuthResponse(
+        false,
+        {
+          hint: 'Make sure to complete the OAuth flow in your browser. Check that DRUPAL_BASE_URL and OAUTH_CLIENT_ID are set correctly.',
+          authorizationUrl: authUrl.toString(),
+          instructions:
+            'Copy and paste the authorization URL above into your browser to complete authentication. Note: The code_challenge parameter will be generated automatically when you use the actual OAuth flow.',
+        },
+        error instanceof Error ? error.message : 'Authentication failed'
+      );
     }
   }
 
@@ -863,31 +915,33 @@ export class DrupalMcpServer {
       const hasValidTokens = await this.mcpOAuthProvider.hasValidTokens();
       const authContext = await this.requireAuthentication();
 
-      return {
-        isAuthenticated: authContext.isAuthenticated,
-        userId: authContext.userId,
-        scopes: authContext.scopes,
-        tokenInfo: mcpTokenInfo,
-        mcpProvider: {
-          hasValidTokens,
-          tokenInfo: mcpTokenInfo,
-        },
-        provider: 'McpOAuthProvider (OAuth 2.1 Stateless)',
-        configInfo: {
-          authEnabled: this.config.auth.enabled,
-          endpointsDiscovered: !!this.config.oauth.discoveredEndpoints,
-          authorizationEndpoint: this.config.oauth.authorizationEndpoint,
-          tokenEndpoint: this.config.oauth.tokenEndpoint,
-        },
-      };
+      return this.formatAuthStatusResponse(
+        authContext,
+        mcpTokenInfo
+          ? {
+              ...mcpTokenInfo,
+              mcpProvider: {
+                hasValidTokens,
+                tokenInfo: mcpTokenInfo,
+              },
+            }
+          : {
+              mcpProvider: {
+                hasValidTokens,
+                tokenInfo: mcpTokenInfo,
+              },
+            }
+      );
     } catch (error) {
-      return {
-        isAuthenticated: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Failed to check auth status',
-      };
+      return this.formatAuthStatusResponse(
+        { isAuthenticated: false },
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Failed to check auth status',
+        }
+      );
     }
   }
 
@@ -904,15 +958,15 @@ export class DrupalMcpServer {
       await this.mcpOAuthProvider.clearTokens();
       this.drupalClient.clearAccessToken();
 
-      return {
-        success: true,
+      return this.formatAuthResponse(true, {
         message: 'Logout successful - cleared all tokens',
-      };
+      });
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Logout failed',
-      };
+      return this.formatAuthResponse(
+        false,
+        {},
+        error instanceof Error ? error.message : 'Logout failed'
+      );
     }
   }
 

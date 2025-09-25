@@ -14,18 +14,6 @@ export interface AuthContext {
 }
 
 /**
- * Simplified session interface for compatibility
- */
-export interface Session {
-  id: string;
-  userId: string;
-  authContext: AuthContext;
-  createdAt: number;
-  lastAccessedAt: number;
-  expiresAt?: number;
-}
-
-/**
  * Basic authentication error class for OAuth 2.1 stateless authentication
  */
 export class AuthError extends Error {

@@ -9,7 +9,6 @@
 import {
   discoverOAuthEndpoints,
   clearDiscoveryCache,
-  getDiscoveryCacheStats,
 } from '../src/auth/endpoint-discovery.js';
 import type { DiscoveryConfig } from '../src/auth/types.js';
 
@@ -84,11 +83,8 @@ async function demonstrateDiscovery() {
 
   // Demonstrate caching
   console.log('\n🗄️  Cache Statistics');
-  const cacheStats = getDiscoveryCacheStats();
-  console.log(`   Cached Entries: ${cacheStats.size}`);
-  if (cacheStats.entries.length > 0) {
-    console.log(`   Cached URLs: ${cacheStats.entries.join(', ')}`);
-  }
+  // Note: Cache statistics function was removed during cleanup
+  console.log('   Cache statistics are not available');
 
   // Test cache hit
   console.log('\n🚀 Testing Cache Performance');

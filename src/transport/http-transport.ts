@@ -204,6 +204,7 @@ export class HttpTransport {
 
     // Handle server shutdown
     if (this.isShuttingDown) {
+      this.handleCorsForRequest(req, res, 'error');
       this.sendResponse(
         res,
         503,
@@ -223,6 +224,7 @@ export class HttpTransport {
           { timeout: this.config.http.timeout },
           'Request timeout'
         );
+        this.handleCorsForRequest(req, res, 'error');
         this.sendResponse(
           res,
           408,
@@ -251,6 +253,7 @@ export class HttpTransport {
       clearTimeout(timeoutId);
       requestLogger.error({ err: error }, 'Error handling request');
       if (!res.headersSent) {
+        this.handleCorsForRequest(req, res, 'error');
         this.sendResponse(
           res,
           500,
@@ -296,6 +299,7 @@ export class HttpTransport {
           return;
         } catch (error) {
           logger.error({ err: error }, 'SDK transport error');
+          this.handleCorsForRequest(req, res, 'error');
           this.sendResponse(
             res,
             500,
@@ -308,6 +312,7 @@ export class HttpTransport {
           return;
         }
       } else {
+        this.handleCorsForRequest(req, res, 'error');
         this.sendResponse(
           res,
           503,
@@ -322,6 +327,7 @@ export class HttpTransport {
     }
 
     // 404 for all other routes
+    this.handleCorsForRequest(req, res, 'error');
     this.sendResponse(
       res,
       404,
@@ -342,9 +348,9 @@ export class HttpTransport {
     logger: Logger
   ): void {
     const origin = req.headers.origin;
-    this.setMcpCorsHeaders(res, origin);
+    this.handleCorsForRequest(req, res, 'preflight');
 
-    if (this.isValidCorsOrigin(origin)) {
+    if (this.shouldAllowCorsOrigin(origin)) {
       logger.debug({ origin }, 'CORS preflight request approved');
     } else {
       logger.warn(
@@ -364,6 +370,9 @@ export class HttpTransport {
     res: ServerResponse,
     logger: Logger
   ): void {
+    // Handle CORS for health check requests
+    this.handleCorsForRequest(req, res, 'regular');
+
     const health = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
@@ -381,25 +390,16 @@ export class HttpTransport {
   }
 
   /**
-   * Enhanced CORS handling with SDK-compatible headers
+   * Unified CORS request handler
+   * Consolidates CORS handling for all request types with consistent behavior
    */
-  private setMcpCorsHeaders(res: ServerResponse, origin?: string): void {
-    if (origin && this.isValidCorsOrigin(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    } else if (
-      this.config.environment === 'development' &&
-      this.config.http.corsOrigins.length === 0
-    ) {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-    }
-
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.setHeader(
-      'Access-Control-Allow-Headers',
-      'Content-Type, Authorization, X-Requested-With, X-MCP-Session-ID'
-    );
-    res.setHeader('Access-Control-Expose-Headers', 'X-MCP-Session-ID');
-    res.setHeader('Access-Control-Max-Age', '86400');
+  private handleCorsForRequest(
+    req: IncomingMessage,
+    res: ServerResponse,
+    requestType: 'preflight' | 'regular' | 'error'
+  ): void {
+    const origin = req.headers.origin;
+    this.setCorsHeaders(res, origin, requestType);
   }
 
   /**
@@ -434,9 +434,20 @@ export class HttpTransport {
 
     // Set CORS headers if not already set
     if (!res.getHeader('Access-Control-Allow-Origin')) {
-      const corsOrigin = this.getCorsOriginFromResponse(res);
-      if (corsOrigin) {
-        res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+      const existingOrigin = res.getHeader('Access-Control-Allow-Origin');
+      if (!existingOrigin) {
+        // Fallback CORS handling for error responses
+        if (
+          this.config.environment === 'development' &&
+          this.config.http.corsOrigins.length === 0
+        ) {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+        } else if (this.config.http.corsOrigins.length > 0) {
+          const firstOrigin = this.config.http.corsOrigins[0];
+          if (firstOrigin) {
+            res.setHeader('Access-Control-Allow-Origin', firstOrigin);
+          }
+        }
       }
     }
 
@@ -454,9 +465,10 @@ export class HttpTransport {
   }
 
   /**
-   * Check if origin is allowed by CORS policy
+   * Consolidated CORS origin validation utility
+   * Determines if an origin should be allowed based on configuration and environment
    */
-  private isValidCorsOrigin(origin: string | undefined): boolean {
+  private shouldAllowCorsOrigin(origin?: string): boolean {
     if (!origin) {
       return false;
     }
@@ -470,43 +482,32 @@ export class HttpTransport {
   }
 
   /**
-   * Get CORS origin for request
+   * Consolidated CORS header setting utility
+   * Sets appropriate CORS headers based on request type and origin validation
    */
-  private getCorsOrigin(req: IncomingMessage): string {
-    const origin = req.headers.origin;
-    if (origin && this.isValidCorsOrigin(origin)) {
-      return origin;
-    }
-
-    // Fallback to first configured origin or wildcard for development
-    if (
+  private setCorsHeaders(
+    res: ServerResponse,
+    origin: string | undefined,
+    _requestType: 'preflight' | 'regular' | 'error'
+  ): void {
+    // Set origin header if origin is allowed
+    if (origin && this.shouldAllowCorsOrigin(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else if (
       this.config.environment === 'development' &&
       this.config.http.corsOrigins.length === 0
     ) {
-      return '*';
+      res.setHeader('Access-Control-Allow-Origin', '*');
     }
 
-    return this.config.http.corsOrigins[0] || 'null';
-  }
-
-  /**
-   * Get CORS origin from response headers (for late CORS header setting)
-   */
-  private getCorsOriginFromResponse(res: ServerResponse): string | null {
-    const existingOrigin = res.getHeader('Access-Control-Allow-Origin');
-    if (existingOrigin) {
-      return existingOrigin as string;
-    }
-
-    // Fallback for cases where CORS origin wasn't set earlier
-    if (
-      this.config.environment === 'development' &&
-      this.config.http.corsOrigins.length === 0
-    ) {
-      return '*';
-    }
-
-    return this.config.http.corsOrigins[0] || null;
+    // Set method and header permissions for all request types
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-Requested-With, X-MCP-Session-ID'
+    );
+    res.setHeader('Access-Control-Expose-Headers', 'X-MCP-Session-ID');
+    res.setHeader('Access-Control-Max-Age', '86400');
   }
 
   /**

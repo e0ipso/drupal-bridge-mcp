@@ -59,7 +59,7 @@ describe('Main module', () => {
     process.env.HTTP_PORT = '99999'; // Invalid port
 
     await expect(loadConfig()).rejects.toThrow(
-      'HTTP_PORT must be between 1 and 65535'
+      'HTTP_PORT must be at most 65535'
     );
 
     // Clean up
@@ -72,7 +72,7 @@ describe('Main module', () => {
     process.env.HTTP_CORS_ORIGINS = 'invalid-url,https://valid.com';
 
     await expect(loadConfig()).rejects.toThrow(
-      'Invalid CORS origin URL: invalid-url'
+      'CORS origin must be a valid URL: invalid-url'
     );
 
     // Clean up

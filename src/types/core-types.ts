@@ -52,15 +52,6 @@ export type JsonRpcResponse<TResult = unknown> =
   | JsonRpcErrorResponse;
 
 /**
- * Type guard to check if response is successful
- */
-export const isJsonRpcSuccessResponse = <TResult = unknown>(
-  response: JsonRpcResponse<TResult>
-): response is JsonRpcSuccessResponse<TResult> => {
-  return 'result' in response;
-};
-
-/**
  * Type guard to check if response is an error
  */
 export const isJsonRpcErrorResponse = (

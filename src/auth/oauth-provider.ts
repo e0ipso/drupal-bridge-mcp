@@ -107,17 +107,25 @@ export class McpOAuthProvider implements OAuthClientProvider {
 
     if (isLoggerInitialized()) {
       const logger = getLogger().child({ component: 'oauth-provider' });
-      logger.info(`Opening authorization URL: ${urlString}`);
-    } else {
-      // Fallback for when logger is not initialized
-      console.log(`Opening authorization URL: ${urlString}`);
+      logger.info('Opening authorization URL', { url: urlString });
     }
 
-    // Make the URL easily visible and copyable
-    console.log('\n=== AUTHORIZATION URL ===');
-    console.log(`Please visit this URL to authorize the application:`);
-    console.log(`${urlString}`);
-    console.log('========================\n');
+    // Make the URL easily visible and copyable - this is user-facing output
+    if (isLoggerInitialized()) {
+      const logger = getLogger().child({ component: 'oauth-provider' });
+      logger.info('');
+      logger.info('=== AUTHORIZATION URL ===');
+      logger.info('Please visit this URL to authorize the application:');
+      logger.info(urlString);
+      logger.info('========================');
+      logger.info('');
+    } else {
+      // Fallback when logger not available - still need to show URL to user
+      console.log('\n=== AUTHORIZATION URL ===');
+      console.log(`Please visit this URL to authorize the application:`);
+      console.log(`${urlString}`);
+      console.log('========================\n');
+    }
 
     try {
       (await import('open')).default(urlString);

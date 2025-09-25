@@ -15,6 +15,77 @@ import createDebug from 'debug';
 const debug = createDebug('mcp:config');
 
 /**
+ * Validation utility functions for environment configuration
+ */
+const validateUrl = (url: string, variableName?: string): void => {
+  try {
+    new URL(url);
+  } catch {
+    throw new Error(
+      `${variableName ? `${variableName} must be a valid URL` : 'Invalid URL'}: ${url}`
+    );
+  }
+};
+
+const parseIntegerEnv = (
+  envVar: string,
+  defaultValue: number,
+  min?: number,
+  max?: number
+): number => {
+  const value = parseInt(process.env[envVar] ?? String(defaultValue), 10);
+
+  if (isNaN(value)) {
+    throw new Error(`${envVar} must be a valid integer`);
+  }
+
+  if (min !== undefined && value < min) {
+    throw new Error(`${envVar} must be at least ${min}`);
+  }
+
+  if (max !== undefined && value > max) {
+    throw new Error(`${envVar} must be at most ${max}`);
+  }
+
+  return value;
+};
+
+const parseArrayEnv = (
+  envVar: string,
+  defaultValue: string[],
+  separator = ' '
+): string[] => {
+  const value = process.env[envVar];
+  return value
+    ? value
+        .split(separator)
+        .map(s => s.trim())
+        .filter(Boolean)
+    : defaultValue;
+};
+
+const parseStringEnv = (envVar: string, defaultValue: string): string => {
+  return process.env[envVar] ?? defaultValue;
+};
+
+const parseEnvironmentEnv = (
+  envVar: string,
+  defaultValue: 'development' | 'test' | 'production'
+): 'development' | 'test' | 'production' => {
+  const value = process.env[envVar] as 'development' | 'test' | 'production';
+  if (value && ['development', 'test', 'production'].includes(value)) {
+    return value;
+  }
+  return defaultValue;
+};
+
+const parseBooleanEnv = (envVar: string, defaultValue: boolean): boolean => {
+  const value = process.env[envVar];
+  if (value === undefined) return defaultValue;
+  return value !== 'false';
+};
+
+/**
  * Simplified OAuth configuration interface
  * Supports both static configuration and discovery-based configuration
  */
@@ -67,19 +138,15 @@ export interface AppConfig {
 const getHttpTransportConfig = (
   environment: 'development' | 'test' | 'production'
 ): HttpTransportConfig => {
-  const port = parseInt(process.env.HTTP_PORT ?? '3000', 10);
-  const host = process.env.HTTP_HOST ?? 'localhost';
-  const timeout = parseInt(process.env.HTTP_TIMEOUT ?? '30000', 10);
+  const port = parseIntegerEnv('HTTP_PORT', 3000, 1, 65535);
+  const host = parseStringEnv('HTTP_HOST', 'localhost');
+  const timeout = parseIntegerEnv('HTTP_TIMEOUT', 30000, 1);
 
   // Parse CORS origins from comma-separated string
-  const corsOriginsEnv = process.env.HTTP_CORS_ORIGINS;
   let corsOrigins: string[];
 
-  if (corsOriginsEnv) {
-    corsOrigins = corsOriginsEnv
-      .split(',')
-      .map(origin => origin.trim())
-      .filter(Boolean);
+  if (process.env.HTTP_CORS_ORIGINS) {
+    corsOrigins = parseArrayEnv('HTTP_CORS_ORIGINS', [], ',');
   } else {
     // Environment-specific defaults
     switch (environment) {
@@ -113,44 +180,47 @@ const getHttpTransportConfig = (
  * Environment variables with defaults
  */
 const getEnvConfig = (): AppConfig => {
-  const drupalBaseUrl =
-    process.env.DRUPAL_BASE_URL ?? 'http://localhost/drupal';
-  const drupalEndpoint = process.env.DRUPAL_JSON_RPC_ENDPOINT ?? '/jsonrpc';
-  const environment =
-    (process.env.NODE_ENV as AppConfig['environment']) ?? 'development';
+  const drupalBaseUrl = parseStringEnv(
+    'DRUPAL_BASE_URL',
+    'http://localhost/drupal'
+  );
+  const drupalEndpoint = parseStringEnv('DRUPAL_JSON_RPC_ENDPOINT', '/jsonrpc');
+  const environment = parseEnvironmentEnv('NODE_ENV', 'development');
 
   return {
     drupal: {
       baseUrl: drupalBaseUrl,
       endpoint: drupalEndpoint,
-      timeout: parseInt(process.env.DRUPAL_TIMEOUT ?? '10000', 10),
-      retries: parseInt(process.env.DRUPAL_RETRIES ?? '3', 10),
+      timeout: parseIntegerEnv('DRUPAL_TIMEOUT', 10000, 1000),
+      retries: parseIntegerEnv('DRUPAL_RETRIES', 3, 0, 10),
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
     },
     oauth: {
-      clientId: process.env.OAUTH_CLIENT_ID ?? '',
+      clientId: parseStringEnv('OAUTH_CLIENT_ID', ''),
       // Support static configuration
       authorizationEndpoint: process.env.OAUTH_AUTHORIZATION_ENDPOINT,
       tokenEndpoint: process.env.OAUTH_TOKEN_ENDPOINT,
-      redirectUri:
-        process.env.OAUTH_REDIRECT_URI ?? 'urn:ietf:wg:oauth:2.0:oob',
-      scopes: (
-        process.env.OAUTH_SCOPES ?? 'tutorial:read user:profile tutorial:search'
-      ).split(' '),
+      redirectUri: parseStringEnv(
+        'OAUTH_REDIRECT_URI',
+        'urn:ietf:wg:oauth:2.0:oob'
+      ),
+      scopes: parseArrayEnv('OAUTH_SCOPES', [
+        'tutorial:read',
+        'user:profile',
+        'tutorial:search',
+      ]),
       serverUrl: drupalBaseUrl,
     },
     auth: {
-      enabled: process.env.AUTH_ENABLED !== 'false',
-      requiredScopes: (
-        process.env.AUTH_REQUIRED_SCOPES ?? 'tutorial:read'
-      ).split(' '),
+      enabled: parseBooleanEnv('AUTH_ENABLED', true),
+      requiredScopes: parseArrayEnv('AUTH_REQUIRED_SCOPES', ['tutorial:read']),
     },
     mcp: {
-      name: process.env.MCP_SERVER_NAME ?? 'drupal-bridge-mcp',
-      version: process.env.MCP_SERVER_VERSION ?? '1.0.0',
+      name: parseStringEnv('MCP_SERVER_NAME', 'drupal-bridge-mcp'),
+      version: parseStringEnv('MCP_SERVER_VERSION', '1.0.0'),
       protocolVersion: '2024-11-05',
       capabilities: {
         resources: {
@@ -166,24 +236,24 @@ const getEnvConfig = (): AppConfig => {
       },
     },
     server: {
-      port: parseInt(process.env.PORT ?? '3000', 10),
-      host: process.env.HOST ?? '0.0.0.0',
+      port: parseIntegerEnv('PORT', 3000, 1, 65535),
+      host: parseStringEnv('HOST', '0.0.0.0'),
     },
     http: getHttpTransportConfig(environment),
     logging: {
-      level: (process.env.LOG_LEVEL as AppConfig['logging']['level']) ?? 'info',
+      level: parseStringEnv(
+        'LOG_LEVEL',
+        'info'
+      ) as AppConfig['logging']['level'],
     },
     environment,
     discovery: {
       baseUrl: drupalBaseUrl,
-      timeout: parseInt(process.env.OAUTH_DISCOVERY_TIMEOUT ?? '5000', 10),
-      retries: parseInt(process.env.OAUTH_DISCOVERY_RETRIES ?? '2', 10),
-      cacheTtl: parseInt(
-        process.env.OAUTH_DISCOVERY_CACHE_TTL ?? '3600000',
-        10
-      ), // 1 hour
-      validateHttps: process.env.OAUTH_DISCOVERY_VALIDATE_HTTPS !== 'false',
-      debug: process.env.OAUTH_DISCOVERY_DEBUG === 'true',
+      timeout: parseIntegerEnv('OAUTH_DISCOVERY_TIMEOUT', 5000, 1000),
+      retries: parseIntegerEnv('OAUTH_DISCOVERY_RETRIES', 2, 0, 10),
+      cacheTtl: parseIntegerEnv('OAUTH_DISCOVERY_CACHE_TTL', 3600000, 60000), // 1 hour, min 1 minute
+      validateHttps: parseBooleanEnv('OAUTH_DISCOVERY_VALIDATE_HTTPS', true),
+      debug: parseBooleanEnv('OAUTH_DISCOVERY_DEBUG', false),
     },
   };
 };
@@ -192,38 +262,21 @@ const getEnvConfig = (): AppConfig => {
  * Validate HTTP transport configuration
  */
 const validateHttpConfig = (httpConfig: HttpTransportConfig): void => {
-  // Validate port range
-  if (httpConfig.port < 1 || httpConfig.port > 65535) {
-    throw new Error('HTTP_PORT must be between 1 and 65535');
-  }
-
-  // Validate host format (basic check for valid hostname/IP)
+  // Basic host validation (port, timeout, and positive number validation handled by parseIntegerEnv)
   if (!httpConfig.host || httpConfig.host.trim().length === 0) {
     throw new Error('HTTP_HOST cannot be empty');
   }
 
-  // Validate timeout
-  if (httpConfig.timeout <= 0) {
-    throw new Error('HTTP_TIMEOUT must be a positive number');
-  }
-
   // Validate CORS origins format
-  for (const origin of httpConfig.corsOrigins) {
-    try {
-      new URL(origin);
-    } catch {
-      throw new Error(`Invalid CORS origin URL: ${origin}`);
-    }
-  }
+  httpConfig.corsOrigins.forEach(origin => validateUrl(origin, 'CORS origin'));
 };
 
 /**
  * Validate configuration
  */
 const validateConfig = (config: AppConfig): void => {
-  if (!config.drupal.baseUrl) {
-    throw new Error('DRUPAL_BASE_URL is required');
-  }
+  // Validate required URLs and endpoints (port validation handled by parseIntegerEnv)
+  validateUrl(config.drupal.baseUrl, 'DRUPAL_BASE_URL');
 
   if (!config.drupal.endpoint) {
     throw new Error('DRUPAL_JSON_RPC_ENDPOINT is required');
@@ -237,24 +290,10 @@ const validateConfig = (config: AppConfig): void => {
     throw new Error('MCP_SERVER_VERSION is required');
   }
 
-  if (config.auth.enabled) {
-    if (!config.oauth.clientId) {
-      throw new Error(
-        'OAUTH_CLIENT_ID is required when authentication is enabled'
-      );
-    }
-
-    // For simplified configuration, only DRUPAL_BASE_URL and OAUTH_CLIENT_ID are required
-    // Endpoints will be discovered from OAuth server metadata
-    if (!config.drupal.baseUrl) {
-      throw new Error(
-        'DRUPAL_BASE_URL is required for OAuth endpoint discovery'
-      );
-    }
-  }
-
-  if (config.server.port < 1 || config.server.port > 65535) {
-    throw new Error('PORT must be between 1 and 65535');
+  if (config.auth.enabled && !config.oauth.clientId) {
+    throw new Error(
+      'OAUTH_CLIENT_ID is required when authentication is enabled'
+    );
   }
 
   // Validate HTTP transport configuration
@@ -266,7 +305,7 @@ const validateConfig = (config: AppConfig): void => {
  */
 export const loadConfig = async (): Promise<AppConfig> => {
   debug('Loading environment configuration...');
-  console.info('[Config] Loading environment configuration...');
+  // Note: Logger not yet initialized, using debug only at this stage
 
   try {
     // Try to load .env file in development
@@ -278,9 +317,7 @@ export const loadConfig = async (): Promise<AppConfig> => {
   } catch {
     // dotenv is optional, continue without it
     debug('⚠ .env file not found or failed to load (this is optional)');
-    console.warn(
-      '[Config] ⚠ .env file not found or failed to load (this is optional)'
-    );
+    // Note: Logger not yet initialized, using debug only at this stage
   }
 
   debug('Parsing environment variables...');
@@ -301,10 +338,8 @@ export const loadConfig = async (): Promise<AppConfig> => {
   debug(`- HTTP_TIMEOUT: ${config.http.timeout}ms`);
 
   debug('Validating configuration...');
-  console.info('[Config] Validating configuration...');
   validateConfig(config);
   debug('✓ Configuration validation passed');
-  console.info('[Config] ✓ Configuration validation passed');
 
   // Initialize logger now that basic config is available
   const logger = createLogger(config);

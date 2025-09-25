@@ -370,13 +370,3 @@ export function clearDiscoveryCache(): void {
 export function cleanupDiscoveryCache(): void {
   metadataCache.cleanup();
 }
-
-/**
- * Get current cache statistics (for debugging)
- */
-export function getDiscoveryCacheStats(): { size: number; entries: string[] } {
-  return {
-    size: metadataCache['cache'].size,
-    entries: Array.from(metadataCache['cache'].keys()),
-  };
-}

@@ -76,120 +76,174 @@ export class DrupalClient {
   }
 
   /**
-   * Make HTTP request with retry logic
+   * Create timeout controller with cleanup
    */
-  private async makeHttpRequest(jsonRPCRequest: unknown): Promise<void> {
+  private createTimeoutController(timeout: number): AbortController {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-    const requestId = this.generateRequestId();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+    // Store timeout ID for cleanup
+    (controller as any).timeoutId = timeoutId;
+
+    return controller;
+  }
+
+  /**
+   * Clear timeout for controller if it exists
+   */
+  private clearControllerTimeout(controller: AbortController): void {
+    const timeoutId = (controller as any).timeoutId;
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * Prepare HTTP request configuration
+   */
+  private prepareHttpRequest(
+    jsonRPCRequest: unknown,
+    controller: AbortController
+  ): RequestInit {
+    return {
+      method: 'POST',
+      headers: this.headers,
+      body: JSON.stringify(jsonRPCRequest),
+      signal: controller.signal,
+    };
+  }
+
+  /**
+   * Map HTTP status code to appropriate error type
+   */
+  private mapHttpStatusToErrorType(status: number): IntegrationErrorType {
+    if (status >= 500) {
+      return IntegrationErrorType.SERVER_UNAVAILABLE;
+    }
+    if (status === 429) {
+      return IntegrationErrorType.RATE_LIMIT_ERROR;
+    }
+    if (status === 401 || status === 403) {
+      return IntegrationErrorType.AUTHENTICATION_ERROR;
+    }
+    return IntegrationErrorType.VALIDATION_ERROR;
+  }
+
+  /**
+   * Validate JSON-RPC response format and content-type
+   */
+  private validateJsonRpcResponse(response: Response, jsonData: unknown): void {
+    // Validate content-type
+    const contentType = response.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+      throw new IntegrationError(
+        IntegrationErrorType.MALFORMED_RESPONSE,
+        `Invalid content-type: expected application/json, got ${contentType}`,
+        response.status,
+        undefined,
+        { expected: 'application/json', received: contentType },
+        undefined,
+        false
+      );
+    }
+
+    // Validate JSON-RPC response format
+    if (!jsonData || typeof jsonData !== 'object' || !('jsonrpc' in jsonData)) {
+      throw new IntegrationError(
+        IntegrationErrorType.MALFORMED_RESPONSE,
+        'Invalid JSON-RPC response: missing jsonrpc field',
+        undefined,
+        undefined,
+        { response: jsonData },
+        undefined,
+        false
+      );
+    }
+
+    const rpcResponse = jsonData as JsonRpcResponse;
+    if (rpcResponse.jsonrpc !== '2.0') {
+      throw new IntegrationError(
+        IntegrationErrorType.MALFORMED_RESPONSE,
+        `Invalid JSON-RPC version: expected "2.0", got "${rpcResponse.jsonrpc}"`,
+        undefined,
+        undefined,
+        { expected: '2.0', received: rpcResponse.jsonrpc },
+        undefined,
+        false
+      );
+    }
+  }
+
+  /**
+   * Handle successful HTTP response
+   */
+  private async handleSuccessResponse(
+    response: Response,
+    requestId: string
+  ): Promise<void> {
+    let jsonRPCResponse: unknown;
+    try {
+      jsonRPCResponse = await response.json();
+    } catch (parseError) {
+      throw new IntegrationError(
+        IntegrationErrorType.PARSE_ERROR,
+        'Failed to parse JSON response',
+        response.status,
+        undefined,
+        { parseError: String(parseError) },
+        parseError,
+        false
+      );
+    }
+
+    this.validateJsonRpcResponse(response, jsonRPCResponse);
+
+    const rpcResponse = jsonRPCResponse as JsonRpcResponse;
+
+    // Check for JSON-RPC errors in the response
+    if (isJsonRpcErrorResponse(rpcResponse)) {
+      throw parseJsonRpcError(rpcResponse, requestId);
+    }
+
+    this.client.receive(rpcResponse as JsonRpcResponse);
+  }
+
+  /**
+   * Handle HTTP error response
+   */
+  private async handleErrorResponse(response: Response): Promise<void> {
+    let errorText = '';
+    try {
+      errorText = await response.text();
+    } catch {
+      errorText = 'Unable to read error response';
+    }
+
+    const errorType = this.mapHttpStatusToErrorType(response.status);
+
+    throw new IntegrationError(
+      errorType,
+      `HTTP ${response.status}: ${response.statusText}`,
+      response.status,
+      undefined,
+      { statusText: response.statusText, responseBody: errorText },
+      undefined,
+      response.status >= 500 || response.status === 429
+    );
+  }
+
+  /**
+   * Execute HTTP request with retry logic and exponential backoff
+   */
+  private async executeWithRetry<T>(
+    requestFn: () => Promise<T>,
+    maxRetries: number
+  ): Promise<T> {
     let lastError: IntegrationError | undefined;
 
-    for (let attempt = 1; attempt <= this.retries; attempt++) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const response = await fetch(this.baseUrl, {
-          method: 'POST',
-          headers: this.headers,
-          body: JSON.stringify(jsonRPCRequest),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (response.status === 200) {
-          const contentType = response.headers.get('content-type');
-          if (!contentType?.includes('application/json')) {
-            throw new IntegrationError(
-              IntegrationErrorType.MALFORMED_RESPONSE,
-              `Invalid content-type: expected application/json, got ${contentType}`,
-              response.status,
-              undefined,
-              { expected: 'application/json', received: contentType },
-              undefined,
-              false
-            );
-          }
-
-          let jsonRPCResponse: unknown;
-          try {
-            jsonRPCResponse = await response.json();
-          } catch (parseError) {
-            throw new IntegrationError(
-              IntegrationErrorType.PARSE_ERROR,
-              'Failed to parse JSON response',
-              response.status,
-              undefined,
-              { parseError: String(parseError) },
-              parseError,
-              false
-            );
-          }
-
-          // Validate JSON-RPC response format
-          if (
-            !jsonRPCResponse ||
-            typeof jsonRPCResponse !== 'object' ||
-            !('jsonrpc' in jsonRPCResponse)
-          ) {
-            throw new IntegrationError(
-              IntegrationErrorType.MALFORMED_RESPONSE,
-              'Invalid JSON-RPC response: missing jsonrpc field',
-              undefined,
-              undefined,
-              { response: jsonRPCResponse },
-              undefined,
-              false
-            );
-          }
-
-          const rpcResponse = jsonRPCResponse as JsonRpcResponse;
-          if (rpcResponse.jsonrpc !== '2.0') {
-            throw new IntegrationError(
-              IntegrationErrorType.MALFORMED_RESPONSE,
-              `Invalid JSON-RPC version: expected "2.0", got "${rpcResponse.jsonrpc}"`,
-              undefined,
-              undefined,
-              { expected: '2.0', received: rpcResponse.jsonrpc },
-              undefined,
-              false
-            );
-          }
-
-          // Check for JSON-RPC errors in the response
-          if (isJsonRpcErrorResponse(rpcResponse)) {
-            throw parseJsonRpcError(rpcResponse, requestId);
-          }
-
-          this.client.receive(rpcResponse as JsonRpcResponse);
-          return;
-        } else {
-          // Handle HTTP error responses
-          let errorText = '';
-          try {
-            errorText = await response.text();
-          } catch {
-            errorText = 'Unable to read error response';
-          }
-
-          const errorType =
-            response.status >= 500
-              ? IntegrationErrorType.SERVER_UNAVAILABLE
-              : response.status === 429
-                ? IntegrationErrorType.RATE_LIMIT_ERROR
-                : response.status === 401 || response.status === 403
-                  ? IntegrationErrorType.AUTHENTICATION_ERROR
-                  : IntegrationErrorType.VALIDATION_ERROR;
-
-          throw new IntegrationError(
-            errorType,
-            `HTTP ${response.status}: ${response.statusText}`,
-            response.status,
-            undefined,
-            { statusText: response.statusText, responseBody: errorText },
-            undefined,
-            response.status >= 500 || response.status === 429
-          );
-        }
+        return await requestFn();
       } catch (error) {
         // Normalize the error to IntegrationError
         if (error instanceof IntegrationError) {
@@ -197,8 +251,8 @@ export class DrupalClient {
         } else {
           lastError = normalizeError(
             error,
-            `HTTP request attempt ${attempt}/${this.retries}`,
-            requestId
+            `HTTP request attempt ${attempt}/${maxRetries}`,
+            this.generateRequestId()
           );
         }
 
@@ -210,7 +264,7 @@ export class DrupalClient {
           throw lastError;
         }
 
-        if (attempt === this.retries) {
+        if (attempt === maxRetries) {
           break;
         }
 
@@ -220,23 +274,54 @@ export class DrupalClient {
       }
     }
 
-    clearTimeout(timeoutId);
-
     if (lastError) {
       // Wrap the final error with retry context
       throw new IntegrationError(
         lastError.errorType,
-        `Failed after ${this.retries} attempts: ${lastError.message}`,
+        `Failed after ${maxRetries} attempts: ${lastError.message}`,
         lastError.code,
         lastError.field,
         {
           ...lastError.details,
-          attempts: this.retries,
+          attempts: maxRetries,
           originalError: lastError,
         },
         lastError,
         false // No more retries available
       );
+    }
+
+    throw new IntegrationError(
+      IntegrationErrorType.NETWORK_ERROR,
+      'Request failed without error details',
+      undefined,
+      undefined,
+      { attempts: maxRetries },
+      undefined,
+      false
+    );
+  }
+
+  /**
+   * Make HTTP request with retry logic
+   */
+  private async makeHttpRequest(jsonRPCRequest: unknown): Promise<void> {
+    const controller = this.createTimeoutController(this.timeout);
+    const requestId = this.generateRequestId();
+
+    try {
+      await this.executeWithRetry(async () => {
+        const requestInit = this.prepareHttpRequest(jsonRPCRequest, controller);
+        const response = await fetch(this.baseUrl, requestInit);
+
+        if (response.status === 200) {
+          await this.handleSuccessResponse(response, requestId);
+        } else {
+          await this.handleErrorResponse(response);
+        }
+      }, this.retries);
+    } finally {
+      this.clearControllerTimeout(controller);
     }
   }
 
