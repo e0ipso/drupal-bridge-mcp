@@ -165,11 +165,11 @@ describe('HTTP Transport Integration - Verified', () => {
   });
 
   describe('JSON-RPC Protocol Integration', () => {
-    it('should create JSON-RPC protocol handler with MCP server', async () => {
+    it('should create MCP SDK transport integration with MCP server', async () => {
       await transport.start();
       await setTimeout(50);
 
-      // Verify the JSON-RPC handler was created and configured
+      // Verify the SDK integration was created and configured
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.objectContaining({
           host: 'localhost',
@@ -177,8 +177,9 @@ describe('HTTP Transport Integration - Verified', () => {
           endpoint: '/mcp',
           corsOrigins: 1,
           timeout: 5000,
+          sdkIntegration: true,
         }),
-        'HTTP server started successfully'
+        'HTTP server started successfully with MCP SDK'
       );
     });
 

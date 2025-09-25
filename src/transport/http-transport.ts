@@ -1,6 +1,7 @@
 /**
  * HTTP Transport for MCP server
- * Provides basic HTTP server infrastructure with CORS support and graceful shutdown
+ * Refactored to use official MCP SDK StreamableHTTPServerTransport
+ * Provides HTTP server infrastructure with CORS support and SDK integration
  */
 
 import {
@@ -10,14 +11,15 @@ import {
   type Server,
 } from 'http';
 import { URL } from 'url';
+import { randomUUID } from 'crypto';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { AppConfig } from '@/config/index.js';
 import type { DrupalMcpServer } from '@/mcp/server.js';
 import { createChildLogger } from '@/utils/logger.js';
 import type { Logger } from 'pino';
-import { JsonRpcProtocolHandler } from './jsonrpc-protocol.js';
 
 /**
- * HTTP transport implementation for MCP over HTTP
+ * HTTP transport implementation using MCP SDK
  */
 export class HttpTransport {
   private server: Server | null = null;
@@ -25,7 +27,7 @@ export class HttpTransport {
   private readonly connections = new Set<NodeJS.Socket>();
   private isShuttingDown = false;
   private readonly mcpEndpoint: string;
-  private jsonRpcHandler?: JsonRpcProtocolHandler;
+  private sdkTransport?: StreamableHTTPServerTransport;
 
   constructor(
     private readonly config: AppConfig,
@@ -39,22 +41,50 @@ export class HttpTransport {
     }
     this.mcpEndpoint = '/mcp';
 
-    // Initialize JSON-RPC handler if MCP server is provided
-    if (mcpServer) {
-      this.jsonRpcHandler = new JsonRpcProtocolHandler(mcpServer, this.logger);
-      this.jsonRpcHandler.setHttpTransport(this);
-    }
+    // SDK transport will be created in start() method for proper restart handling
   }
 
   /**
-   * Start the HTTP server
+   * Start the HTTP server with MCP SDK integration
    */
   async start(): Promise<void> {
     if (this.server) {
       throw new Error('HTTP server is already running');
     }
 
-    this.logger.info('Starting HTTP server...');
+    this.logger.info('Starting HTTP server with MCP SDK integration...');
+
+    // Create and connect MCP SDK transport if MCP server is provided
+    if (this.mcpServer) {
+      this.sdkTransport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (sessionId: string) => {
+          this.logger.debug({ sessionId }, 'MCP session initialized');
+        },
+        onsessionclosed: (sessionId: string) => {
+          this.logger.debug({ sessionId }, 'MCP session closed');
+        },
+        allowedHosts: this.config.http.host
+          ? [this.config.http.host]
+          : undefined,
+        allowedOrigins:
+          this.config.http.corsOrigins.length > 0
+            ? this.config.http.corsOrigins
+            : undefined,
+        enableDnsRebindingProtection: this.config.environment === 'production',
+      });
+
+      try {
+        await this.mcpServer.connect(this.sdkTransport);
+        this.logger.debug('MCP server connected to SDK transport');
+      } catch (error) {
+        this.logger.error(
+          { err: error },
+          'Failed to connect MCP server to transport'
+        );
+        throw error;
+      }
+    }
 
     return new Promise((resolve, reject) => {
       this.server = createServer((req, res) => {
@@ -82,8 +112,9 @@ export class HttpTransport {
             endpoint: this.mcpEndpoint,
             corsOrigins: this.config.http.corsOrigins.length,
             timeout: this.config.http.timeout,
+            sdkIntegration: !!this.sdkTransport,
           },
-          'HTTP server started successfully'
+          'HTTP server started successfully with MCP SDK'
         );
 
         resolve();
@@ -103,7 +134,19 @@ export class HttpTransport {
     this.logger.info('Stopping HTTP server...');
     this.isShuttingDown = true;
 
-    return new Promise((resolve, reject) => {
+    try {
+      // Close MCP server and SDK transport first
+      if (this.mcpServer) {
+        await this.mcpServer.close();
+        this.logger.debug('MCP server closed');
+      }
+
+      if (this.sdkTransport) {
+        await this.sdkTransport.close();
+        this.sdkTransport = undefined;
+        this.logger.debug('SDK transport closed');
+      }
+
       // Close all active connections
       for (const connection of this.connections) {
         if (
@@ -115,29 +158,33 @@ export class HttpTransport {
       }
       this.connections.clear();
 
-      // Close the server
-      this.server!.close(error => {
-        if (error) {
-          this.logger.error({ err: error }, 'Error stopping HTTP server');
-          reject(error);
-        } else {
-          this.logger.info('HTTP server stopped successfully');
-          // Clean up JSON-RPC handler
-          if (this.jsonRpcHandler) {
-            this.jsonRpcHandler.destroy();
+      // Close the HTTP server
+      await new Promise<void>((resolve, reject) => {
+        this.server!.close(error => {
+          if (error) {
+            this.logger.error({ err: error }, 'Error stopping HTTP server');
+            reject(error);
+          } else {
+            this.logger.info('HTTP server stopped successfully');
+            this.server = null;
+            this.isShuttingDown = false;
+            resolve();
           }
-          this.server = null;
-          this.isShuttingDown = false;
-          resolve();
-        }
+        });
       });
-    });
+    } catch (error) {
+      this.logger.error({ err: error }, 'Error during server shutdown');
+      throw error;
+    }
   }
 
   /**
    * Handle incoming HTTP requests
    */
-  private handleRequest(req: IncomingMessage, res: ServerResponse): void {
+  private async handleRequest(
+    req: IncomingMessage,
+    res: ServerResponse
+  ): Promise<void> {
     const startTime = Date.now();
     const requestId = this.generateRequestId();
     const method = req.method?.toUpperCase() || 'UNKNOWN';
@@ -199,7 +246,7 @@ export class HttpTransport {
     });
 
     try {
-      this.routeRequest(req, res, requestLogger);
+      await this.routeRequest(req, res, requestLogger);
     } catch (error) {
       clearTimeout(timeoutId);
       requestLogger.error({ err: error }, 'Error handling request');
@@ -220,11 +267,11 @@ export class HttpTransport {
   /**
    * Route requests to appropriate handlers
    */
-  private routeRequest(
+  private async routeRequest(
     req: IncomingMessage,
     res: ServerResponse,
     logger: Logger
-  ): void {
+  ): Promise<void> {
     const method = req.method?.toUpperCase();
     const url = new URL(req.url || '/', `http://${req.headers.host}`);
     const pathname = url.pathname;
@@ -241,19 +288,32 @@ export class HttpTransport {
       return;
     }
 
-    // MCP endpoint
+    // MCP endpoint - delegate to SDK transport
     if (pathname === this.mcpEndpoint) {
-      if (method === 'POST') {
-        this.handleJsonRpcRequest(req, res, logger);
-        return;
+      if (this.sdkTransport) {
+        try {
+          await this.sdkTransport.handleRequest(req, res);
+          return;
+        } catch (error) {
+          logger.error({ err: error }, 'SDK transport error');
+          this.sendResponse(
+            res,
+            500,
+            {
+              error: 'MCP transport error',
+              message: 'Failed to process MCP request',
+            },
+            logger
+          );
+          return;
+        }
       } else {
         this.sendResponse(
           res,
-          405,
+          503,
           {
-            error: 'Method not allowed',
-            message: `Method ${method} is not allowed for ${pathname}`,
-            allowed: ['POST', 'OPTIONS'],
+            error: 'MCP transport not available',
+            message: 'MCP server not configured for HTTP transport',
           },
           logger
         );
@@ -274,7 +334,7 @@ export class HttpTransport {
   }
 
   /**
-   * Handle CORS preflight requests
+   * Handle CORS preflight requests with MCP SDK compatibility
    */
   private handleCorsPreflightRequest(
     req: IncomingMessage,
@@ -282,16 +342,9 @@ export class HttpTransport {
     logger: Logger
   ): void {
     const origin = req.headers.origin;
+    this.setMcpCorsHeaders(res, origin);
 
     if (this.isValidCorsOrigin(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin!);
-      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-      res.setHeader(
-        'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, X-Requested-With'
-      );
-      res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-
       logger.debug({ origin }, 'CORS preflight request approved');
     } else {
       logger.warn(
@@ -328,65 +381,25 @@ export class HttpTransport {
   }
 
   /**
-   * Handle JSON-RPC requests
+   * Enhanced CORS handling with SDK-compatible headers
    */
-  private handleJsonRpcRequest(
-    req: IncomingMessage,
-    res: ServerResponse,
-    logger: Logger
-  ): void {
-    if (!this.jsonRpcHandler) {
-      this.sendResponse(
-        res,
-        503,
-        {
-          error: 'JSON-RPC handler not available',
-          message: 'MCP server not configured for HTTP transport',
-        },
-        logger
-      );
-      return;
+  private setMcpCorsHeaders(res: ServerResponse, origin?: string): void {
+    if (origin && this.isValidCorsOrigin(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else if (
+      this.config.environment === 'development' &&
+      this.config.http.corsOrigins.length === 0
+    ) {
+      res.setHeader('Access-Control-Allow-Origin', '*');
     }
 
-    let body = '';
-
-    req.on('data', chunk => {
-      body += chunk.toString();
-    });
-
-    req.on('end', async () => {
-      try {
-        await this.jsonRpcHandler!.handleJsonRpcRequest(req, res, body, logger);
-      } catch (error) {
-        logger.error({ err: error }, 'Error in JSON-RPC handler');
-        if (!res.headersSent) {
-          this.sendResponse(
-            res,
-            500,
-            {
-              error: 'Internal server error',
-              message: 'JSON-RPC processing failed',
-            },
-            logger
-          );
-        }
-      }
-    });
-
-    req.on('error', error => {
-      logger.error({ err: error }, 'Error reading request body');
-      if (!res.headersSent) {
-        this.sendResponse(
-          res,
-          400,
-          {
-            error: 'Bad request',
-            message: 'Error reading request body',
-          },
-          logger
-        );
-      }
-    });
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-Requested-With, X-MCP-Session-ID'
+    );
+    res.setHeader('Access-Control-Expose-Headers', 'X-MCP-Session-ID');
+    res.setHeader('Access-Control-Max-Age', '86400');
   }
 
   /**
@@ -419,9 +432,12 @@ export class HttpTransport {
       return;
     }
 
-    const corsOrigin = this.getCorsOriginFromResponse(res);
-    if (corsOrigin) {
-      res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+    // Set CORS headers if not already set
+    if (!res.getHeader('Access-Control-Allow-Origin')) {
+      const corsOrigin = this.getCorsOriginFromResponse(res);
+      if (corsOrigin) {
+        res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+      }
     }
 
     res.setHeader('Content-Type', 'application/json');
