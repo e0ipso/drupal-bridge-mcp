@@ -39,6 +39,7 @@ import {
   type AuthContext,
 } from '@/auth/index.js';
 import createDebug from 'debug';
+import * as process from 'node:process';
 
 const debug = createDebug('mcp:server');
 
@@ -951,19 +952,15 @@ export class DrupalMcpServer {
       // Process and format the response for MCP consumption
       const results: TutorialSearchResult[] = response.results.map(
         tutorial => ({
+          score: tutorial.score,
           id: tutorial.id,
+          bundle: tutorial.bundle,
           title: tutorial.title,
           url: tutorial.url,
-          description:
-            tutorial.description ||
-            this.extractDescriptionFromContent(tutorial.content),
+          summary: tutorial.summary,
+          excerpt: tutorial.excerpt,
           drupal_version: tutorial.drupal_version,
-          tags: tutorial.tags,
-          difficulty: tutorial.difficulty as
-            | 'beginner'
-            | 'intermediate'
-            | 'advanced'
-            | undefined,
+          category: tutorial.category,
           created: tutorial.created,
           updated: tutorial.updated,
         })

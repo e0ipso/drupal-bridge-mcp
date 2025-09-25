@@ -191,13 +191,15 @@ export interface ProcessedSearchContentParams {
  * Tutorial search result item
  */
 export interface TutorialSearchResult {
+  readonly score: number;
   readonly id: string;
+  readonly bundle: string;
   readonly title: string;
   readonly url: string;
-  readonly description?: string;
+  readonly excerpt?: string;
+  readonly summary?: string;
   readonly drupal_version?: string[];
-  readonly tags?: string[];
-  readonly difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  readonly category?: string;
   readonly created: string;
   readonly updated?: string;
 }

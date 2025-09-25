@@ -418,14 +418,16 @@ export class DrupalClient {
     page?: { limit: number; offset: number };
   }): Promise<{
     results: Array<{
+      score: number;
       id: string;
+      bundle: string;
       title: string;
       content: string;
-      tags: string[];
+      category?: string;
       drupal_version: string[];
       url: string;
-      description?: string;
-      difficulty?: string;
+      summary?: string;
+      excerpt?: string;
       created: string;
       updated?: string;
     }>;
@@ -443,14 +445,16 @@ export class DrupalClient {
 
     return this.request<{
       results: Array<{
+        score: number;
         id: string;
+        bundle: string;
         title: string;
         content: string;
-        tags: string[];
+        category?: string;
         drupal_version: string[];
         url: string;
-        description?: string;
-        difficulty?: string;
+        summary?: string;
+        excerpt?: string;
         created: string;
         updated?: string;
       }>;
