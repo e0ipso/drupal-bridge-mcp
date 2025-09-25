@@ -10,7 +10,6 @@ beforeAll(async () => {
   // Set test environment variables for integration testing
   process.env.NODE_ENV = 'test';
   process.env.LOG_LEVEL = 'error';
-  process.env.AUTH_SKIP = 'false';
   process.env.AUTH_ENABLED = 'true';
 
   // Integration test specific environment

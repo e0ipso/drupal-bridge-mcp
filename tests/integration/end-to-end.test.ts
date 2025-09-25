@@ -46,7 +46,6 @@ describe('End-to-End Integration Tests', () => {
       auth: {
         enabled: false, // Disable auth for end-to-end tests
         requiredScopes: ['tutorial:read'],
-        skipAuth: true,
       },
       mcp: {
         name: 'test-drupal-bridge-mcp',
@@ -80,7 +79,7 @@ describe('End-to-End Integration Tests', () => {
 
   describe('Complete Search Tutorial Workflow', () => {
     test('should execute complete search workflow successfully', async () => {
-      // This test runs in test environment, so it should return mock data
+      // This test verifies the search tutorial functionality
       const searchArgs = {
         keywords: 'content management',
         drupal_version: ['10'],
@@ -143,7 +142,7 @@ describe('End-to-End Integration Tests', () => {
         searchArgs
       );
 
-      // In test mode, mock data should include version filtering
+      // Results should include version filtering
       const drupal9Results = result.results.filter(r =>
         r.drupal_version?.includes('9')
       );
@@ -227,12 +226,12 @@ describe('End-to-End Integration Tests', () => {
 
       const content = JSON.parse(result.contents[0].text);
 
-      // In test environment, this might return error or mock data
+      // Check for results or error response
       if (content.error) {
         expect(content.error).toHaveProperty('type');
         expect(content.error).toHaveProperty('message');
       } else {
-        // If mock data is returned, it should be an array
+        // If results are returned, it should be an array
         expect(Array.isArray(content)).toBe(true);
       }
     });
@@ -314,53 +313,6 @@ describe('End-to-End Integration Tests', () => {
       console.log(
         `Concurrent Baseline - ${concurrentSearches} searches: ${endTime - startTime}ms`
       );
-    });
-  });
-
-  describe('Error Recovery and Fallbacks', () => {
-    test('should fall back to mock data when API is unavailable in development', async () => {
-      // Simulate network failure
-      mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
-
-      // Set to development environment to trigger fallback
-      const devConfig = { ...config, environment: 'development' };
-      const devServer = new DrupalMcpServer(devConfig);
-
-      const result = await (devServer as any).executeSearchTutorials({
-        keywords: 'fallback test',
-      });
-
-      // Should receive mock data instead of error
-      expect(result.results).toBeDefined();
-      expect(result.results.length).toBeGreaterThan(0);
-      expect(result.query.keywords).toBe('fallback test');
-    });
-
-    test('should propagate errors in production environment', async () => {
-      // Simulate network failure
-      mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
-
-      // Set to production environment AND ensure it's not test mode
-      const prodConfig = {
-        ...config,
-        environment: 'production',
-      };
-      const prodServer = new DrupalMcpServer(prodConfig);
-
-      // Override NODE_ENV to ensure we're not in test mode
-      const originalNodeEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
-
-      try {
-        await expect(
-          (prodServer as any).executeSearchTutorials({
-            keywords: 'production test',
-          })
-        ).rejects.toThrow();
-      } finally {
-        // Restore original NODE_ENV
-        process.env.NODE_ENV = originalNodeEnv;
-      }
     });
   });
 

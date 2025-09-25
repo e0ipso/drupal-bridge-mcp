@@ -137,11 +137,6 @@ export class DrupalMcpServer {
    * Simplified authentication check for OAuth 2.1 stateless design
    */
   private async requireAuthentication(): Promise<AuthContext> {
-    // Skip authentication if configured
-    if (this.config.auth.skipAuth) {
-      return { isAuthenticated: true };
-    }
-
     // If authentication is disabled entirely, allow access
     if (!this.config.auth.enabled || !this.mcpOAuthProvider) {
       return { isAuthenticated: true };
@@ -519,7 +514,7 @@ export class DrupalMcpServer {
       }
 
       // For data tools, check if auth is required and provider exists
-      if (!this.config.auth.skipAuth && this.mcpOAuthProvider) {
+      if (this.mcpOAuthProvider) {
         const authContext = await this.requireAuthentication();
 
         if (!authContext.isAuthenticated) {
@@ -884,7 +879,6 @@ export class DrupalMcpServer {
           endpointsDiscovered: !!this.config.oauth.discoveredEndpoints,
           authorizationEndpoint: this.config.oauth.authorizationEndpoint,
           tokenEndpoint: this.config.oauth.tokenEndpoint,
-          skipAuth: this.config.auth.skipAuth,
         },
       };
     } catch (error) {
@@ -931,11 +925,6 @@ export class DrupalMcpServer {
   ): Promise<SearchContentResponse> {
     // Validate and process input parameters using new validation function
     const processedParams = validateSearchContentParams(args);
-
-    // In test environment or when Drupal is unavailable, return mock data
-    if (this.config.environment === 'test' || process.env.NODE_ENV === 'test') {
-      return this.getMockSearchContentResults(processedParams);
-    }
 
     try {
       // Make real JSON-RPC call to Drupal endpoint using new parameter structure
@@ -991,100 +980,13 @@ export class DrupalMcpServer {
 
       // Handle IntegrationErrors from the DrupalClient
       if (error instanceof IntegrationError) {
-        // In production, re-throw the error; in development, log and return mock data for certain error types
-        if (this.config.environment === 'production' || !error.retryable) {
-          throw error;
-        }
-
-        // Fallback to mock data if the real endpoint is unavailable and error is retryable
-        console.warn(
-          `API unavailable (${error.errorType}), returning mock data: ${error.message}`
-        );
-        return this.getMockSearchContentResults(processedParams);
+        throw error;
       }
 
       // Handle any other unexpected errors
       const integrationError = normalizeError(error, 'Tutorial search');
-
-      // In production, re-throw; in development, return mock data for network-related errors
-      if (this.config.environment === 'production') {
-        throw integrationError;
-      }
-
-      console.warn(
-        `Unexpected error, returning mock data: ${integrationError.message}`
-      );
-      return this.getMockSearchContentResults(processedParams);
+      throw integrationError;
     }
-  }
-
-  /**
-   * Get mock search results for new content API (testing and fallback scenarios)
-   */
-  private getMockSearchContentResults(
-    processedParams: ProcessedSearchContentParams
-  ): SearchContentResponse {
-    // Create mock results that support filtering
-    const allMockResults: TutorialSearchResult[] = [
-      {
-        id: '1',
-        title: `Tutorial about ${processedParams.keywords}`,
-        url: 'https://drupalize.me/tutorial/sample-tutorial',
-        description: `A comprehensive tutorial covering ${processedParams.keywords} concepts`,
-        drupal_version: ['10', '11'],
-        tags:
-          processedParams.category && processedParams.category.length > 0
-            ? processedParams.category
-            : ['tutorial', 'drupal'],
-        difficulty: 'intermediate',
-        created: '2024-01-01T00:00:00Z',
-        updated: '2024-06-01T00:00:00Z',
-      },
-      // Add a Drupal 9 specific tutorial for testing filtering
-      {
-        id: '2',
-        title: `Drupal 9 specific tutorial about ${processedParams.keywords}`,
-        url: 'https://drupalize.me/tutorial/drupal9-tutorial',
-        description: `Tutorial for ${processedParams.keywords} in Drupal 9`,
-        drupal_version: ['9'],
-        tags:
-          processedParams.category && processedParams.category.length > 0
-            ? [...processedParams.category, 'drupal-9']
-            : ['tutorial', 'drupal', 'drupal-9'],
-        difficulty: 'intermediate',
-        created: '2023-01-01T00:00:00Z',
-        updated: '2023-06-01T00:00:00Z',
-      },
-    ];
-
-    // Filter results by drupal_version if specified
-    const filteredResults =
-      processedParams.drupal_version &&
-      processedParams.drupal_version.length > 0
-        ? allMockResults.filter(result =>
-            processedParams.drupal_version!.some(version =>
-              result.drupal_version?.includes(version)
-            )
-          )
-        : allMockResults.slice(0, 1); // Return only the first result when no version filter is applied
-
-    return {
-      results: filteredResults,
-      total: filteredResults.length,
-      facets: {
-        drupal_version: {
-          '9': 1,
-          '10': 1,
-          '11': 1,
-        },
-        content_type: {
-          tutorial: 2,
-          topic: 0,
-          course: 0,
-        },
-      },
-      query: processedParams,
-    };
   }
 
   /**

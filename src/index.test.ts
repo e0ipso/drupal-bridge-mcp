@@ -20,7 +20,6 @@ describe('Main module', () => {
     expect(config.http.port).toBe(3000);
     expect(config.http.host).toBe('localhost');
     expect(config.http.timeout).toBe(30000);
-    expect(config.http.enableSSE).toBe(true);
     expect(Array.isArray(config.http.corsOrigins)).toBe(true);
     expect(config.http.corsOrigins).toContain('http://localhost:3000');
 
@@ -36,7 +35,6 @@ describe('Main module', () => {
     process.env.HTTP_CORS_ORIGINS =
       'http://example.com,https://app.example.com';
     process.env.HTTP_TIMEOUT = '60000';
-    process.env.HTTP_ENABLE_SSE = 'false';
 
     const config = await loadConfig();
 
@@ -47,7 +45,6 @@ describe('Main module', () => {
       'https://app.example.com',
     ]);
     expect(config.http.timeout).toBe(60000);
-    expect(config.http.enableSSE).toBe(false);
 
     // Clean up
     delete process.env.AUTH_ENABLED;
@@ -55,7 +52,6 @@ describe('Main module', () => {
     delete process.env.HTTP_HOST;
     delete process.env.HTTP_CORS_ORIGINS;
     delete process.env.HTTP_TIMEOUT;
-    delete process.env.HTTP_ENABLE_SSE;
   });
 
   test('config validation fails with invalid HTTP settings', async () => {

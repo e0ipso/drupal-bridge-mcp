@@ -40,7 +40,6 @@ describe('HTTP Transport Integration - Verified', () => {
         host: 'localhost',
         corsOrigins: ['http://localhost:3000'],
         timeout: 5000,
-        enableSSE: true,
       },
       mcp: {
         name: 'integration-test-server',
@@ -75,7 +74,6 @@ describe('HTTP Transport Integration - Verified', () => {
       auth: {
         enabled: false,
         requiredScopes: [],
-        skipAuth: true,
       },
       server: {
         port: 3005,
@@ -179,7 +177,6 @@ describe('HTTP Transport Integration - Verified', () => {
           endpoint: '/mcp',
           corsOrigins: 1,
           timeout: 5000,
-          sse: true,
         }),
         'HTTP server started successfully'
       );
@@ -193,13 +190,13 @@ describe('HTTP Transport Integration - Verified', () => {
       const status = transport.getStatus();
       expect(status.running).toBe(true);
 
-      // The transport should have SSE enabled based on config
-      expect(config.http.enableSSE).toBe(true);
+      // The transport should be running properly
+      expect(status.running).toBe(true);
     });
 
     it('should handle SSE disabled configuration', async () => {
       const configNoSSE = { ...config };
-      configNoSSE.http = { ...config.http, enableSSE: false };
+      configNoSSE.http = { ...config.http };
 
       const transportNoSSE = new HttpTransport(
         configNoSSE,
@@ -332,8 +329,8 @@ describe('HTTP Transport Integration - Verified', () => {
       expect(transport.getStatus().running).toBe(true);
 
       // MCP server should have been initialized with capabilities
-      expect(config.mcp.capabilities.tools.listChanged).toBe(true);
-      expect(config.mcp.capabilities.resources.subscribe).toBe(true);
+      expect(config.mcp.capabilities.tools?.listChanged).toBe(true);
+      expect(config.mcp.capabilities.resources?.subscribe).toBe(true);
     });
   });
 });

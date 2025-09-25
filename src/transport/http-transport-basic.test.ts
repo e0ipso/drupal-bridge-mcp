@@ -40,7 +40,6 @@ describe('HTTP Transport Basic Test', () => {
         host: 'localhost',
         corsOrigins: ['http://localhost:3000'],
         timeout: 5000,
-        enableSSE: true,
       },
       mcp: {
         name: 'basic-test-server',
@@ -75,7 +74,6 @@ describe('HTTP Transport Basic Test', () => {
       auth: {
         enabled: false,
         requiredScopes: [],
-        skipAuth: true,
       },
       server: {
         port: 3004,

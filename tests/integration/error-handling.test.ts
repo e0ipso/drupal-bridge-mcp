@@ -53,7 +53,6 @@ describe('Error Handling Integration', () => {
       auth: {
         enabled: false, // Disable auth for error handling tests
         requiredScopes: ['tutorial:read'],
-        skipAuth: true,
       },
       mcp: {
         name: 'test-drupal-bridge-mcp',

@@ -40,7 +40,6 @@ describe('HttpTransport Integration', () => {
         host: 'localhost',
         corsOrigins: ['http://localhost:3000'],
         timeout: 5000,
-        enableSSE: true,
       },
       mcp: {
         name: 'test-server',

@@ -61,7 +61,6 @@ async function main(): Promise<void> {
     debug(`Environment: ${config.environment}`);
     debug(`Log level: ${config.logging.level}`);
     debug(`Auth enabled: ${config.auth.enabled}`);
-    debug(`Auth skip: ${config.auth.skipAuth}`);
 
     // Initialize logger after configuration is loaded
     initializeLogger(config);

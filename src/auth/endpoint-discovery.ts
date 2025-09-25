@@ -121,12 +121,8 @@ async function fetchWithTimeout(
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    // In development environments, we may need to handle self-signed certificates
-    const isDevelopment =
-      process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
-
-    // Use native fetch with proper agent configuration for HTTPS in development
-    let fetchOptions: RequestInit = {
+    // Use standard fetch with proper certificate validation
+    const fetchOptions: RequestInit = {
       signal: controller.signal,
       headers: {
         Accept: 'application/json',
@@ -134,26 +130,6 @@ async function fetchWithTimeout(
       },
     };
 
-    // For development environments with self-signed certificates
-    if (isDevelopment && url.startsWith('https:')) {
-      // Use node-fetch with custom agent to handle self-signed certificates
-      const { default: fetch } = await import('node-fetch');
-      const https = await import('https');
-
-      const agent = new https.Agent({
-        rejectUnauthorized: false, // Accept self-signed certificates in development
-      });
-
-      fetchOptions = {
-        ...fetchOptions,
-        agent,
-      } as any;
-
-      const response = await fetch(url, fetchOptions as any);
-      return response as any;
-    }
-
-    // Use standard fetch for production or HTTP URLs
     const fetch = globalThis.fetch || (await import('node-fetch')).default;
     const response = await fetch(url, fetchOptions as any);
     return response as any;

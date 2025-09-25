@@ -66,7 +66,6 @@ describe('Performance Baseline Measurements', () => {
       auth: {
         enabled: false, // Disable auth for performance tests
         requiredScopes: ['tutorial:read'],
-        skipAuth: true,
       },
       mcp: {
         name: 'test-drupal-bridge-mcp',

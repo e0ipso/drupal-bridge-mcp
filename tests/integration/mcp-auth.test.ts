@@ -47,7 +47,6 @@ describe('MCP Authentication Integration Tests', () => {
       auth: {
         enabled: true,
         requiredScopes: ['tutorial:read'],
-        skipAuth: false,
       },
       mcp: {
         name: 'test-drupal-bridge-mcp',
@@ -177,7 +176,6 @@ describe('MCP Authentication Integration Tests', () => {
         ...testConfig,
         auth: {
           ...testConfig.auth,
-          skipAuth: true,
         },
       };
 

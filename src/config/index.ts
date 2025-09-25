@@ -36,7 +36,6 @@ export interface HttpTransportConfig {
   readonly host: string;
   readonly corsOrigins: string[];
   readonly timeout: number;
-  readonly enableSSE: boolean;
 }
 
 /**
@@ -49,7 +48,6 @@ export interface AppConfig {
   readonly auth: {
     readonly enabled: boolean;
     readonly requiredScopes: string[];
-    readonly skipAuth: boolean;
   };
   readonly server: {
     readonly port: number;
@@ -72,7 +70,6 @@ const getHttpTransportConfig = (
   const port = parseInt(process.env.HTTP_PORT ?? '3000', 10);
   const host = process.env.HTTP_HOST ?? 'localhost';
   const timeout = parseInt(process.env.HTTP_TIMEOUT ?? '30000', 10);
-  const enableSSE = process.env.HTTP_ENABLE_SSE !== 'false';
 
   // Parse CORS origins from comma-separated string
   const corsOriginsEnv = process.env.HTTP_CORS_ORIGINS;
@@ -109,7 +106,6 @@ const getHttpTransportConfig = (
     host,
     corsOrigins,
     timeout,
-    enableSSE,
   };
 };
 
@@ -151,9 +147,6 @@ const getEnvConfig = (): AppConfig => {
       requiredScopes: (
         process.env.AUTH_REQUIRED_SCOPES ?? 'tutorial:read'
       ).split(' '),
-      skipAuth:
-        process.env.AUTH_SKIP === 'true' ||
-        process.env.NODE_ENV === 'development',
     },
     mcp: {
       name: process.env.MCP_SERVER_NAME ?? 'drupal-bridge-mcp',
@@ -299,7 +292,6 @@ export const loadConfig = async (): Promise<AppConfig> => {
   debug(`- NODE_ENV: ${config.environment}`);
   debug(`- LOG_LEVEL: ${config.logging.level}`);
   debug(`- AUTH_ENABLED: ${config.auth.enabled}`);
-  debug(`- AUTH_SKIP: ${config.auth.skipAuth}`);
   debug(
     `- OAUTH_CLIENT_ID: ${config.oauth.clientId ? '***set***' : 'NOT SET'}`
   );
@@ -307,7 +299,6 @@ export const loadConfig = async (): Promise<AppConfig> => {
   debug(`- HTTP_HOST: ${config.http.host}`);
   debug(`- HTTP_CORS_ORIGINS: ${config.http.corsOrigins.length} origin(s)`);
   debug(`- HTTP_TIMEOUT: ${config.http.timeout}ms`);
-  debug(`- HTTP_ENABLE_SSE: ${config.http.enableSSE}`);
 
   debug('Validating configuration...');
   console.info('[Config] Validating configuration...');
@@ -319,8 +310,8 @@ export const loadConfig = async (): Promise<AppConfig> => {
   const logger = createLogger(config);
   const configLogger = logger.child({ component: 'config' });
 
-  // Perform OAuth endpoint discovery if authentication is enabled and endpoints are not explicitly configured
-  if (config.auth.enabled && !process.env.OAUTH_SKIP_DISCOVERY) {
+  // Perform OAuth endpoint discovery if authentication is enabled
+  if (config.auth.enabled) {
     debug('Authentication enabled, checking OAuth configuration...');
     configLogger.info(
       'Authentication enabled, checking OAuth configuration...'
@@ -413,9 +404,6 @@ export const loadConfig = async (): Promise<AppConfig> => {
     configLogger.info(
       '✓ Authentication disabled, skipping OAuth configuration'
     );
-  } else {
-    debug('✓ OAuth discovery skipped (OAUTH_SKIP_DISCOVERY=true)');
-    configLogger.info('✓ OAuth discovery skipped (OAUTH_SKIP_DISCOVERY=true)');
   }
 
   debug('✓ Configuration loading completed successfully');
@@ -424,9 +412,7 @@ export const loadConfig = async (): Promise<AppConfig> => {
   debug(`- Environment: ${config.environment}`);
   debug(`- Drupal URL: ${config.drupal.baseUrl}${config.drupal.endpoint}`);
   debug(`- MCP Server: ${config.mcp.name} v${config.mcp.version}`);
-  debug(
-    `- HTTP Transport: ${config.http.host}:${config.http.port} (SSE: ${config.http.enableSSE ? 'enabled' : 'disabled'})`
-  );
+  debug(`- HTTP Transport: ${config.http.host}:${config.http.port}`);
   debug(
     `- CORS Origins: ${config.http.corsOrigins.length > 0 ? config.http.corsOrigins.join(', ') : 'none configured'}`
   );

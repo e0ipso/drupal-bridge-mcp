@@ -285,7 +285,6 @@ describe('Authentication Mode Integration Tests', () => {
       process.env.OAUTH_AUTHORIZATION_ENDPOINT =
         'http://localhost/drupal/oauth/authorize';
       process.env.OAUTH_TOKEN_ENDPOINT = 'http://localhost/drupal/oauth/token';
-      process.env.OAUTH_SKIP_DISCOVERY = 'true';
 
       const config = await loadConfig();
 
@@ -478,24 +477,6 @@ describe('Authentication Mode Integration Tests', () => {
   });
 
   describe('Configuration Edge Cases', () => {
-    test('should handle environment variable combinations', async () => {
-      // Test AUTH_ENABLED=false with AUTH_SKIP=true
-      process.env.AUTH_ENABLED = 'false';
-      process.env.AUTH_SKIP = 'true';
-      process.env.DRUPAL_BASE_URL = 'http://localhost/drupal';
-
-      const config = await loadConfig();
-      expect(config.auth.enabled).toBe(false);
-      expect(config.auth.skipAuth).toBe(true);
-
-      const server = new DrupalMcpServer(config);
-      try {
-        expect(server).toBeInstanceOf(DrupalMcpServer);
-      } finally {
-        await server.close();
-      }
-    });
-
     test('should handle AUTH_ENABLED=false in production environment', async () => {
       const originalNodeEnv = process.env.NODE_ENV;
 

@@ -45,7 +45,6 @@ const mockConfig: AppConfig = {
   auth: {
     enabled: false, // Disable auth for tests
     requiredScopes: ['read'],
-    skipAuth: true,
   },
   server: {
     port: 3000,
