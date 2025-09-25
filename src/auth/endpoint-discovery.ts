@@ -226,7 +226,9 @@ async function fetchMetadata(
           logDiscovery(
             'debug',
             `Retry ${attempt} after ${delay}ms due to:`,
-            error
+            error instanceof Error
+              ? { message: error.message, stack: error.stack }
+              : { error: String(error) }
           );
         }
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -336,7 +338,13 @@ export async function discoverOAuthEndpoints(
     return endpoints;
   } catch (error) {
     if (fullConfig.debug) {
-      logDiscovery('warn', 'OAuth endpoint discovery failed:', error);
+      logDiscovery(
+        'warn',
+        'OAuth endpoint discovery failed:',
+        error instanceof Error
+          ? { message: error.message, stack: error.stack }
+          : { error: String(error) }
+      );
     }
 
     // OAuth discovery is mandatory - throw descriptive error instead of using fallbacks

@@ -27,15 +27,16 @@ function safeLog(
 ): void {
   if (isLoggerInitialized()) {
     const logger = createChildLogger({ component: 'bootstrap' });
+    const logData = args.length > 0 ? { args } : undefined;
     switch (level) {
       case 'info':
-        logger.info(message, ...args);
+        logger.info(logData, message);
         break;
       case 'warn':
-        logger.warn(message, ...args);
+        logger.warn(logData, message);
         break;
       case 'error':
-        logger.error(message, ...args);
+        logger.error(logData, message);
         break;
     }
   } else {
