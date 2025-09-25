@@ -89,6 +89,15 @@ export class HttpTransport {
 
       this.server.on('error', error => {
         this.logger.error({ err: error }, 'HTTP server error');
+        if (this.server) {
+          try {
+            this.server.close();
+          } catch {
+            // Ignore errors when closing a server that failed to start
+          }
+          this.server = null;
+        }
+        this.connections.clear();
         reject(error);
       });
 
@@ -389,22 +398,33 @@ export class HttpTransport {
   ): void {
     const origin = req.headers.origin;
 
-    if (this.isValidCorsOrigin(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin!);
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader(
-        'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, X-Requested-With, Mcp-Session-Id, Mcp-Protocol-Version'
-      );
-      res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-
-      logger.debug({ origin }, 'CORS preflight request approved');
-    } else {
+    if (!this.isValidCorsOrigin(origin)) {
       logger.warn(
         { origin, configuredOrigins: this.config.http.corsOrigins },
         'CORS preflight request denied'
       );
+
+      this.sendResponse(
+        res,
+        403,
+        {
+          error: 'CORS origin denied',
+          message: 'The request origin is not permitted',
+        },
+        logger
+      );
+      return;
     }
+
+    res.setHeader('Access-Control-Allow-Origin', origin!);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-Requested-With, Mcp-Session-Id, Mcp-Protocol-Version'
+    );
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+
+    logger.debug({ origin }, 'CORS preflight request approved');
 
     this.sendResponse(res, 204, null, logger);
   }
@@ -419,6 +439,12 @@ export class HttpTransport {
       uptime: process.uptime(),
       version: this.config.mcp.version,
       environment: this.config.environment,
+      server: {
+        name: this.config.mcp.name,
+        version: this.config.mcp.version,
+        host: this.config.http.host,
+        port: this.config.http.port,
+      },
     };
 
     logger.debug('Health check requested');
@@ -488,7 +514,7 @@ export class HttpTransport {
       } else {
         this.sendResponse(
           res,
-          405,
+          400,
           {
             error: 'SSE not enabled',
             message: 'Server-Sent Events are disabled',
@@ -741,19 +767,6 @@ export class HttpTransport {
     res: Response,
     logger: Logger
   ): void {
-    if (!this.jsonRpcHandler) {
-      this.sendResponse(
-        res,
-        503,
-        {
-          error: 'JSON-RPC handler not available',
-          message: 'MCP server not configured for HTTP transport',
-        },
-        logger
-      );
-      return;
-    }
-
     let body = '';
 
     req.on('data', chunk => {
@@ -761,8 +774,59 @@ export class HttpTransport {
     });
 
     req.on('end', async () => {
+      const trimmedBody = body.trim();
+
+      if (!trimmedBody) {
+        this.sendResponse(
+          res,
+          400,
+          {
+            error: 'Empty request body',
+          },
+          logger
+        );
+        return;
+      }
+
+      if (!this.jsonRpcHandler) {
+        this.sendResponse(
+          res,
+          503,
+          {
+            error: 'JSON-RPC handler not available',
+            message: 'MCP server not configured for HTTP transport',
+          },
+          logger
+        );
+        return;
+      }
+
       try {
-        await this.jsonRpcHandler!.handleJsonRpcRequest(req, res, body, logger);
+        JSON.parse(trimmedBody);
+      } catch {
+        this.sendResponse(
+          res,
+          400,
+          {
+            jsonrpc: '2.0',
+            error: {
+              code: -32700,
+              message: 'Parse error',
+            },
+            id: null,
+          },
+          logger
+        );
+        return;
+      }
+
+      try {
+        await this.jsonRpcHandler!.handleJsonRpcRequest(
+          req,
+          res,
+          trimmedBody,
+          logger
+        );
       } catch (error) {
         logger.error({ err: error }, 'Error in JSON-RPC handler');
         if (!res.headersSent) {
@@ -896,7 +960,7 @@ export class HttpTransport {
       return '*';
     }
 
-    return this.config.http.corsOrigins[0] || null;
+    return null;
   }
 
   /**

@@ -5,9 +5,11 @@
 
 import { HttpTransport } from './http-transport.js';
 import type { AppConfig } from '@/config/index.js';
+import type { DrupalMcpServer } from '@/mcp/server.js';
 import { createChildLogger } from '@/utils/logger.js';
 import type { Logger } from 'pino';
 import http from 'http';
+import { TextDecoder } from 'node:util';
 
 // Mock the logger
 const mockLogger: Logger = {
@@ -22,9 +24,34 @@ jest.mock('@/utils/logger.js', () => ({
   createChildLogger: jest.fn(() => mockLogger),
 }));
 
+const mockTools = [
+  {
+    name: 'test-tool',
+    description: 'Test tool',
+  },
+];
+
+const createMockMcpServer = () => ({
+  getTools: jest.fn(() => mockTools),
+  executeToolWithAuth: jest.fn(async () => ({
+    message: 'Tool executed',
+  })),
+  getResources: jest.fn(async () => []),
+  readResource: jest.fn(async () => ({
+    content: 'resource content',
+  })),
+  getPrompts: jest.fn(() => []),
+  getPrompt: jest.fn(async () => ({
+    content: [],
+  })),
+});
+
+type MockMcpServer = ReturnType<typeof createMockMcpServer>;
+
 describe('HttpTransport', () => {
   let mockConfig: AppConfig;
   let transport: HttpTransport;
+  let mockMcpServer: MockMcpServer;
 
   beforeEach(() => {
     // Clear all mock calls
@@ -83,7 +110,13 @@ describe('HttpTransport', () => {
       },
     } as AppConfig;
 
-    transport = new HttpTransport(mockConfig, undefined, mockLogger);
+    mockMcpServer = createMockMcpServer();
+
+    transport = new HttpTransport(
+      mockConfig,
+      mockMcpServer as unknown as DrupalMcpServer,
+      mockLogger
+    );
     global.testTransport = transport;
   });
 
@@ -197,7 +230,7 @@ describe('HttpTransport', () => {
     it('should handle MCP POST requests', async () => {
       const jsonRpcRequest = {
         jsonrpc: '2.0',
-        method: 'test_method',
+        method: 'tools/list',
         id: 1,
       };
 
@@ -215,7 +248,7 @@ describe('HttpTransport', () => {
       const body = JSON.parse(response.body);
       expect(body.jsonrpc).toBe('2.0');
       expect(body.id).toBe(1);
-      expect(body.result.message).toBe('HTTP transport ready');
+      expect(body.result.tools).toEqual(mockTools);
     });
 
     it('should handle CORS preflight requests', async () => {
@@ -238,8 +271,10 @@ describe('HttpTransport', () => {
         Origin: 'http://evil.com',
       });
 
-      expect(response.statusCode).toBe(204);
-      expect(response.headers['access-control-allow-origin']).toBeUndefined();
+      expect(response.statusCode).toBe(403);
+
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe('CORS origin denied');
     });
 
     it('should return 404 for unknown routes', async () => {
@@ -263,12 +298,19 @@ describe('HttpTransport', () => {
     });
 
     it('should handle invalid JSON in POST requests', async () => {
-      const response = await makeRequest('POST', '/mcp', 'invalid json');
+      const response = await fetch('http://localhost:3001/mcp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: 'invalid json',
+      });
 
-      expect(response.statusCode).toBe(400);
+      expect(response.status).toBe(400);
 
-      const body = JSON.parse(response.body);
-      expect(body.error).toBe('Invalid JSON');
+      const body = await response.json();
+      expect(body.jsonrpc).toBe('2.0');
+      expect(body.error.code).toBe(-32700);
     });
 
     it('should handle empty POST request body', async () => {
@@ -302,19 +344,30 @@ describe('HttpTransport', () => {
     });
 
     it('should handle SSE requests when enabled', async () => {
-      const response = await makeRequest('GET', '/mcp', undefined, {
-        Accept: 'text/event-stream',
+      const response = await fetch('http://localhost:3001/mcp', {
+        method: 'GET',
+        headers: {
+          Accept: 'text/event-stream',
+        },
       });
 
-      expect(response.statusCode).toBe(200);
-      expect(response.headers['content-type']).toBe('text/event-stream');
-      expect(response.headers['cache-control']).toBe('no-cache');
-      expect(response.headers['connection']).toBe('keep-alive');
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('text/event-stream');
+      expect(response.headers.get('cache-control')).toBe('no-cache');
+      const reader = response.body?.getReader();
+      expect(reader).toBeDefined();
 
-      // Verify initial connection event is sent
-      expect(response.body).toContain('event: connection');
-      expect(response.body).toContain('data:');
-      expect(response.body).toContain('connectionId');
+      const { value } = await reader!.read();
+      expect(value).toBeDefined();
+
+      if (value) {
+        const chunk = new TextDecoder().decode(value);
+        expect(chunk).toContain('event: connection');
+        expect(chunk).toContain('data:');
+        expect(chunk).toContain('connectionId');
+      }
+
+      await reader?.cancel();
     });
 
     it('should reject SSE requests when disabled', async () => {
@@ -341,7 +394,7 @@ describe('HttpTransport', () => {
           sseDisabledTransport
         );
 
-        expect(response.statusCode).toBe(405);
+        expect(response.statusCode).toBe(400);
 
         const body = JSON.parse(response.body);
         expect(body.error).toBe('SSE not enabled');
@@ -408,8 +461,10 @@ describe('HttpTransport', () => {
           prodTransport
         );
 
-        expect(response.statusCode).toBe(204);
-        expect(response.headers['access-control-allow-origin']).toBeUndefined();
+        expect(response.statusCode).toBe(403);
+
+        const body = JSON.parse(response.body);
+        expect(body.error).toBe('CORS origin denied');
       } finally {
         await prodTransport.stop();
       }

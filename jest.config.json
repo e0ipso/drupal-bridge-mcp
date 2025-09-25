@@ -18,7 +18,7 @@
   "moduleNameMapper": {
     "^@/(.*)\\.(js|ts)$": "<rootDir>/src/$1",
     "^@/(.*)$": "<rootDir>/src/$1",
-    "^(.*)\\.js$": "$1"
+    "^(\\.{1,2}/.*)\\.js$": "$1"
   },
   "testMatch": [
     "<rootDir>/src/**/*.test.ts",

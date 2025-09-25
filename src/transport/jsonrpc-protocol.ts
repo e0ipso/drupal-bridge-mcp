@@ -114,6 +114,7 @@ export class JsonRpcProtocolHandler {
   private readonly sessionManager = new SessionManager();
   private readonly jsonRpcServer = new JSONRPCServer();
   private readonly mcpBridge: McpJsonRpcBridge;
+  private readonly sessionCleanupInterval: NodeJS.Timeout;
   private httpTransport?: {
     getSseConnection: (id: string) => SseConnection | undefined;
     sendSseResponse: (
@@ -131,12 +132,13 @@ export class JsonRpcProtocolHandler {
     this.setupJsonRpcMethods();
 
     // Cleanup expired sessions every 5 minutes
-    setInterval(
+    this.sessionCleanupInterval = setInterval(
       () => {
         this.sessionManager.cleanupExpiredSessions();
       },
       5 * 60 * 1000
     );
+    this.sessionCleanupInterval.unref();
   }
 
   /**
