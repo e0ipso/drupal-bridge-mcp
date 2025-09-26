@@ -188,6 +188,5 @@ settings.local.*
 # Auto-generated files
 auto-generated/
 
-/.ai/task-manager/
 .idea
 .jest-cache-integration
