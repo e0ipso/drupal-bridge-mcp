@@ -1,7 +1,7 @@
 ---
 id: 2
 group: 'mcp-integration'
-dependencies: [1]
+dependencies: []
 status: 'pending'
 created: '2025-09-29'
 skills: ['typescript', 'oauth']
@@ -13,6 +13,8 @@ skills: ['typescript', 'oauth']
 
 Build the core MCP server that leverages @modelcontextprotocol/sdk OAuth capabilities for
 authentication against the Drupal OAuth server, with automatic discovery and token management.
+
+**Note:** This assumes the Drupal OAuth server (Simple OAuth 2.1) is already configured separately.
 
 ## Skills Required
 
@@ -39,9 +41,9 @@ authentication against the Drupal OAuth server, with automatic discovery and tok
 
 ## Input Dependencies
 
-- OAuth client credentials from Task 1
-- OAuth discovery endpoint from Drupal server
-- Valid Drupal OAuth server configuration
+- OAuth client credentials (from Drupal Simple OAuth 2.1 setup)
+- OAuth discovery endpoint from Drupal server (`/.well-known/oauth-authorization-server`)
+- Valid Drupal OAuth server configuration (assumed to be handled in Drupal)
 
 ## Output Artifacts
 

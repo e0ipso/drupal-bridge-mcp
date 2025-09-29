@@ -41,7 +41,7 @@ end-to-end, ensuring secure authentication between MCP clients and Drupal OAuth 
 
 ## Input Dependencies
 
-- Configured Drupal OAuth server from Task 1
+- Configured Drupal OAuth server (external, assumed ready)
 - MCP server with OAuth client from Task 2
 - Device flow implementation from Task 3
 - Valid OAuth client credentials

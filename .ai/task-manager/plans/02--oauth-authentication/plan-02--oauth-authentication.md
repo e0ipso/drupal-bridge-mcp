@@ -81,32 +81,6 @@ environments through RFC 8628 Device Authorization Grant.
 
 ## Technical Stack Requirements
 
-### Drupal OAuth Server Setup
-
-**Installation:**
-
-```bash
-# Install Simple OAuth 2.1 ecosystem (includes all 6 RFC implementations)
-composer require e0ipso/simple_oauth_21
-
-# Enable required modules for full OAuth 2.1 compliance
-drush pm:enable simple_oauth_21 \
-  simple_oauth_device_flow \
-  simple_oauth_pkce \
-  simple_oauth_server_metadata \
-  simple_oauth_client_registration \
-  simple_oauth_native_apps
-```
-
-**Module Capabilities:**
-
-- `simple_oauth_21`: Umbrella module with compliance dashboard and assessment
-- `simple_oauth_device_flow`: RFC 8628 Device Authorization Grant (Docker/terminal support)
-- `simple_oauth_pkce`: RFC 7636 PKCE enforcement (mandatory for OAuth 2.1)
-- `simple_oauth_server_metadata`: RFC 8414 & 9728 discovery endpoints
-- `simple_oauth_client_registration`: RFC 7591 dynamic client registration
-- `simple_oauth_native_apps`: RFC 8252 enhanced security for native applications
-
 ### MCP Server Dependencies
 
 ```bash
@@ -391,53 +365,6 @@ class DrupalMCPServer {
   }
 }
 
-## Drupal OAuth Client Configuration
-
-### Creating OAuth Clients for MCP
-
-1. **Navigate to Consumers**: `/admin/config/services/consumer`
-2. **Create New Consumer** with these settings:
-
-```yaml
-Label: MCP Server Client
-Client ID: mcp-server-client  # Auto-generated if blank
-Secret: [Auto-generated - save securely]
-Grant Types:
-  - authorization_code  # For browser-based flows
-  - refresh_token       # For token refresh
-  - urn:ietf:params:oauth:grant-type:device_code  # For Docker/terminal
-Scopes:
-  - read:tutorials
-  - write:tutorials
-  - profile
-Redirect URIs:
-  - http://localhost:3000/callback  # Development
-  - https://mcp-server.example.com/callback  # Production
-PKCE: Required (S256 only)
-````
-
-### Device Flow Configuration
-
-Configure at `/admin/config/people/simple_oauth/oauth-21/device-flow`:
-
-```yaml
-Device Code Lifetime: 1800 # 30 minutes
-Polling Interval: 5 # Start at 5 seconds
-User Code Length: 8 # Human-friendly length
-User Code Charset: BCDFGHJKLMNPQRSTVWXZ # No ambiguous characters
-Verification URI: /oauth/device
-Enable Statistics: true # For monitoring usage
-```
-
-### OAuth 2.1 Compliance Dashboard
-
-Monitor compliance at `/admin/config/people/simple_oauth/oauth-21`:
-
-- **Overall Status**: Shows OAuth 2.1 compliance level
-- **Critical Issues**: Lists any blocking security issues
-- **Recommendations**: Provides configuration improvements
-- **RFC Implementation**: Shows status of all 6 RFC modules
-
 ## Security Considerations
 
 ### OAuth 2.1 Security Features (Enforced by Simple OAuth 2.1)
@@ -484,23 +411,6 @@ OAUTH_DISCOVERY_CACHE_TTL=3600  # Cache metadata for 1 hour
 OAUTH_DEVICE_FLOW_ENABLED=true  # Enable device flow support
 ```
 
-### Drupal Configuration
-
-```bash
-# Enable OAuth modules via Drush
-drush pm:enable simple_oauth_21 \
-  simple_oauth_device_flow \
-  simple_oauth_pkce \
-  simple_oauth_server_metadata \
-  simple_oauth_client_registration
-
-# Configure OAuth settings
-drush config:set simple_oauth.settings token_expire 3600
-drush config:set simple_oauth.settings refresh_token_expire 2592000
-drush config:set simple_oauth_pkce.settings enforcement_level mandatory
-drush config:set simple_oauth_device_flow.settings device_code_lifetime 1800
-```
-
 ## Success Criteria
 
 - ✅ **Authorization Code Flow**: Browser-based MCP clients authenticate with PKCE
@@ -512,15 +422,7 @@ drush config:set simple_oauth_device_flow.settings device_code_lifetime 1800
 
 ## Implementation Roadmap
 
-### Phase 1: Core Setup ✅ (Ready to Use)
-
-- [x] Install Simple OAuth 2.1 ecosystem (`composer require e0ipso/simple_oauth_21`)
-- [x] Enable all RFC implementation modules
-- [x] Configure OAuth 2.1 compliance settings
-- [x] Create OAuth clients in Drupal
-- [x] Test discovery endpoints
-
-### Phase 2: MCP Integration (Current Phase)
+### Phase 1: MCP OAuth Client Integration
 
 - [ ] Implement MCP Server with SDK OAuth support
 - [ ] Configure automatic OAuth discovery
@@ -528,7 +430,7 @@ drush config:set simple_oauth_device_flow.settings device_code_lifetime 1800
 - [ ] Add token caching and refresh logic
 - [ ] Create authentication status tools
 
-### Phase 3: Production Deployment
+### Phase 2: Production Deployment
 
 - [ ] Configure HTTPS certificates
 - [ ] Set up monitoring and logging
@@ -538,27 +440,7 @@ drush config:set simple_oauth_device_flow.settings device_code_lifetime 1800
 
 ## Quick Start Guide
 
-### 1. Drupal Setup (5 minutes)
-
-```bash
-# Install Simple OAuth 2.1
-composer require e0ipso/simple_oauth_21
-
-# Enable all modules
-drush pm:enable simple_oauth_21 simple_oauth_device_flow \
-  simple_oauth_pkce simple_oauth_server_metadata
-
-# Clear cache
-drush cr
-```
-
-### 2. Create OAuth Client
-
-1. Visit `/admin/config/services/consumer`
-2. Add Consumer with device_code and authorization_code grants
-3. Save client ID and secret
-
-### 3. MCP Server Implementation
+### MCP Server Implementation
 
 ```typescript
 // Minimal implementation using MCP SDK
@@ -611,8 +493,7 @@ const oauth = new OAuthClient({
 
 ```mermaid
 graph TD
-    001[Task 001: Setup Drupal OAuth Server] --> 002[Task 002: Implement MCP OAuth Client]
-    002 --> 003[Task 003: Implement Device Flow Support]
+    002[Task 002: Implement MCP OAuth Client] --> 003[Task 003: Implement Device Flow Support]
     003 --> 004[Task 004: Test OAuth Integration]
 ```
 
@@ -622,25 +503,19 @@ graph TD
 
 - Reference: `/config/hooks/POST_PHASE.md`
 
-### Phase 1: OAuth Server Foundation
+### Phase 1: MCP Client Integration
 
 **Parallel Tasks:**
 
-- Task 001: Setup Drupal OAuth Server and Client Configuration
+- Task 002: Implement MCP Server with OAuth Client Integration
 
-### Phase 2: MCP Client Integration
-
-**Parallel Tasks:**
-
-- Task 002: Implement MCP Server with OAuth Client Integration (depends on: 001)
-
-### Phase 3: Device Flow Implementation
+### Phase 2: Device Flow Implementation
 
 **Parallel Tasks:**
 
 - Task 003: Implement Device Authorization Grant Flow Support (depends on: 002)
 
-### Phase 4: Integration Validation
+### Phase 3: Integration Validation
 
 **Parallel Tasks:**
 
@@ -652,8 +527,9 @@ Complete OAuth 2.1 compliance verification and production deployment preparation
 
 ### Execution Summary
 
-- Total Phases: 4
-- Total Tasks: 4
+- Total Phases: 3
+- Total Tasks: 3
 - Maximum Parallelism: 1 task (linear execution required)
-- Critical Path Length: 4 phases
+- Critical Path Length: 3 phases
 - Estimated Duration: Each phase builds upon previous OAuth infrastructure
+````
