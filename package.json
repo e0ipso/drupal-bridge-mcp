@@ -32,7 +32,10 @@
     "url": "https://github.com/e0ipso/drupal-bridge-mcp.git"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.0.0",
+    "@commitlint/config-conventional": "^20.0.0",
     "@types/node": "^24.3.1",
+    "prettier": "^3.6.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   },
