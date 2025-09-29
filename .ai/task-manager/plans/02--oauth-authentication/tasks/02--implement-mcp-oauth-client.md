@@ -2,8 +2,9 @@
 id: 2
 group: 'mcp-integration'
 dependencies: []
-status: 'pending'
+status: 'completed'
 created: '2025-09-29'
+completed: '2025-09-29'
 skills: ['typescript', 'oauth']
 ---
 

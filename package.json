@@ -13,7 +13,9 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
+    "dev:http": "tsx src/server-http.ts",
     "start": "node dist/index.js",
+    "start:http": "node dist/server-http.js",
     "type-check": "tsc --noEmit",
     "test": "jest"
   },
@@ -36,17 +38,20 @@
     "@commitlint/config-conventional": "^20.0.0",
     "@eslint/js": "^9.36.0",
     "@types/eslint__js": "^8.42.3",
+    "@types/express": "^5.0.3",
     "@types/node": "^24.3.1",
     "@typescript-eslint/eslint-plugin": "^8.44.1",
     "@typescript-eslint/parser": "^8.44.1",
     "eslint": "^9.36.0",
+    "fs-extra": "^11.3.2",
     "prettier": "^3.6.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.44.1"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.17.5"
+    "@modelcontextprotocol/sdk": "^1.17.5",
+    "express": "^5.1.0"
   },
   "publishConfig": {
     "access": "public"
