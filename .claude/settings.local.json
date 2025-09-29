@@ -19,7 +19,8 @@
       "Bash(npm run build:*)",
       "Bash(export AUTH_SKIP=false)",
       "Bash(npm start)",
-      "Bash(AUTH_SKIP=false npm start)"
+      "Bash(AUTH_SKIP=false npm start)",
+      "Read(//home/e0ipso/workspace/www/drupal-contrib/drupal/web/modules/contrib/simple_oauth_21/**)"
     ],
     "deny": []
   },
