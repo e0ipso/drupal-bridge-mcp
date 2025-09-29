@@ -23,6 +23,8 @@ import {
   createOAuthConfigFromEnv,
 } from './oauth/config.js';
 import { createDrupalOAuthProvider } from './oauth/provider.js';
+import { DeviceFlow } from './oauth/device-flow.js';
+import type { TokenResponse } from './oauth/device-flow-types.js';
 
 /**
  * HTTP server configuration interface
@@ -56,6 +58,7 @@ export class DrupalMCPHttpServer {
   private oauthConfigManager?: OAuthConfigManager;
   private sessionTransports: Map<string, StreamableHTTPServerTransport> =
     new Map();
+  private sessionTokens: Map<string, TokenResponse> = new Map();
 
   constructor(config: HttpServerConfig = DEFAULT_HTTP_CONFIG) {
     this.config = config;
@@ -193,6 +196,14 @@ export class DrupalMCPHttpServer {
               properties: {},
             },
           },
+          {
+            name: 'device_flow_test',
+            description: 'Test device authorization grant flow',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
         ],
       };
     });
@@ -238,6 +249,59 @@ export class DrupalMCPHttpServer {
             };
           }
 
+          case 'device_flow_test': {
+            if (!this.config.enableAuth) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: 'OAuth authentication is disabled',
+                      message: 'Set AUTH_ENABLED=true to enable OAuth',
+                    }),
+                  },
+                ],
+              };
+            }
+
+            try {
+              // Get session ID from request context
+              const sessionId = randomUUID();
+
+              // Run device flow
+              const tokens = await this.handleDeviceFlow(sessionId);
+
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      success: true,
+                      message: 'Device flow authentication successful',
+                      tokenType: tokens.token_type,
+                      scope: tokens.scope,
+                      expiresIn: tokens.expires_in,
+                      hasRefreshToken: !!tokens.refresh_token,
+                    }),
+                  },
+                ],
+              };
+            } catch (error) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      success: false,
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    }),
+                  },
+                ],
+              };
+            }
+          }
+
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -246,6 +310,81 @@ export class DrupalMCPHttpServer {
         }
       }
     );
+  }
+
+  /**
+   * Handles device flow authentication for a session
+   * @param {string} sessionId Session identifier
+   * @returns {Promise<TokenResponse>} OAuth tokens
+   * @throws {Error} If device flow is not appropriate or authentication fails
+   */
+  async handleDeviceFlow(sessionId: string): Promise<TokenResponse> {
+    if (!DeviceFlow.shouldUseDeviceFlow()) {
+      throw new Error(
+        'Device flow not appropriate for this environment. ' +
+          'Set OAUTH_FORCE_DEVICE_FLOW=true to force device flow usage.'
+      );
+    }
+
+    if (!this.oauthConfigManager) {
+      throw new Error(
+        'OAuth is not configured. Set AUTH_ENABLED=true to enable OAuth.'
+      );
+    }
+
+    try {
+      const config = this.oauthConfigManager.getConfig();
+      const metadata = await this.oauthConfigManager.fetchMetadata();
+
+      // Create device flow handler
+      const deviceFlow = new DeviceFlow(config, metadata);
+
+      // Execute authentication flow
+      const tokens = await deviceFlow.authenticate();
+
+      // Store tokens for this session
+      this.sessionTokens.set(sessionId, tokens);
+
+      return tokens;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Device flow authentication failed: ${error.message}`);
+      }
+      throw new Error('Device flow authentication failed: Unknown error');
+    }
+  }
+
+  /**
+   * Handles browser-based OAuth flow for a session
+   * @param {string} sessionId Session identifier
+   * @returns {Promise<void>}
+   * @throws {Error} If browser flow is not implemented
+   */
+  async handleBrowserFlow(_sessionId: string): Promise<void> {
+    throw new Error(
+      'Browser-based OAuth flow not yet implemented. ' +
+        'Use device flow for headless environments by setting OAUTH_FORCE_DEVICE_FLOW=true.'
+    );
+  }
+
+  /**
+   * Initializes authentication for a session
+   * @param {string} sessionId Session identifier
+   * @returns {Promise<void>}
+   */
+  async initializeAuthentication(sessionId: string): Promise<void> {
+    if (!this.config.enableAuth) {
+      console.log('OAuth authentication is disabled');
+      return;
+    }
+
+    if (DeviceFlow.shouldUseDeviceFlow()) {
+      console.log('Using device flow for authentication');
+      await this.handleDeviceFlow(sessionId);
+    } else {
+      console.log('Using browser-based flow for authentication');
+      await this.handleBrowserFlow(sessionId);
+    }
   }
 
   /**
