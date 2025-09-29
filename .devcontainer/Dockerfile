@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   jq \
   nano \
   vim \
+  tree \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Ensure default node user has access to /usr/local/share
@@ -75,8 +76,6 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
   -x
 
-# Install Claude
+# Install Claude & Gemini
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION:-latest}
-
-# Install Gemini
 RUN npm install -g @google/gemini-cli@${GEMINI_VERSION:-latest}
