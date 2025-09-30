@@ -12,10 +12,10 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/index.ts",
-    "dev:http": "tsx src/server-http.ts",
-    "start": "node dist/index.js",
-    "start:http": "node dist/server-http.js",
+    "dev": "tsx --env-file=.env src/index.ts",
+    "dev:http": "tsx --env-file=.env src/server-http.ts",
+    "start": "node --env-file=.env dist/index.js",
+    "start:http": "node --env-file=.env dist/server-http.js",
     "type-check": "tsc --noEmit",
     "test": "jest"
   },

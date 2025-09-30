@@ -56,8 +56,7 @@ export class DrupalMCPHttpServer {
   private app: Application;
   private config: HttpServerConfig;
   private oauthConfigManager?: OAuthConfigManager;
-  private sessionTransports: Map<string, StreamableHTTPServerTransport> =
-    new Map();
+  private transport?: StreamableHTTPServerTransport;
   private sessionTokens: Map<string, TokenResponse> = new Map();
 
   constructor(config: HttpServerConfig = DEFAULT_HTTP_CONFIG) {
@@ -83,15 +82,25 @@ export class DrupalMCPHttpServer {
    * Sets up Express middleware
    */
   private setupMiddleware(): void {
-    // Parse JSON bodies
-    this.app.use(express.json());
-
     // CORS headers
     this.app.use((req, res, next) => {
       const origin = req.headers.origin;
-      const allowedOrigins = process.env.HTTP_CORS_ORIGINS?.split(',') || [
+
+      // Default allowed origins include common MCP Inspector ports and localhost variations
+      const defaultOrigins = [
         'http://localhost:6200',
+        'http://localhost:6201',
+        'http://localhost:6202',
+        'http://localhost:5173', // Common Vite dev server port
+        'http://127.0.0.1:6200',
+        'http://127.0.0.1:6201',
+        'http://127.0.0.1:6202',
+        'http://127.0.0.1:5173',
       ];
+
+      const allowedOrigins = process.env.HTTP_CORS_ORIGINS
+        ? process.env.HTTP_CORS_ORIGINS.split(',').map(o => o.trim())
+        : defaultOrigins;
 
       if (origin && allowedOrigins.includes(origin)) {
         res.setHeader('Access-Control-Allow-Origin', origin);
@@ -148,8 +157,19 @@ export class DrupalMCPHttpServer {
       const _oauthProvider = createDrupalOAuthProvider(this.oauthConfigManager);
 
       // Set up OAuth metadata router
+      // Use the MCP server's URL as the resource server URL, not Drupal's URL
       const resourceServerUrl = new URL(
-        oauthConfig.resourceServerUrl || oauthConfig.drupalUrl
+        `http://${this.config.host}:${this.config.port}`
+      );
+
+      console.log('Setting up OAuth metadata router...');
+      console.log(`  Resource server URL: ${resourceServerUrl.href}`);
+      console.log(`  Expected well-known endpoints:`);
+      const rsPath = resourceServerUrl.pathname;
+      const wellKnownPath = `/.well-known/oauth-protected-resource${rsPath === '/' ? '' : rsPath}`;
+      console.log(`    - ${resourceServerUrl.origin}${wellKnownPath}`);
+      console.log(
+        `    - ${resourceServerUrl.origin}/.well-known/oauth-authorization-server`
       );
 
       this.app.use(
@@ -390,38 +410,32 @@ export class DrupalMCPHttpServer {
   /**
    * Sets up MCP HTTP endpoint
    */
-  private setupMcpEndpoint(): void {
+  private async setupMcpEndpoint(): Promise<void> {
+    // Create a single transport instance that handles all sessions
+    this.transport = new StreamableHTTPServerTransport({
+      // Let the transport generate session IDs automatically
+      sessionIdGenerator: () => randomUUID(),
+      enableDnsRebindingProtection: true,
+      allowedHosts: [
+        this.config.host,
+        'localhost',
+        `localhost:${this.config.port}`,
+        `${this.config.host}:${this.config.port}`,
+      ],
+      onsessionclosed: async (sessionId: string) => {
+        console.log(`Session closed: ${sessionId}`);
+        // Clean up session tokens when session closes
+        this.sessionTokens.delete(sessionId);
+      },
+    });
+
+    // Connect the transport to the MCP server
+    await this.server.connect(this.transport);
+
+    // Handle all MCP requests through the single transport
     this.app.all('/mcp', async (req, res) => {
       try {
-        // Get or create session ID
-        let sessionId = req.headers['x-session-id'] as string | undefined;
-
-        if (!sessionId) {
-          sessionId = randomUUID();
-          res.setHeader('X-Session-ID', sessionId);
-        }
-
-        // Get or create transport for this session
-        let transport = this.sessionTransports.get(sessionId);
-
-        if (!transport) {
-          transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => sessionId!,
-            enableDnsRebindingProtection: true,
-            allowedHosts: [this.config.host, 'localhost'],
-            onsessionclosed: async (closedSessionId: string) => {
-              console.log(`Session closed: ${closedSessionId}`);
-              this.sessionTransports.delete(closedSessionId);
-            },
-          });
-
-          await this.server.connect(transport);
-          this.sessionTransports.set(sessionId, transport);
-          console.log(`New session created: ${sessionId}`);
-        }
-
-        // Handle the request
-        await transport.handleRequest(req, res);
+        await this.transport!.handleRequest(req, res);
       } catch (error) {
         console.error('Error handling MCP request:', error);
         if (!res.headersSent) {
@@ -443,7 +457,7 @@ export class DrupalMCPHttpServer {
       await this.initializeOAuth();
 
       // Set up MCP endpoint
-      this.setupMcpEndpoint();
+      await this.setupMcpEndpoint();
 
       // Health check endpoint
       this.app.get('/health', (_req, res) => {
@@ -503,17 +517,18 @@ export class DrupalMCPHttpServer {
   async stop(): Promise<void> {
     console.log('Shutting down HTTP server...');
 
-    // Close all session transports
-    for (const [sessionId, transport] of this.sessionTransports) {
+    // Close the transport if it exists
+    if (this.transport) {
       try {
-        await transport.close();
-        console.log(`Closed session: ${sessionId}`);
+        await this.transport.close();
+        console.log('Transport closed');
       } catch (error) {
-        console.error(`Error closing session ${sessionId}:`, error);
+        console.error('Error closing transport:', error);
       }
     }
 
-    this.sessionTransports.clear();
+    // Clear session tokens
+    this.sessionTokens.clear();
   }
 }
 

@@ -36,46 +36,29 @@ OAuth-enabled HTTP server using StreamableHTTP transport:
 
 ## OAuth Flow
 
-```
-┌─────────────┐                ┌──────────────┐                ┌─────────────┐
-│             │                │              │                │             │
-│  MCP Client │                │  MCP Server  │                │   Drupal    │
-│             │                │              │                │             │
-└──────┬──────┘                └──────┬───────┘                └──────┬──────┘
-       │                              │                               │
-       │  1. GET /.well-known/...    │                               │
-       │────────────────────────────>│                               │
-       │                              │                               │
-       │  2. OAuth Metadata           │                               │
-       │<────────────────────────────│                               │
-       │                              │                               │
-       │  3. Authorization Request    │                               │
-       │────────────────────────────>│  4. Proxy to Drupal          │
-       │                              │──────────────────────────────>│
-       │                              │                               │
-       │                              │  5. Auth Code                │
-       │                              │<──────────────────────────────│
-       │  6. Auth Code                │                               │
-       │<────────────────────────────│                               │
-       │                              │                               │
-       │  7. Token Exchange           │                               │
-       │────────────────────────────>│  8. Proxy to Drupal          │
-       │                              │──────────────────────────────>│
-       │                              │                               │
-       │                              │  9. Access Token             │
-       │                              │<──────────────────────────────│
-       │  10. Access Token            │                               │
-       │<────────────────────────────│                               │
-       │                              │                               │
-       │  11. MCP Request + Token     │                               │
-       │────────────────────────────>│  12. Verify Token            │
-       │                              │──────────────────────────────>│
-       │                              │                               │
-       │                              │  13. Token Valid             │
-       │                              │<──────────────────────────────│
-       │  14. MCP Response            │                               │
-       │<────────────────────────────│                               │
-       │                              │                               │
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant Drupal as Drupal
+
+    Client->>Server: 1. GET /.well-known/...
+    Server->>Client: 2. OAuth Metadata
+
+    Client->>Server: 3. Authorization Request
+    Server->>Drupal: 4. Proxy to Drupal
+    Drupal->>Server: 5. Auth Code
+    Server->>Client: 6. Auth Code
+
+    Client->>Server: 7. Token Exchange
+    Server->>Drupal: 8. Proxy to Drupal
+    Drupal->>Server: 9. Access Token
+    Server->>Client: 10. Access Token
+
+    Client->>Server: 11. MCP Request + Token
+    Server->>Drupal: 12. Verify Token
+    Drupal->>Server: 13. Token Valid
+    Server->>Client: 14. MCP Response
 ```
 
 ## Configuration
