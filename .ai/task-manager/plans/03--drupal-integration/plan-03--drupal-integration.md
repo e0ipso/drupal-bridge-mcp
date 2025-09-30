@@ -62,7 +62,7 @@ The MCP Server currently has:
 
 - `src/oauth/provider.ts` - OAuth token management with `getToken(sessionId)` method
 - `src/oauth/config.ts` - OAuth metadata discovery and configuration
-- `src/server-http.ts` - HTTP MCP server with session handling
+- `src/index.ts` - HTTP MCP server with session handling
 
 ### Target State
 
@@ -260,7 +260,7 @@ Create `src/tools/content/get.ts` implementing `get_tutorial` tool:
 
 **Implementation Details:**
 
-Update `src/server-http.ts` to:
+Update `src/index.ts` to:
 
 - Import and register all five tools (auth_login, auth_logout, auth_status, search_tutorial,
   get_tutorial)
