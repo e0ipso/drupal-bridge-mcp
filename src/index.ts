@@ -185,10 +185,15 @@ export class DrupalMCPHttpServer {
       console.log(`  Resource server: ${resourceServerUrl}`);
       console.log(`  Scopes: ${oauthConfig.scopes.join(', ')}`);
     } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Failed to initialize OAuth: ${error.message}`);
-      }
-      throw new Error('Failed to initialize OAuth: Unknown error');
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      console.warn('⚠️  OAuth initialization failed:', errorMessage);
+      console.warn(
+        '   Server will start without OAuth. Check your DRUPAL_BASE_URL and network connectivity.'
+      );
+      console.warn('   To disable this warning, set AUTH_ENABLED=false');
+      // Don't throw - allow server to start without OAuth
+      this.config.enableAuth = false;
     }
   }
 
