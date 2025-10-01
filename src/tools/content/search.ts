@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import {
+  McpError,
+  ErrorCode,
+  type ClientCapabilities,
+} from '@modelcontextprotocol/sdk/types.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { DrupalConnector } from '../../drupal/connector.js';
 import { DrupalOAuthProvider } from '../../oauth/provider.js';
 
@@ -22,6 +27,8 @@ export interface SearchTutorialContext {
   sessionId: string;
   oauthProvider: DrupalOAuthProvider;
   drupalConnector: DrupalConnector;
+  samplingCapabilities?: ClientCapabilities;
+  server: Server;
 }
 
 /**

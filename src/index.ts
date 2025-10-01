@@ -29,6 +29,7 @@ import {
 import { DrupalConnector } from './drupal/connector.js';
 import { DeviceFlow } from './oauth/device-flow.js';
 import type { TokenResponse } from './oauth/device-flow-types.js';
+import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 
 // Tool imports
 import {
@@ -80,6 +81,7 @@ export class DrupalMCPHttpServer {
   private drupalConnector?: DrupalConnector;
   private transport?: StreamableHTTPServerTransport;
   private sessionTokens: Map<string, TokenResponse> = new Map();
+  private sessionCapabilities: Map<string, ClientCapabilities> = new Map();
 
   constructor(config: HttpServerConfig = DEFAULT_HTTP_CONFIG) {
     this.config = config;
@@ -314,6 +316,9 @@ export class DrupalMCPHttpServer {
           );
         }
 
+        // Retrieve capabilities for this session
+        const capabilities = this.server.getClientCapabilities();
+
         // Create shared context for all tools
         const authContext = {
           sessionId,
@@ -324,6 +329,8 @@ export class DrupalMCPHttpServer {
           sessionId,
           oauthProvider: this.oauthProvider,
           drupalConnector: this.drupalConnector,
+          samplingCapabilities: capabilities,
+          server: this.server,
         };
 
         // Route to appropriate tool handler
@@ -450,11 +457,22 @@ export class DrupalMCPHttpServer {
         console.log(`Session closed: ${sessionId}`);
         // Clean up session tokens when session closes
         this.sessionTokens.delete(sessionId);
+        // Clean up session capabilities when session closes
+        this.sessionCapabilities.delete(sessionId);
       },
     });
 
     // Connect the transport to the MCP server
     await this.server.connect(this.transport);
+
+    // Log client capabilities when available
+    const capabilities = this.server.getClientCapabilities();
+    if (capabilities) {
+      console.log('Client capabilities detected:', {
+        sampling: capabilities.sampling !== undefined,
+        experimental: capabilities.experimental !== undefined,
+      });
+    }
 
     // Handle all MCP requests through the single transport
     this.app.all('/mcp', async (req, res) => {
