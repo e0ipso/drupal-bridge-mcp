@@ -36,50 +36,51 @@ export class DrupalConnector {
     // Using a placeholder variable to resolve circular reference
     const clientInstance: JSONRPCClient[] = [];
 
-    const sendRequest = (jsonRPCRequest: JSONRPCRequest): Promise<void> => {
-      return fetch(`${this.baseUrl}${this.jsonrpcEndpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(jsonRPCRequest),
-      })
-        .then(async response => {
-          // Map HTTP errors to MCP errors
-          if (!response.ok) {
-            throw this.mapHttpErrorToMcpError(response.status);
-          }
+    const sendRequest = async (
+      jsonRPCRequest: JSONRPCRequest
+    ): Promise<void> => {
+      try {
+        const response = await fetch(`${this.baseUrl}${this.jsonrpcEndpoint}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(jsonRPCRequest),
+        });
 
-          if (response.status === 200) {
-            // Parse JSON response and feed it back to the client
-            return response.json().then(jsonRPCResponse => {
-              const client = clientInstance[0];
-              if (!client) {
-                throw new McpError(
-                  ErrorCode.InternalError,
-                  'JSON-RPC client not initialized'
-                );
-              }
-              return client.receive(jsonRPCResponse);
-            });
-          } else if (jsonRPCRequest.id !== undefined) {
+        // Map HTTP errors to MCP errors
+        if (!response.ok) {
+          throw this.mapHttpErrorToMcpError(response.status);
+        }
+
+        if (response.status === 200) {
+          // Parse JSON response and feed it back to the client
+          const jsonRPCResponse = await response.json();
+          const client = clientInstance[0];
+          if (!client) {
             throw new McpError(
               ErrorCode.InternalError,
-              `Drupal API error: HTTP ${response.status}`
+              'JSON-RPC client not initialized'
             );
           }
-        })
-        .catch(error => {
-          // Network or fetch errors
-          if (error instanceof McpError) {
-            throw error;
-          }
+          return client.receive(jsonRPCResponse);
+        } else if (jsonRPCRequest.id !== undefined) {
           throw new McpError(
             ErrorCode.InternalError,
-            `Drupal communication failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+            `Drupal API error: HTTP ${response.status}`
           );
-        });
+        }
+      } catch (error) {
+        // Network or fetch errors
+        if (error instanceof McpError) {
+          throw error;
+        }
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Drupal communication failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
     };
 
     const client = new JSONRPCClient(sendRequest);
