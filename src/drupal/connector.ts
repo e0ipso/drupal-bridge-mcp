@@ -53,11 +53,16 @@ export class DrupalConnector {
 
           if (response.status === 200) {
             // Parse JSON response and feed it back to the client
-            return response
-              .json()
-              .then(jsonRPCResponse =>
-                clientInstance[0].receive(jsonRPCResponse)
-              );
+            return response.json().then(jsonRPCResponse => {
+              const client = clientInstance[0];
+              if (!client) {
+                throw new McpError(
+                  ErrorCode.InternalError,
+                  'JSON-RPC client not initialized'
+                );
+              }
+              return client.receive(jsonRPCResponse);
+            });
           } else if (jsonRPCRequest.id !== undefined) {
             throw new McpError(
               ErrorCode.InternalError,
