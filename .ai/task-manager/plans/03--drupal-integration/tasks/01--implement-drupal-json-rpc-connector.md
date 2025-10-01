@@ -2,7 +2,7 @@
 id: 1
 group: 'drupal-integration'
 dependencies: []
-status: 'pending'
+status: 'completed'
 created: '2025-09-30'
 skills:
   - typescript
@@ -24,14 +24,14 @@ operations.
 
 ## Acceptance Criteria
 
-- [ ] `src/drupal/connector.ts` created with `DrupalConnector` class
-- [ ] Accepts OAuth token as parameter for each request (stateless design)
-- [ ] Provides `searchTutorial(query, token)` and `getTutorial(id, token)` methods
-- [ ] Maps JSON-RPC errors (401, 403, 404) to MCP error codes
-- [ ] Uses Zod schemas to validate Drupal API responses
-- [ ] Base URL configured from `process.env.DRUPAL_BASE_URL`
-- [ ] Zero TypeScript compilation errors
-- [ ] `npm install json-rpc-2.0` dependency added to package.json
+- [x] `src/drupal/connector.ts` created with `DrupalConnector` class
+- [x] Accepts OAuth token as parameter for each request (stateless design)
+- [x] Provides `searchTutorial(query, token)` and `getTutorial(id, token)` methods
+- [x] Maps JSON-RPC errors (401, 403, 404) to MCP error codes
+- [x] Uses Zod schemas to validate Drupal API responses
+- [x] Base URL configured from `process.env.DRUPAL_BASE_URL`
+- [x] Zero TypeScript compilation errors
+- [x] `npm install json-rpc-2.0` dependency added to package.json
 
 Use your internal Todo tool to track these and keep on track.
 

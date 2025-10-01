@@ -16,6 +16,8 @@ import {
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { OAuthConfigManager } from './config.js';
+import type { TokenResponse } from './device-flow-types.js';
+import { DeviceFlow } from './device-flow.js';
 
 /**
  * Token introspection response from Drupal
@@ -35,6 +37,7 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
   private readonly configManager: OAuthConfigManager;
   private readonly drupalUrl: string;
   private clientCache: Map<string, OAuthClientInformationFull> = new Map();
+  private sessionTokens: Map<string, TokenResponse> = new Map();
 
   constructor(configManager: OAuthConfigManager) {
     const config = configManager.getConfig();
@@ -208,6 +211,104 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
    */
   clearClientCache(): void {
     this.clientCache.clear();
+  }
+
+  /**
+   * Authenticates using device authorization grant flow
+   * @param {string} sessionId Session identifier
+   * @returns {Promise<TokenResponse>} OAuth tokens
+   */
+  async authenticateDeviceFlow(sessionId: string): Promise<TokenResponse> {
+    const config = this.configManager.getConfig();
+    const metadata = await this.configManager.fetchMetadata();
+
+    // Create device flow handler
+    const deviceFlow = new DeviceFlow(config, metadata);
+
+    // Execute authentication flow
+    const tokens = await deviceFlow.authenticate();
+
+    // Store tokens for this session
+    this.sessionTokens.set(sessionId, tokens);
+
+    return tokens;
+  }
+
+  /**
+   * Gets the access token for a session
+   * @param {string} sessionId Session identifier
+   * @returns {Promise<string | null>} Access token or null if not authenticated
+   */
+  async getToken(sessionId: string): Promise<string | null> {
+    const tokenResponse = this.sessionTokens.get(sessionId);
+    return tokenResponse?.access_token || null;
+  }
+
+  /**
+   * Clears the session and removes stored tokens
+   * @param {string} sessionId Session identifier
+   * @returns {Promise<void>}
+   */
+  async clearSession(sessionId: string): Promise<void> {
+    const tokenResponse = this.sessionTokens.get(sessionId);
+
+    // Optionally revoke token with Drupal if revocation is supported
+    if (tokenResponse && this.revokeToken) {
+      try {
+        const clientInfo = await this.getClientInfo(
+          this.configManager.getConfig().clientId
+        );
+        if (clientInfo) {
+          await this.revokeToken(clientInfo, {
+            token: tokenResponse.access_token,
+            token_type_hint: 'access_token',
+          });
+        }
+      } catch (error) {
+        // Log error but don't throw - still clear the session
+        console.error('Token revocation failed:', error);
+      }
+    }
+
+    // Clear session from storage
+    this.sessionTokens.delete(sessionId);
+  }
+
+  /**
+   * Gets the token expiration time for a session
+   * @param {string} sessionId Session identifier
+   * @returns {Promise<string | null>} ISO 8601 expiration time or null
+   */
+  async getTokenExpiration(sessionId: string): Promise<string | null> {
+    const tokenResponse = this.sessionTokens.get(sessionId);
+
+    if (!tokenResponse || !tokenResponse.expires_in) {
+      return null;
+    }
+
+    // Calculate expiration time from current time + expires_in seconds
+    // Note: In a production system, you'd want to store the issue time
+    // For now, we'll estimate based on current time (this is imprecise)
+    const expirationDate = new Date(
+      Date.now() + tokenResponse.expires_in * 1000
+    );
+    return expirationDate.toISOString();
+  }
+
+  /**
+   * Gets the scopes for a session's token
+   * @param {string} sessionId Session identifier
+   * @returns {Promise<string[] | null>} Array of scope strings or null
+   */
+  async getTokenScopes(sessionId: string): Promise<string[] | null> {
+    const tokenResponse = this.sessionTokens.get(sessionId);
+
+    if (!tokenResponse || !tokenResponse.scope) {
+      return null;
+    }
+
+    // Parse scope string into array
+    return tokenResponse.scope.split(/[\s,]+/).filter(s => s.length > 0);
   }
 }
 

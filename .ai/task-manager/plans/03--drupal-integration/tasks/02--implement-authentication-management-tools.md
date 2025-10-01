@@ -2,7 +2,7 @@
 id: 2
 group: 'authentication-tools'
 dependencies: []
-status: 'pending'
+status: 'completed'
 created: '2025-09-30'
 skills:
   - typescript
@@ -23,15 +23,15 @@ session management by integrating with the existing `OAuthProvider` from Plan 02
 
 ## Acceptance Criteria
 
-- [ ] Three tool files created: `src/tools/auth/login.ts`, `logout.ts`, `status.ts`
-- [ ] `auth_login` triggers device flow and displays verification URL/code
-- [ ] `auth_logout` clears session and optionally revokes token with Drupal
-- [ ] `auth_status` returns authentication state with token expiration
-- [ ] All tools access `OAuthProvider` singleton for session management
-- [ ] Session ID extracted from MCP request context
-- [ ] Tools return structured JSON responses with clear status messages
-- [ ] Zod schemas define input parameters for each tool
-- [ ] Zero TypeScript compilation errors
+- [x] Three tool files created: `src/tools/auth/login.ts`, `logout.ts`, `status.ts`
+- [x] `auth_login` triggers device flow and displays verification URL/code
+- [x] `auth_logout` clears session and optionally revokes token with Drupal
+- [x] `auth_status` returns authentication state with token expiration
+- [x] All tools access `OAuthProvider` singleton for session management
+- [x] Session ID extracted from MCP request context
+- [x] Tools return structured JSON responses with clear status messages
+- [x] Zod schemas define input parameters for each tool
+- [x] Zero TypeScript compilation errors
 
 Use your internal Todo tool to track these and keep on track.
 

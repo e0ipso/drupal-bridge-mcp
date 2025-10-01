@@ -58,7 +58,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.5",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "json-rpc-2.0": "^1.7.1"
   },
   "publishConfig": {
     "access": "public"
