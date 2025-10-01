@@ -1,3 +1,15 @@
+# [1.1.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.0.0...v1.1.0) (2025-10-01)
+
+
+### Bug Fixes
+
+* gracefully handle OAuth initialization failures ([90e232f](https://github.com/e0ipso/drupal-bridge-mcp/commit/90e232fc08c7f2d8d8224ee7188627fd22dc3ae3))
+
+
+### Features
+
+* consolidate to HTTP server as default entry point ([6b63c9a](https://github.com/e0ipso/drupal-bridge-mcp/commit/6b63c9a12b6683583db1a928bef53e86bc061951))
+
 # 1.0.0 (2025-09-30)
 
 
