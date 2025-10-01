@@ -51,7 +51,9 @@ describe('AI-Enhanced Search Integration', () => {
       );
 
       // Verify metadata indicates no AI enhancement
-      const response = JSON.parse(result.content[0].text);
+      const response = JSON.parse(
+        (result.content[0] as { type: string; text: string }).text
+      );
       expect(response.metadata.aiEnhanced).toBe(false);
       expect(response.results).toHaveLength(2);
     });
@@ -101,7 +103,9 @@ describe('AI-Enhanced Search Integration', () => {
       );
 
       // Verify metadata shows AI enhancement
-      const response = JSON.parse(result.content[0].text);
+      const response = JSON.parse(
+        (result.content[0] as { type: string; text: string }).text
+      );
       expect(response.metadata.aiEnhanced).toBe(true);
       expect(response.metadata.intent).toBe(
         'Learn to create Views in Drupal 10'
@@ -141,7 +145,9 @@ describe('AI-Enhanced Search Integration', () => {
       );
 
       // Verify metadata shows no AI enhancement
-      const response = JSON.parse(result.content[0].text);
+      const response = JSON.parse(
+        (result.content[0] as { type: string; text: string }).text
+      );
       expect(response.metadata.aiEnhanced).toBe(false);
     });
 
@@ -172,7 +178,9 @@ describe('AI-Enhanced Search Integration', () => {
       );
 
       // Verify fallback to keyword search
-      const response = JSON.parse(result.content[0].text);
+      const response = JSON.parse(
+        (result.content[0] as { type: string; text: string }).text
+      );
       expect(response.metadata.aiEnhanced).toBe(false);
     });
 
@@ -203,7 +211,9 @@ describe('AI-Enhanced Search Integration', () => {
       );
 
       // Verify fallback to keyword search
-      const response = JSON.parse(result.content[0].text);
+      const response = JSON.parse(
+        (result.content[0] as { type: string; text: string }).text
+      );
       expect(response.metadata.aiEnhanced).toBe(false);
     });
   });
@@ -248,7 +258,9 @@ describe('AI-Enhanced Search Integration', () => {
       );
 
       // Verify no AI enhancement
-      const response = JSON.parse(result.content[0].text);
+      const response = JSON.parse(
+        (result.content[0] as { type: string; text: string }).text
+      );
       expect(response.metadata.aiEnhanced).toBe(false);
     });
 
@@ -277,7 +289,9 @@ describe('AI-Enhanced Search Integration', () => {
       expect(mockServer.createMessage).not.toHaveBeenCalled();
 
       // Verify no AI enhancement
-      const response = JSON.parse(result.content[0].text);
+      const response = JSON.parse(
+        (result.content[0] as { type: string; text: string }).text
+      );
       expect(response.metadata.aiEnhanced).toBe(false);
     });
   });
