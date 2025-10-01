@@ -1,3 +1,17 @@
+# [1.2.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.1.0...v1.2.0) (2025-10-01)
+
+
+### Bug Fixes
+
+* use async/await for promise handing ([a4bd0fc](https://github.com/e0ipso/drupal-bridge-mcp/commit/a4bd0fc34f302eefe7f2e536c7fd97b00166d912))
+
+
+### Features
+
+* implement content search and retrieval tools ([20bc745](https://github.com/e0ipso/drupal-bridge-mcp/commit/20bc74557aeb4b44d3ad7d4334bcc1c5f4ed1a85))
+* implement Drupal JSON-RPC connector and authentication tools ([fe46f60](https://github.com/e0ipso/drupal-bridge-mcp/commit/fe46f60d40d2b6930ffd9a4bfd15e9c70cfa7abb))
+* integrate all tools with MCP server ([748a414](https://github.com/e0ipso/drupal-bridge-mcp/commit/748a414f23f210ac844ce1e222d7c7bd7701aefa))
+
 # [1.1.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.0.0...v1.1.0) (2025-10-01)
 
 
