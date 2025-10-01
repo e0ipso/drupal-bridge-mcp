@@ -7,6 +7,10 @@ import {
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { DrupalConnector } from '../../drupal/connector.js';
 import { DrupalOAuthProvider } from '../../oauth/provider.js';
+import {
+  analyzeQuery,
+  type EnhancedSearchParams,
+} from '../../sampling/query-analyzer.js';
 
 /**
  * Input schema for search_tutorial tool
@@ -37,16 +41,25 @@ export interface SearchTutorialContext {
  * Authenticates using session-based OAuth token and searches
  * the Drupal tutorial repository via JSON-RPC.
  *
+ * Uses AI-powered query analysis when sampling is available to optimize
+ * search keywords and extract user intent.
+ *
  * @param params - Search parameters (query and optional limit)
  * @param context - Execution context with session and providers
- * @returns MCP tool response with search results
+ * @returns MCP tool response with search results and AI enhancement metadata
  * @throws McpError if authentication fails or search encounters errors
  */
 export async function searchTutorial(
   params: z.infer<typeof searchTutorialSchema>,
   context: SearchTutorialContext
 ) {
-  const { sessionId, oauthProvider, drupalConnector } = context;
+  const {
+    sessionId,
+    oauthProvider,
+    drupalConnector,
+    samplingCapabilities,
+    server,
+  } = context;
   const { query, limit } = params;
 
   // Step 1: Retrieve OAuth token from session
@@ -59,20 +72,59 @@ export async function searchTutorial(
     );
   }
 
-  // Step 2: Call DrupalConnector with token
+  // Step 2: Attempt AI enhancement if available
+  let enhancedParams: EnhancedSearchParams | null = null;
+  let aiEnhanced = false;
+
+  const canUseSampling = samplingCapabilities?.sampling !== undefined && server;
+
+  if (canUseSampling) {
+    try {
+      enhancedParams = await analyzeQuery(query, { server, sessionId });
+      if (enhancedParams) {
+        aiEnhanced = true;
+        console.log('Using AI-enhanced search parameters');
+      }
+    } catch (error) {
+      // analyzeQuery should never throw, but handle defensively
+      console.warn('AI analysis unexpected error:', error);
+    }
+  }
+
+  // Step 3: Build search parameters
+  // Use optimized keywords if available, otherwise use original query
+  const searchQuery = enhancedParams?.optimizedKeywords.join(' ') || query;
+
+  // Step 4: Call DrupalConnector with token
   try {
     const searchResponse = await drupalConnector.searchTutorial(
-      query,
+      searchQuery,
       token,
       limit
     );
 
-    // Step 3: Format results as MCP tool response
+    // Step 5: Format results with AI enhancement metadata
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(searchResponse, null, 2),
+          text: JSON.stringify(
+            {
+              ...searchResponse,
+              metadata: {
+                aiEnhanced,
+                ...(aiEnhanced && enhancedParams
+                  ? {
+                      intent: enhancedParams.intent,
+                      contentTypes: enhancedParams.contentTypes,
+                      drupalVersions: enhancedParams.drupalVersions,
+                    }
+                  : {}),
+              },
+            },
+            null,
+            2
+          ),
         },
       ],
     };
