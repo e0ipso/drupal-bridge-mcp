@@ -25,7 +25,7 @@ Implements the OAuth server provider that proxies authentication to Drupal:
 - Manages OAuth client information and caching
 - Supports authorization code and refresh token flows
 
-### 3. HTTP MCP Server (`../server-http.ts`)
+### 3. HTTP MCP Server (`../index.ts`)
 
 OAuth-enabled HTTP server using StreamableHTTP transport:
 
@@ -107,17 +107,17 @@ On the Drupal side, you need to:
 
 ```bash
 # Development mode
-npm run dev:http
+npm run dev
 
 # Production mode
 npm run build
-npm run start:http
+npm run start
 ```
 
 ### Programmatic Usage
 
 ```typescript
-import { DrupalMCPHttpServer } from './server-http.js';
+import { DrupalMCPHttpServer } from './index.js';
 
 const server = new DrupalMCPHttpServer({
   name: 'my-mcp-server',

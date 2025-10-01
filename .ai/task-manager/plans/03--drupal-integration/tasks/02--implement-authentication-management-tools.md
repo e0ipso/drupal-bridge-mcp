@@ -247,7 +247,7 @@ export * from './status.js';
 
 ### Integration Pattern
 
-These tools will be registered in `server-http.ts` (Task 4):
+These tools will be registered in `index.ts` (Task 4):
 
 ```typescript
 server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {

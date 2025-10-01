@@ -14,8 +14,8 @@ skills:
 ## Objective
 
 Integrate all five tools (auth_login, auth_logout, auth_status, search_tutorial, get_tutorial) into
-the existing HTTP MCP server, ensuring proper session ID propagation and shared singleton instances
-for OAuthProvider and DrupalConnector.
+the HTTP MCP server in index.ts, ensuring proper session ID propagation and shared singleton
+instances for OAuthProvider and DrupalConnector.
 
 ## Skills Required
 
@@ -24,7 +24,7 @@ for OAuthProvider and DrupalConnector.
 
 ## Acceptance Criteria
 
-- [ ] All five tools registered in `src/server-http.ts`
+- [ ] All five tools registered in `src/index.ts`
 - [ ] Shared singleton instances created for `OAuthProvider` and `DrupalConnector`
 - [ ] Session ID extracted from MCP transport context (`extra.sessionId`)
 - [ ] Tool context passed to all handler functions with sessionId and providers
@@ -32,7 +32,7 @@ for OAuthProvider and DrupalConnector.
 - [ ] `CallToolRequestSchema` handler routes to appropriate tool functions
 - [ ] Tool input schemas properly defined with Zod descriptions
 - [ ] Zero TypeScript compilation errors
-- [ ] Server starts without errors: `npm run dev:http`
+- [ ] Server starts without errors: `npm run dev`
 
 Use your internal Todo tool to track these and keep on track.
 
@@ -59,11 +59,11 @@ Use your internal Todo tool to track these and keep on track.
 - `src/drupal/connector.ts` - DrupalConnector class
 - `src/tools/auth/` - Authentication tool handlers
 - `src/tools/content/` - Content tool handlers
-- Existing `src/server-http.ts` with HTTP transport
+- Existing `src/index.ts` with HTTP transport
 
 ## Output Artifacts
 
-- Updated `src/server-http.ts` with all five tools registered
+- Updated `src/index.ts` with all five tools registered
 - Shared provider instances initialized at server startup
 - Complete MCP server ready for testing
 
@@ -72,13 +72,13 @@ Use your internal Todo tool to track these and keep on track.
 <details>
 <summary>Detailed Implementation Guide</summary>
 
-### Step 1: Update Imports in `src/server-http.ts`
+### Step 1: Update Imports in `src/index.ts`
 
 Add imports for all tools and providers:
 
 ```typescript
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -246,7 +246,7 @@ npm run type-check
 npm run build
 
 # Start server (should run without errors)
-npm run dev:http
+npm run dev
 ```
 
 ### Step 6: Test with MCP Inspector
