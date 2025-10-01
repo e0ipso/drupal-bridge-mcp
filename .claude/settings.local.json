@@ -33,5 +33,6 @@
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "drupal-bridge"
-  ]
+  ],
+  "outputStyle": "default"
 }
