@@ -2,7 +2,7 @@
 id: 4
 group: 'server-integration'
 dependencies: [1, 2, 3]
-status: 'pending'
+status: 'completed'
 created: '2025-09-30'
 skills:
   - typescript
@@ -24,15 +24,15 @@ instances for OAuthProvider and DrupalConnector.
 
 ## Acceptance Criteria
 
-- [ ] All five tools registered in `src/index.ts`
-- [ ] Shared singleton instances created for `OAuthProvider` and `DrupalConnector`
-- [ ] Session ID extracted from MCP transport context (`extra.sessionId`)
-- [ ] Tool context passed to all handler functions with sessionId and providers
-- [ ] `ListToolsRequestSchema` handler returns all five tool schemas
-- [ ] `CallToolRequestSchema` handler routes to appropriate tool functions
-- [ ] Tool input schemas properly defined with Zod descriptions
-- [ ] Zero TypeScript compilation errors
-- [ ] Server starts without errors: `npm run dev`
+- [x] All five tools registered in `src/index.ts`
+- [x] Shared singleton instances created for `OAuthProvider` and `DrupalConnector`
+- [x] Session ID extracted from MCP transport context (`extra.sessionId`)
+- [x] Tool context passed to all handler functions with sessionId and providers
+- [x] `ListToolsRequestSchema` handler returns all five tool schemas
+- [x] `CallToolRequestSchema` handler routes to appropriate tool functions
+- [x] Tool input schemas properly defined with Zod descriptions
+- [x] Zero TypeScript compilation errors
+- [x] Server starts without errors: `npm run dev`
 
 Use your internal Todo tool to track these and keep on track.
 

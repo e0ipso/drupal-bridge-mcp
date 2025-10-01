@@ -22,9 +22,29 @@ import {
   OAuthConfigManager,
   createOAuthConfigFromEnv,
 } from './oauth/config.js';
-import { createDrupalOAuthProvider } from './oauth/provider.js';
+import {
+  DrupalOAuthProvider,
+  createDrupalOAuthProvider,
+} from './oauth/provider.js';
+import { DrupalConnector } from './drupal/connector.js';
 import { DeviceFlow } from './oauth/device-flow.js';
 import type { TokenResponse } from './oauth/device-flow-types.js';
+
+// Tool imports
+import {
+  authLogin,
+  authLoginSchema,
+  authLogout,
+  authLogoutSchema,
+  authStatus,
+  authStatusSchema,
+} from './tools/auth/index.js';
+import {
+  searchTutorial,
+  searchTutorialSchema,
+  getTutorial,
+  getTutorialSchema,
+} from './tools/content/index.js';
 
 /**
  * HTTP server configuration interface
@@ -56,6 +76,8 @@ export class DrupalMCPHttpServer {
   private app: Application;
   private config: HttpServerConfig;
   private oauthConfigManager?: OAuthConfigManager;
+  private oauthProvider?: DrupalOAuthProvider;
+  private drupalConnector?: DrupalConnector;
   private transport?: StreamableHTTPServerTransport;
   private sessionTokens: Map<string, TokenResponse> = new Map();
 
@@ -153,8 +175,9 @@ export class DrupalMCPHttpServer {
       );
       console.log(`  Token endpoint: ${metadata.token_endpoint}`);
 
-      // Create OAuth provider (available for future use in authenticated requests)
-      const _oauthProvider = createDrupalOAuthProvider(this.oauthConfigManager);
+      // Create OAuth provider and Drupal connector as shared instances
+      this.oauthProvider = createDrupalOAuthProvider(this.oauthConfigManager);
+      this.drupalConnector = new DrupalConnector();
 
       // Set up OAuth metadata router
       // Use the MCP server's URL as the resource server URL, not Drupal's URL
@@ -206,8 +229,16 @@ export class DrupalMCPHttpServer {
       return {
         tools: [
           {
-            name: 'health_check',
-            description: 'Check server health status',
+            name: 'auth_login',
+            description: 'Authenticate with Drupal using OAuth device flow',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'auth_logout',
+            description: 'Log out and clear OAuth session',
             inputSchema: {
               type: 'object',
               properties: {},
@@ -215,18 +246,42 @@ export class DrupalMCPHttpServer {
           },
           {
             name: 'auth_status',
-            description: 'Check OAuth authentication status',
+            description: 'Check current authentication status',
             inputSchema: {
               type: 'object',
               properties: {},
             },
           },
           {
-            name: 'device_flow_test',
-            description: 'Test device authorization grant flow',
+            name: 'search_tutorial',
+            description: 'Search Drupal tutorials by keyword',
             inputSchema: {
               type: 'object',
-              properties: {},
+              properties: {
+                query: {
+                  type: 'string',
+                  description: 'Search keywords',
+                },
+                limit: {
+                  type: 'number',
+                  description: 'Maximum number of results (default: 10)',
+                },
+              },
+              required: ['query'],
+            },
+          },
+          {
+            name: 'get_tutorial',
+            description: 'Retrieve a specific tutorial by ID',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'string',
+                  description: 'Tutorial ID',
+                },
+              },
+              required: ['id'],
             },
           },
         ],
@@ -236,101 +291,65 @@ export class DrupalMCPHttpServer {
     // Handle tool calls
     this.server.setRequestHandler(
       CallToolRequestSchema,
-      async (request, _extra) => {
-        const { name } = request.params;
+      async (request, extra) => {
+        // Extract session ID from MCP transport context
+        const sessionId = extra?.sessionId || 'default-session';
 
-        switch (name) {
-          case 'health_check':
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify({
-                    status: 'healthy',
-                    server: this.config.name,
-                    version: this.config.version,
-                    authEnabled: this.config.enableAuth,
-                    timestamp: new Date().toISOString(),
-                  }),
-                },
-              ],
-            };
+        const toolName = request.params.name;
+        const args = request.params.arguments || {};
 
-          case 'auth_status': {
-            // Note: AuthInfo would be available in extra._meta.authInfo when using OAuth middleware
-            // For now, return basic status based on auth configuration
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify({
-                    authEnabled: this.config.enableAuth,
-                    message: this.config.enableAuth
-                      ? 'OAuth authentication is enabled'
-                      : 'OAuth authentication is disabled',
-                  }),
-                },
-              ],
-            };
-          }
+        // Check if OAuth provider is initialized
+        if (!this.oauthProvider) {
+          throw new McpError(
+            ErrorCode.InternalError,
+            'OAuth provider not initialized. Set AUTH_ENABLED=true to enable OAuth.'
+          );
+        }
 
-          case 'device_flow_test': {
-            if (!this.config.enableAuth) {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: JSON.stringify({
-                      error: 'OAuth authentication is disabled',
-                      message: 'Set AUTH_ENABLED=true to enable OAuth',
-                    }),
-                  },
-                ],
-              };
-            }
+        // Check if Drupal connector is initialized
+        if (!this.drupalConnector) {
+          throw new McpError(
+            ErrorCode.InternalError,
+            'Drupal connector not initialized'
+          );
+        }
 
-            try {
-              // Get session ID from request context
-              const sessionId = randomUUID();
+        // Create shared context for all tools
+        const authContext = {
+          sessionId,
+          oauthProvider: this.oauthProvider,
+        };
 
-              // Run device flow
-              const tokens = await this.handleDeviceFlow(sessionId);
+        const contentContext = {
+          sessionId,
+          oauthProvider: this.oauthProvider,
+          drupalConnector: this.drupalConnector,
+        };
 
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: JSON.stringify({
-                      success: true,
-                      message: 'Device flow authentication successful',
-                      tokenType: tokens.token_type,
-                      scope: tokens.scope,
-                      expiresIn: tokens.expires_in,
-                      hasRefreshToken: !!tokens.refresh_token,
-                    }),
-                  },
-                ],
-              };
-            } catch (error) {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: JSON.stringify({
-                      success: false,
-                      error:
-                        error instanceof Error ? error.message : String(error),
-                    }),
-                  },
-                ],
-              };
-            }
-          }
+        // Route to appropriate tool handler
+        switch (toolName) {
+          case 'auth_login':
+            return authLogin(authLoginSchema.parse(args), authContext);
+
+          case 'auth_logout':
+            return authLogout(authLogoutSchema.parse(args), authContext);
+
+          case 'auth_status':
+            return authStatus(authStatusSchema.parse(args), authContext);
+
+          case 'search_tutorial':
+            return searchTutorial(
+              searchTutorialSchema.parse(args),
+              contentContext
+            );
+
+          case 'get_tutorial':
+            return getTutorial(getTutorialSchema.parse(args), contentContext);
 
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
-              `Unknown tool: ${name}`
+              `Unknown tool: ${toolName}`
             );
         }
       }
