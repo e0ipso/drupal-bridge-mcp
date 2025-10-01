@@ -1,0 +1,34 @@
+{
+  "searchResponse": {
+    "results": [
+      {
+        "id": "tutorial-123",
+        "title": "Introduction to MCP",
+        "summary": "Learn the basics of Model Context Protocol",
+        "url": "https://drupal.site/tutorial/123",
+        "difficulty": "beginner"
+      },
+      {
+        "id": "tutorial-456",
+        "title": "Advanced OAuth Integration",
+        "summary": "Deep dive into OAuth 2.1",
+        "url": "https://drupal.site/tutorial/456",
+        "difficulty": "advanced"
+      }
+    ],
+    "total": 2,
+    "limit": 10
+  },
+  "tutorialDetail": {
+    "id": "tutorial-123",
+    "title": "Introduction to MCP",
+    "summary": "Learn the basics of Model Context Protocol",
+    "body": "<p>Full tutorial content here...</p>",
+    "url": "https://drupal.site/tutorial/123",
+    "author": "Jane Doe",
+    "created": "2025-01-15T10:30:00Z",
+    "updated": "2025-01-20T14:45:00Z",
+    "tags": ["mcp", "tutorial", "beginner"],
+    "difficulty": "beginner"
+  }
+}
