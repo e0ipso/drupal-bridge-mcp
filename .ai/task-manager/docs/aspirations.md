@@ -16,17 +16,18 @@ This research provides a comprehensive implementation strategy for building a **
 ### Primary Goals
 1. **Maximum SDK Reuse**: Leverage the official MCP SDK to avoid custom implementations
 2. **OAuth 2.1 Compliance**: Implement secure, modern authentication with auto-discovery
-3. **Multi-User Support**: Handle multiple authenticated users simultaneously on the **MCP Server**
-4. **Secure Token Storage**: In-memory encryption without database dependencies on the **MCP Server**
+3. **Multi-User Support**: Handle multiple authenticated users simultaneously with reconnection resilience on the **MCP Server**
+4. **Secure Token Storage**: User-level in-memory encryption without database dependencies on the **MCP Server**
 5. **AI Agent Integration**: **MCP Server** leverages host AI capabilities via **MCP Client** without separate API keys
 6. **HTTP Streamable Transport**: Use the modern transport mechanism for **MCP Server** communication (NOT stdio)
-7. **MCP Inspector Compatibility**: Full validation and debugging support for the **MCP Server**
+7. **MCP Inspector Compatibility**: Full validation, debugging, and reconnection support for the **MCP Server**
 
 ### Core Features
 
 #### Authentication Features
 - **OAuth 2.1 Auto-Configuration**: **MCP Server** discovers OAuth endpoints via well-known URLs
-- **Multi-User Sessions**: **MCP Server** supports concurrent authenticated users
+- **Multi-User Sessions**: **MCP Server** supports concurrent authenticated users with reconnection support
+- **User-Level Token Storage**: **MCP Server** stores tokens by user ID (not session ID) for reconnection resilience
 - **Encrypted Token Storage**: **MCP Server** provides cryptographically secure in-memory token management
 - **Three Auth Tools**: login, logout, and authentication status provided by **MCP Server**
 
@@ -884,17 +885,23 @@ export class MCPDrupalServer {
   private queryAnalyzer: QueryAnalyzer;
   private app: express.Application;
 
+  // User-level token storage (persistent across reconnections)
+  private userTokens: Map<string, TokenResponse> = new Map();
+
+  // Session-to-user mapping (ephemeral)
+  private sessionToUser: Map<string, string> = new Map();
+
   constructor() {
     this.mcpServer = new McpServer({
       name: "drupal-oauth-server",
       version: "1.0.0"
     });
-    
+
     this.app = express();
     this.oauth = new MCPOAuthManager();
     this.drupal = new DrupalConnector(process.env.DRUPAL_URL, this.oauth);
     this.queryAnalyzer = new QueryAnalyzer(this.mcpServer);
-    
+
     this.registerTokenValidation();
     this.registerTools();
   }
@@ -1299,6 +1306,91 @@ Configure your Drupal OAuth client with:
 - **Official Discord**: https://discord.com/invite/model-context-protocol-1312302100125843476
 - **Example Servers**: https://github.com/modelcontextprotocol/servers
 
+## Session Management & Reconnection: Known Issues
+
+During implementation, two critical bugs were discovered related to session management and reconnection support. These have been documented in the spec and resolved through architectural changes.
+
+### Issue 1: HTTP 403 After Authentication (Token Lookup Failure)
+
+**Problem**: MCP Inspector authenticated successfully but all tool calls returned `HTTP 403 Forbidden`.
+
+**Root Cause**:
+```typescript
+// BROKEN: Session-based token storage
+private sessionTokens: Map<string, TokenResponse> = new Map();
+
+onsessionclosed: async (sessionId: string) => {
+  this.sessionTokens.delete(sessionId); // Tokens lost on disconnect!
+}
+```
+
+When Inspector reconnected, it received a NEW session ID. Token lookup failed because tokens were keyed by the OLD session ID. Requests to Drupal went without Authorization headers, resulting in 403 errors.
+
+**Solution**: User-level token storage with session-to-user mapping:
+```typescript
+// FIXED: User-level token storage
+private userTokens: Map<string, TokenResponse> = new Map(); // userId → tokens
+private sessionToUser: Map<string, string> = new Map(); // sessionId → userId
+
+async getSession(sessionId: string) {
+  const userId = this.sessionToUser.get(sessionId); // Step 1: session → user
+  const tokens = this.userTokens.get(userId); // Step 2: user → tokens
+  return tokens ? { accessToken: tokens.access_token, ... } : null;
+}
+
+onsessionclosed: async (sessionId: string) => {
+  this.sessionToUser.delete(sessionId); // Remove session mapping
+  // DO NOT delete user tokens - they persist for reconnection
+}
+```
+
+### Issue 2: "Server Already Initialized" on Reconnection
+
+**Problem**: Inspector connected successfully but reconnection failed with:
+```
+Error: Invalid Request: Server already initialized
+```
+
+**Root Cause**:
+- `server.connect(transport)` called once at server startup
+- Each Inspector connection sends `initialize` request
+- MCP SDK Server class rejects duplicate initialization
+
+**Solution**: Use single long-lived transport instance that handles multiple sessions:
+```typescript
+// Create ONE transport at server startup
+this.transport = new StreamableHTTPServerTransport({
+  sessionIdGenerator: () => randomUUID(),
+  onsessionclosed: (sessionId) => {
+    // Clean up session mapping, preserve user tokens
+  }
+});
+
+// Connect ONCE
+await this.server.connect(this.transport);
+
+// Transport handles all sessions internally
+this.app.all('/mcp', async (req, res) => {
+  await this.transport.handleRequest(req, res);
+});
+```
+
+### Architectural Insight: Sessions vs Users
+
+**Transport Sessions (Ephemeral)**:
+- Created on each connection
+- Destroyed on disconnect
+- Inspector creates new session per connection
+
+**User Authentication (Persistent)**:
+- Tied to user identity from OAuth
+- Survives transport reconnections
+- Only cleared on explicit logout
+
+**Key Design Principle**: Separate transport session lifecycle from user authentication lifecycle.
+
+See [06--multi-user-sessions.md](./specs/06--multi-user-sessions.md) for full specification.
+
 ## Key Implementation Decisions
 
 **Single Binary Architecture**: Based on production MCP server analysis, this implementation creates one server binary that handles OAuth authentication, provides MCP tools, and integrates with existing MCP clients. No separate client binary is needed.
@@ -1308,6 +1400,8 @@ Configure your Drupal OAuth client with:
 **OAuth 2.1 compliance** achieved natively through the @modelcontextprotocol/sdk with automatic discovery endpoint support, mandatory PKCE, and built-in token management. The server implements OAuth callback endpoints directly.
 
 **Direct OAuth Callback Handling**: The MCP Server handles OAuth callbacks at its own endpoints (e.g., `https://example.org/oauth/callback`) rather than requiring localhost callbacks. This follows the pattern of production MCP servers like NapthaAI and LlamaIndex implementations.
+
+**User-Level Token Storage** separates user authentication from transport session lifecycle. Tokens are stored by user ID (not session ID) to support reconnection. When MCP Inspector or clients reconnect with new session IDs, they can reuse existing user tokens without re-authentication or 403 errors.
 
 **In-memory encryption** using Node.js built-in crypto eliminates database dependencies while maintaining security through AES-256-GCM encryption with proper key derivation.
 
