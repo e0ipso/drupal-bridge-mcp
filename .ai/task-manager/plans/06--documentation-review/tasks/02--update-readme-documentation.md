@@ -2,7 +2,7 @@
 id: 2
 group: 'documentation-update'
 dependencies: [1]
-status: 'pending'
+status: 'completed'
 created: '2025-10-02'
 skills:
   - technical-writing
@@ -81,7 +81,7 @@ compatibility.
 
 Replace with comprehensive environment variables:
 
-````markdown
+`````markdown
 ### Configuration
 
 Create a `.env` file:
@@ -108,7 +108,9 @@ HTTP_CORS_ORIGINS=http://localhost:5173,http://localhost:6200
 OAUTH_FORCE_DEVICE_FLOW=true  # Force device flow for headless environments
 ```\`\`\`
 ````
-````
+`````
+
+`````
 
 ### Section 4: Update "Available Tools" Section (Lines ~56-92)
 
@@ -126,7 +128,7 @@ Authenticate with Drupal using OAuth Device Flow
   // No parameters required
 }
 ```
-````
+`````
 
 ### `auth_logout`
 
