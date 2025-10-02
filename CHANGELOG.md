@@ -1,3 +1,12 @@
+# [1.4.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.3.0...v1.4.0) (2025-10-02)
+
+
+### Features
+
+* implement dynamic tool handlers and caching ([d9590aa](https://github.com/e0ipso/drupal-bridge-mcp/commit/d9590aa7a7aceceff8fdb71fca900aede3ef53b4))
+* implement tool discovery service ([95caac1](https://github.com/e0ipso/drupal-bridge-mcp/commit/95caac184b44a9da887101bc2e56e361df13bb6c))
+* integrate dynamic tool discovery into server startup ([24de557](https://github.com/e0ipso/drupal-bridge-mcp/commit/24de5576f4c4d80b4f17c03ca529ad0ba96caa17))
+
 # [1.3.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.2.0...v1.3.0) (2025-10-02)
 
 
