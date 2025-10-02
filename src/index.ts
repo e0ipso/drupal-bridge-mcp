@@ -11,12 +11,7 @@ import express, { type Application } from 'express';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { mcpAuthMetadataRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
-import {
-  CallToolRequestSchema,
-  ErrorCode,
-  ListToolsRequestSchema,
-  McpError,
-} from '@modelcontextprotocol/sdk/types.js';
+import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'node:crypto';
 import {
   OAuthConfigManager,
@@ -37,22 +32,6 @@ import {
   registerDynamicTools,
   type ToolDefinition,
 } from './discovery/index.js';
-
-// Tool imports
-import {
-  authLogin,
-  authLoginSchema,
-  authLogout,
-  authLogoutSchema,
-  authStatus,
-  authStatusSchema,
-} from './tools/auth/index.js';
-import {
-  searchTutorial,
-  searchTutorialSchema,
-  getTutorial,
-  getTutorialSchema,
-} from './tools/content/index.js';
 
 /**
  * Discovered tool definitions from /mcp/tools/list endpoint
@@ -260,77 +239,8 @@ export class DrupalMCPHttpServer {
       };
     });
 
-    // Handle tool calls
-    this.server.setRequestHandler(
-      CallToolRequestSchema,
-      async (request, extra) => {
-        // Extract session ID from MCP transport context
-        const sessionId = extra?.sessionId || 'default-session';
-
-        const toolName = request.params.name;
-        const args = request.params.arguments || {};
-
-        // Check if OAuth provider is initialized
-        if (!this.oauthProvider) {
-          throw new McpError(
-            ErrorCode.InternalError,
-            'OAuth provider not initialized. Set AUTH_ENABLED=true to enable OAuth.'
-          );
-        }
-
-        // Check if Drupal connector is initialized
-        if (!this.drupalConnector) {
-          throw new McpError(
-            ErrorCode.InternalError,
-            'Drupal connector not initialized'
-          );
-        }
-
-        // Retrieve capabilities for this session
-        const capabilities = this.server.getClientCapabilities();
-
-        // Create shared context for all tools
-        const authContext = {
-          sessionId,
-          oauthProvider: this.oauthProvider,
-        };
-
-        const contentContext = {
-          sessionId,
-          oauthProvider: this.oauthProvider,
-          drupalConnector: this.drupalConnector,
-          samplingCapabilities: capabilities,
-          server: this.server,
-        };
-
-        // Route to appropriate tool handler
-        switch (toolName) {
-          case 'auth_login':
-            return authLogin(authLoginSchema.parse(args), authContext);
-
-          case 'auth_logout':
-            return authLogout(authLogoutSchema.parse(args), authContext);
-
-          case 'auth_status':
-            return authStatus(authStatusSchema.parse(args), authContext);
-
-          case 'search_tutorial':
-            return searchTutorial(
-              searchTutorialSchema.parse(args),
-              contentContext
-            );
-
-          case 'get_tutorial':
-            return getTutorial(getTutorialSchema.parse(args), contentContext);
-
-          default:
-            throw new McpError(
-              ErrorCode.MethodNotFound,
-              `Unknown tool: ${toolName}`
-            );
-        }
-      }
-    );
+    // CallToolRequestSchema handler is now registered dynamically
+    // via registerDynamicTools() during server startup
   }
 
   /**
@@ -389,9 +299,7 @@ export class DrupalMCPHttpServer {
    * Get session by ID
    * Used by dynamic tool handlers for OAuth
    */
-  private async getSession(
-    sessionId: string
-  ): Promise<{
+  private async getSession(sessionId: string): Promise<{
     accessToken: string;
     refreshToken?: string;
     expiresAt: number;

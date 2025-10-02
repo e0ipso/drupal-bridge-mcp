@@ -23,6 +23,7 @@
   "testMatch": [
     "<rootDir>/src/**/*.test.ts",
     "<rootDir>/src/**/*.spec.ts",
+    "<rootDir>/src/**/__tests__/**/*.test.ts",
     "<rootDir>/tests/unit/**/*.test.ts",
     "<rootDir>/tests/unit/**/*.spec.ts"
   ],

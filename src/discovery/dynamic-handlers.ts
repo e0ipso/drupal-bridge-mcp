@@ -9,11 +9,12 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { convertJsonSchemaToZod } from 'zod-from-json-schema';
+import type { z } from 'zod';
 import type { ToolDefinition } from './tool-discovery.js';
 
 interface DynamicToolContext {
   tool: ToolDefinition;
-  schema: any; // Using any to handle Zod version differences
+  schema: z.ZodTypeAny;
 }
 
 /**
@@ -36,12 +37,13 @@ function convertToolSchemas(
   for (const tool of tools) {
     try {
       // Convert JSON Schema to Zod schema using zod-from-json-schema
-      // Cast to any to handle version differences between zod v3 and v4
-      const zodSchema = convertJsonSchemaToZod(tool.inputSchema as any);
+      const zodSchema = convertJsonSchemaToZod(
+        tool.inputSchema as Record<string, unknown>
+      );
 
       toolContexts.set(tool.name, {
         tool,
-        schema: zodSchema as any,
+        schema: zodSchema as unknown as z.ZodTypeAny,
       });
 
       console.log(`✓ Registered schema for tool: ${tool.name}`);
@@ -51,10 +53,15 @@ function convertToolSchemas(
         `⚠ Skipping tool "${tool.name}": Schema conversion failed.`,
         error instanceof Error ? error.message : String(error)
       );
-      console.warn(
-        `  Input schema:`,
-        JSON.stringify(tool.inputSchema, null, 2)
-      );
+      // Try to stringify schema, but handle circular references
+      try {
+        console.warn(
+          `  Input schema:`,
+          JSON.stringify(tool.inputSchema, null, 2)
+        );
+      } catch {
+        console.warn(`  Input schema: <circular or non-serializable>`);
+      }
     }
   }
 

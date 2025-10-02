@@ -2,7 +2,7 @@
 id: 7
 group: 'cleanup'
 dependencies: [6]
-status: 'pending'
+status: 'completed'
 created: '2025-10-02'
 skills: ['typescript']
 ---
