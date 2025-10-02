@@ -26,7 +26,10 @@
       "Bash(npm run start:http:*)",
       "Bash(npx:*)",
       "Bash(lsof:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:www.devturtleblog.com)"
     ],
     "deny": []
   },

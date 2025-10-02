@@ -31,6 +31,13 @@ import { DeviceFlow } from './oauth/device-flow.js';
 import type { TokenResponse } from './oauth/device-flow-types.js';
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 
+// Discovery imports
+import {
+  getDiscoveredTools,
+  registerDynamicTools,
+  type ToolDefinition,
+} from './discovery/index.js';
+
 // Tool imports
 import {
   authLogin,
@@ -46,6 +53,22 @@ import {
   getTutorial,
   getTutorialSchema,
 } from './tools/content/index.js';
+
+/**
+ * Discovered tool definitions from /mcp/tools/list endpoint
+ * Set during server initialization via setDiscoveredTools()
+ */
+let discoveredToolDefinitions: ToolDefinition[] = [];
+
+/**
+ * Store discovered tools for ListToolsRequest handler
+ */
+function setDiscoveredTools(tools: ToolDefinition[]): void {
+  discoveredToolDefinitions = tools;
+  console.log(
+    `Stored ${tools.length} tool definitions for ListToolsRequest handler`
+  );
+}
 
 /**
  * HTTP server configuration interface
@@ -226,67 +249,14 @@ export class DrupalMCPHttpServer {
    * Sets up MCP request handlers
    */
   private setupHandlers(): void {
-    // List available tools
+    // List available tools - returns dynamically discovered tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
-        tools: [
-          {
-            name: 'auth_login',
-            description: 'Authenticate with Drupal using OAuth device flow',
-            inputSchema: {
-              type: 'object',
-              properties: {},
-            },
-          },
-          {
-            name: 'auth_logout',
-            description: 'Log out and clear OAuth session',
-            inputSchema: {
-              type: 'object',
-              properties: {},
-            },
-          },
-          {
-            name: 'auth_status',
-            description: 'Check current authentication status',
-            inputSchema: {
-              type: 'object',
-              properties: {},
-            },
-          },
-          {
-            name: 'search_tutorial',
-            description: 'Search Drupal tutorials by keyword',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                query: {
-                  type: 'string',
-                  description: 'Search keywords',
-                },
-                limit: {
-                  type: 'number',
-                  description: 'Maximum number of results (default: 10)',
-                },
-              },
-              required: ['query'],
-            },
-          },
-          {
-            name: 'get_tutorial',
-            description: 'Retrieve a specific tutorial by ID',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                id: {
-                  type: 'string',
-                  description: 'Tutorial ID',
-                },
-              },
-              required: ['id'],
-            },
-          },
-        ],
+        tools: discoveredToolDefinitions.map(tool => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema, // Already JSON Schema from discovery
+        })),
       };
     });
 
@@ -361,6 +331,81 @@ export class DrupalMCPHttpServer {
         }
       }
     );
+  }
+
+  /**
+   * Make a JSON-RPC request to Drupal
+   * Used by dynamic tool handlers
+   */
+  private async makeRequest(
+    method: string,
+    params: unknown,
+    token?: string
+  ): Promise<unknown> {
+    if (!this.drupalConnector) {
+      throw new Error('Drupal connector not initialized');
+    }
+
+    if (!token) {
+      throw new Error('OAuth token required for JSON-RPC requests');
+    }
+
+    // Create a JSON-RPC client for this request
+    const response = await fetch(
+      `${process.env.DRUPAL_BASE_URL}${process.env.DRUPAL_JSONRPC_ENDPOINT || '/jsonrpc'}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method,
+          params,
+          id: randomUUID(),
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `JSON-RPC request failed: HTTP ${response.status} ${response.statusText}`
+      );
+    }
+
+    const jsonRpcResponse = await response.json();
+
+    if (jsonRpcResponse.error) {
+      throw new Error(
+        `JSON-RPC error: ${jsonRpcResponse.error.message || 'Unknown error'}`
+      );
+    }
+
+    return jsonRpcResponse.result;
+  }
+
+  /**
+   * Get session by ID
+   * Used by dynamic tool handlers for OAuth
+   */
+  private async getSession(
+    sessionId: string
+  ): Promise<{
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt: number;
+  } | null> {
+    const tokens = this.sessionTokens.get(sessionId);
+    if (!tokens) {
+      return null;
+    }
+
+    return {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      expiresAt: Date.now() + (tokens.expires_in || 3600) * 1000,
+    };
   }
 
   /**
@@ -498,6 +543,76 @@ export class DrupalMCPHttpServer {
       // Initialize OAuth if enabled
       await this.initializeOAuth();
 
+      // ========== NEW: Tool Discovery ==========
+      console.log('\n=== Discovering Tools ===');
+
+      const DRUPAL_BASE_URL = process.env.DRUPAL_BASE_URL;
+      if (!DRUPAL_BASE_URL) {
+        console.error(
+          'ERROR: DRUPAL_BASE_URL environment variable is required'
+        );
+        console.error('Set it in your .env file or environment:');
+        console.error('  DRUPAL_BASE_URL=https://your-drupal-site.com');
+        process.exit(1);
+      }
+
+      let tools: ToolDefinition[];
+      try {
+        tools = await getDiscoveredTools(DRUPAL_BASE_URL);
+      } catch (error) {
+        console.error('\n❌ FATAL: Tool discovery failed');
+        console.error(
+          'Error:',
+          error instanceof Error ? error.message : String(error)
+        );
+        console.error('\nTroubleshooting:');
+        console.error('  1. Verify DRUPAL_BASE_URL is correct');
+        console.error('  2. Ensure /mcp/tools/list endpoint exists on Drupal');
+        console.error('  3. Check network connectivity to Drupal server');
+        console.error('  4. Review Drupal logs for errors');
+        process.exit(1);
+      }
+
+      // Validate we have tools
+      if (tools.length === 0) {
+        console.error('\n❌ FATAL: No tools discovered from /mcp/tools/list');
+        console.error('The MCP server cannot start without any tools.');
+        console.error(
+          '\nEnsure Drupal backend has configured tools at /mcp/tools/list endpoint.'
+        );
+        process.exit(1);
+      }
+
+      console.log(`✓ Discovered ${tools.length} tools from Drupal`);
+      tools.forEach(tool => {
+        console.log(
+          `  - ${tool.name}: ${tool.description.substring(0, 60)}${tool.description.length > 60 ? '...' : ''}`
+        );
+      });
+
+      // Store tools for ListToolsRequest handler
+      setDiscoveredTools(tools);
+
+      // Register dynamic handlers
+      console.log('\n=== Registering Dynamic Handlers ===');
+      try {
+        registerDynamicTools(
+          this.server,
+          tools,
+          this.makeRequest.bind(this),
+          this.getSession.bind(this)
+        );
+      } catch (error) {
+        console.error('\n❌ FATAL: Dynamic handler registration failed');
+        console.error(
+          'Error:',
+          error instanceof Error ? error.message : String(error)
+        );
+        process.exit(1);
+      }
+
+      // ========== END: Tool Discovery ==========
+
       // Set up MCP endpoint
       await this.setupMcpEndpoint();
 
@@ -516,6 +631,7 @@ export class DrupalMCPHttpServer {
       return new Promise((resolve, reject) => {
         try {
           this.app.listen(this.config.port, this.config.host, () => {
+            console.log('\n=== MCP Server Started ===');
             console.log('='.repeat(60));
             console.log(`${this.config.name} v${this.config.version}`);
             console.log('='.repeat(60));
@@ -536,7 +652,13 @@ export class DrupalMCPHttpServer {
               console.log(`OAuth Server: ${config.drupalUrl}`);
               console.log(`OAuth Client: ${config.clientId}`);
             }
+            console.log(
+              `Tools Registered: ${discoveredToolDefinitions.length}`
+            );
             console.log('='.repeat(60));
+            console.log(
+              `\n✅ MCP Server started successfully with ${discoveredToolDefinitions.length} tools`
+            );
             resolve();
           });
         } catch (error) {

@@ -226,6 +226,464 @@ const clientCapabilities = await this.mcpServer.getClientCapabilities();
 const samplingEnabled = clientCapabilities.experimental?.sampling?.enabled;
 ```
 
+## Dynamic Tool Discovery via /mcp/tools/list Endpoint
+
+**MCP Servers** can dynamically discover and register tools from backend systems using the emerging community standard `/mcp/tools/list` endpoint pattern. This enables **MCP Servers** to automatically configure available tools based on backend capabilities without hardcoding tool definitions, following the agent-to-agent (A2A) framework principles.
+
+**Community Standard Note**: The `/mcp/tools/list` endpoint is an emerging community convention for tool discovery in MCP implementations, not an official part of the MCP specification. It enables dynamic tool composition in agent-to-agent communication scenarios.
+
+### The Three-Step Discovery Pattern
+
+The tool discovery workflow follows a standardized three-step pattern:
+
+1. **Discovery**: **MCP Server** queries the `/mcp/tools/list` endpoint at startup to discover available tools
+2. **Description**: Backend responds with JSON tool definitions including schemas, endpoints, and metadata
+3. **Invocation**: **MCP Server** dynamically registers handlers that validate and proxy requests to the backend
+
+This pattern enables runtime tool composition where AI agents can discover and integrate specialized capabilities on-the-fly, similar to how browsers dynamically interact with REST APIs.
+
+### Tool Definition Format
+
+Drupal exposes tools via a standardized JSON format that describes each tool's interface:
+
+```json
+{
+  "tools": [
+    {
+      "name": "search_tutorial",
+      "description": "Search Drupal tutorials by keyword, tag, or category with AI-enhanced query analysis",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query string"
+          },
+          "limit": {
+            "type": "number",
+            "default": 10,
+            "description": "Maximum number of results to return"
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Optional array of tags to filter by"
+          }
+        },
+        "required": ["query"]
+      },
+      "endpoint": "/jsonrpc",
+      "method": "tutorial.search",
+      "requiresAuth": true
+    },
+    {
+      "name": "get_tutorial",
+      "description": "Retrieve a specific tutorial by ID with full content and metadata",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Tutorial node ID"
+          }
+        },
+        "required": ["id"]
+      },
+      "endpoint": "/jsonrpc",
+      "method": "tutorial.get",
+      "requiresAuth": true
+    },
+    {
+      "name": "create_tutorial",
+      "description": "Create a new tutorial with content and metadata",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string", "description": "Tutorial title"},
+          "body": {"type": "string", "description": "Tutorial content in markdown"},
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Tutorial tags"
+          },
+          "category": {"type": "string", "description": "Tutorial category"}
+        },
+        "required": ["title", "body"]
+      },
+      "endpoint": "/jsonrpc",
+      "method": "tutorial.create",
+      "requiresAuth": true
+    }
+  ]
+}
+```
+
+### TypeScript Implementation with MCP SDK
+
+The **MCP Server** uses `@modelcontextprotocol/sdk` to dynamically discover and register tools from Drupal:
+
+```typescript
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
+import type { DrupalConnector } from "./drupal/connector.js";
+
+interface ToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: JSONSchema;
+  endpoint: string;
+  method: string;
+  requiresAuth: boolean;
+}
+
+interface JSONSchema {
+  type: string;
+  properties?: Record<string, any>;
+  required?: string[];
+}
+
+/**
+ * Convert JSON Schema to Zod schema for runtime validation
+ */
+function jsonSchemaToZod(schema: JSONSchema): z.ZodSchema {
+  if (schema.type !== "object" || !schema.properties) {
+    return z.object({});
+  }
+
+  const properties: Record<string, z.ZodTypeAny> = {};
+  const required = new Set(schema.required || []);
+
+  for (const [key, prop] of Object.entries(schema.properties)) {
+    let zodType: z.ZodTypeAny;
+
+    // Convert JSON Schema types to Zod types
+    switch (prop.type) {
+      case "string":
+        zodType = z.string();
+        if (prop.description) zodType = zodType.describe(prop.description);
+        break;
+      case "number":
+        zodType = z.number();
+        if (prop.description) zodType = zodType.describe(prop.description);
+        if (prop.default !== undefined) zodType = zodType.default(prop.default);
+        break;
+      case "boolean":
+        zodType = z.boolean();
+        break;
+      case "array":
+        if (prop.items?.type === "string") {
+          zodType = z.array(z.string());
+        } else {
+          zodType = z.array(z.any());
+        }
+        break;
+      default:
+        zodType = z.any();
+    }
+
+    // Make optional if not required
+    if (!required.has(key)) {
+      zodType = zodType.optional();
+    }
+
+    properties[key] = zodType;
+  }
+
+  return z.object(properties);
+}
+
+/**
+ * Discover tools from Drupal /mcp/tools/list endpoint
+ */
+async function discoverTools(
+  drupalUrl: string,
+  server: Server,
+  drupalConnector: DrupalConnector
+): Promise<Map<string, ToolDefinition>> {
+  const discoveredTools = new Map<string, ToolDefinition>();
+
+  try {
+    console.log(`Discovering tools from ${drupalUrl}/mcp/tools/list`);
+
+    const response = await fetch(`${drupalUrl}/mcp/tools/list`, {
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "MCP-Server/1.0"
+      }
+    });
+
+    if (!response.ok) {
+      console.warn(`Tool discovery failed: ${response.status} ${response.statusText}`);
+      return discoveredTools;
+    }
+
+    const data = await response.json() as { tools: ToolDefinition[] };
+
+    if (!Array.isArray(data.tools)) {
+      console.warn("Invalid tool discovery response: 'tools' must be an array");
+      return discoveredTools;
+    }
+
+    console.log(`Discovered ${data.tools.length} tools from Drupal`);
+
+    for (const toolDef of data.tools) {
+      // Validate tool definition
+      if (!toolDef.name || !toolDef.description || !toolDef.method) {
+        console.warn(`Skipping invalid tool definition: ${JSON.stringify(toolDef)}`);
+        continue;
+      }
+
+      // Convert JSON Schema to Zod for validation
+      const zodSchema = jsonSchemaToZod(toolDef.inputSchema);
+
+      // Register tool with MCP server
+      server.setRequestHandler(CallToolRequestSchema, async (request) => {
+        if (request.params.name !== toolDef.name) {
+          return; // Not this tool
+        }
+
+        try {
+          // Validate input parameters against schema
+          const validated = zodSchema.parse(request.params.arguments);
+
+          // Check authentication if required
+          if (toolDef.requiresAuth && !drupalConnector.isAuthenticated()) {
+            throw new Error("Authentication required for this tool");
+          }
+
+          // Invoke Drupal backend via JSON-RPC
+          const result = await drupalConnector.call(toolDef.method, validated);
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(result, null, 2)
+              }
+            ]
+          };
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            throw new Error(`Invalid parameters: ${error.message}`);
+          }
+          throw error;
+        }
+      });
+
+      discoveredTools.set(toolDef.name, toolDef);
+      console.log(`Registered dynamic tool: ${toolDef.name}`);
+    }
+
+    return discoveredTools;
+
+  } catch (error) {
+    console.error("Tool discovery error:", error);
+    return discoveredTools;
+  }
+}
+
+/**
+ * Initialize MCP Server with dynamic tool discovery
+ */
+export async function createMCPServerWithDiscovery(
+  drupalUrl: string,
+  drupalConnector: DrupalConnector
+): Promise<Server> {
+  const server = new Server(
+    {
+      name: "drupal-mcp-server",
+      version: "1.0.0"
+    },
+    {
+      capabilities: {
+        tools: {}
+      }
+    }
+  );
+
+  // Discover and register tools from Drupal
+  const discoveredTools = await discoverTools(drupalUrl, server, drupalConnector);
+
+  // Register ListTools handler to report discovered tools
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    return {
+      tools: Array.from(discoveredTools.values()).map(tool => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema
+      }))
+    };
+  });
+
+  // If no tools were discovered, fall back to static tools
+  if (discoveredTools.size === 0) {
+    console.warn("No tools discovered, falling back to static tool registration");
+    await registerStaticTools(server, drupalConnector);
+  }
+
+  return server;
+}
+
+/**
+ * Fallback: Register minimal static tools if discovery fails
+ */
+async function registerStaticTools(
+  server: Server,
+  drupalConnector: DrupalConnector
+): Promise<void> {
+  // Register core search_tutorial tool as fallback
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    if (request.params.name === "search_tutorial") {
+      const schema = z.object({
+        query: z.string(),
+        limit: z.number().optional().default(10)
+      });
+
+      const validated = schema.parse(request.params.arguments);
+      const result = await drupalConnector.call("tutorial.search", validated);
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }]
+      };
+    }
+  });
+
+  console.log("Registered static fallback tools");
+}
+```
+
+### Discovery Flow Architecture
+
+```mermaid
+sequenceDiagram
+    participant MCP as MCP Server
+    participant Drupal as Drupal Backend
+    participant Client as MCP Client<br/>(Claude Desktop)
+
+    Note over MCP: Server Startup
+    MCP->>Drupal: GET /mcp/tools/list
+    Drupal-->>MCP: { tools: [...] }
+
+    loop For each discovered tool
+        MCP->>MCP: Parse JSON Schema
+        MCP->>MCP: Convert to Zod schema
+        MCP->>MCP: Register tool handler
+        MCP->>MCP: Store tool metadata
+    end
+
+    Note over MCP: Runtime Operation
+    Client->>MCP: tools/list request
+    MCP-->>Client: List of discovered tools
+
+    Client->>MCP: tools/call search_tutorial
+    MCP->>MCP: Validate params with Zod
+    MCP->>Drupal: POST /jsonrpc<br/>{ method: "tutorial.search", params: {...} }
+    Drupal->>Drupal: Execute search
+    Drupal-->>MCP: { result: [...] }
+    MCP-->>Client: Tool response with results
+```
+
+### Security Considerations
+
+**Authentication Propagation**:
+- OAuth Bearer tokens from **MCP Client** sessions are forwarded with every tool invocation
+- Drupal validates tokens and enforces user permissions before executing tool methods
+- Tool discovery endpoint itself may require authentication to prevent information disclosure
+
+**Schema Validation**:
+- All tool parameters are validated against Zod schemas before backend invocation
+- Invalid parameters are rejected with clear error messages
+- Type coercion follows Zod's strict validation rules
+
+**HTTPS Enforcement**:
+- Tool discovery endpoint must use HTTPS in production environments
+- Prevents man-in-the-middle attacks on tool definitions
+- Protects OAuth tokens during tool invocations
+
+**CORS Configuration**:
+- Drupal must configure CORS headers to allow **MCP Server** origin
+- Prevents unauthorized cross-origin tool discovery
+- Restricts tool access to authorized MCP server instances
+
+### Graceful Fallback Strategy
+
+If tool discovery fails due to network errors, endpoint unavailability, or invalid responses, the **MCP Server** falls back to a minimal set of statically defined core tools:
+
+```typescript
+async function discoverTools(...) {
+  try {
+    // Attempt discovery
+    const response = await fetch(`${drupalUrl}/mcp/tools/list`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const { tools } = await response.json();
+    // ... register discovered tools
+
+  } catch (error) {
+    console.warn("Tool discovery failed, using static fallback tools");
+    await registerStaticTools(server, drupalConnector);
+  }
+}
+```
+
+This ensures the **MCP Server** remains functional even if the Drupal backend is temporarily unavailable or doesn't implement the `/mcp/tools/list` endpoint yet.
+
+### Integration with Existing Features
+
+**OAuth Authentication**:
+- Discovered tools automatically use the existing OAuth token flow
+- Session tokens are propagated to Drupal with every tool invocation
+- Tools marked with `requiresAuth: true` enforce authentication
+
+**Session Management**:
+- Tool calls maintain session state across invocations
+- Each **MCP Client** session has isolated tool execution context
+- Session cleanup removes tool-specific state
+
+**MCP Sampling**:
+- Dynamically discovered tools can leverage AI sampling for query analysis
+- Tool implementations can request human confirmation via sampling
+- No code changes needed in tool definitions
+
+**Error Handling**:
+- Tool execution errors propagate with structured JSON-RPC error codes
+- Validation failures provide clear parameter mismatch messages
+- Backend errors are wrapped with contextual information
+
+### Benefits of Dynamic Tool Discovery
+
+**Zero Configuration Maintenance**:
+- No hardcoded tool definitions in **MCP Server** code
+- New Drupal capabilities automatically become available to **MCP Clients**
+- Tool signature changes don't require **MCP Server** updates
+
+**Type Safety**:
+- JSON Schema → Zod conversion ensures runtime type checking
+- Invalid parameters are caught before reaching Drupal
+- TypeScript provides compile-time safety for tool handlers
+
+**Standardization**:
+- Follows emerging MCP community conventions for A2A communication
+- Tool definitions are backend-agnostic (works with any JSON-RPC backend)
+- Consistent tool interface across multiple **MCP Servers**
+
+**Development Velocity**:
+- Backend developers can add tools without coordinating with **MCP Server** team
+- Tool logic lives in Drupal where domain expertise exists
+- Faster iteration on tool capabilities
+
+**Scalability**:
+- Supports hundreds of tools without **MCP Server** code bloat
+- Tool registration happens once at startup, minimal runtime overhead
+- Caching strategies can optimize repeated discovery requests
+
 ## OAuth 2.0 Multi-User Authentication Architecture
 
 ### Drupal as Unified Authorization and Resource Server
