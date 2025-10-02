@@ -1,3 +1,16 @@
+# [1.3.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.2.0...v1.3.0) (2025-10-02)
+
+
+### Bug Fixes
+
+* add type assertions to test file for strict null checks ([6b6ed6a](https://github.com/e0ipso/drupal-bridge-mcp/commit/6b6ed6a2d13c46ff998b51e3ce3601bceb7d373d))
+
+
+### Features
+
+* implement MCP sampling capability detection and query analyzer ([1650e08](https://github.com/e0ipso/drupal-bridge-mcp/commit/1650e082c4f21c5565670d51a9a0bfa4ee9de02f))
+* integrate AI-enhanced search with sampling capability ([ca0e0f7](https://github.com/e0ipso/drupal-bridge-mcp/commit/ca0e0f71e508fa3c6023338c510da0b5257b05df))
+
 # [1.2.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.1.0...v1.2.0) (2025-10-01)
 
 
