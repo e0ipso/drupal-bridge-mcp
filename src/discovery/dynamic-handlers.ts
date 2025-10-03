@@ -77,14 +77,14 @@ function convertToolSchemas(
  *
  * @param server - MCP Server instance
  * @param tools - Array of discovered tool definitions
- * @param makeRequest - Function to make authenticated JSON-RPC requests
+ * @param makeRequest - Function to invoke tools via A2A /mcp/tools/invoke endpoint
  * @param getSession - Function to retrieve session tokens
  */
 export function registerDynamicTools(
   server: Server,
   tools: ToolDefinition[],
   makeRequest: (
-    method: string,
+    toolName: string,
     params: unknown,
     token?: string
   ) => Promise<unknown>,
@@ -113,28 +113,15 @@ export function registerDynamicTools(
       );
     }
 
-    // Handle OAuth authentication if required
+    // Attempt to get OAuth token if available (let Drupal handle auth)
     let accessToken: string | undefined;
-    if (context.tool.requiresAuth) {
-      const sessionId = extra?.sessionId;
+    const sessionId = extra?.sessionId;
 
-      if (!sessionId) {
-        throw new Error(
-          `Tool "${toolName}" requires authentication but no session ID ` +
-            `provided. Use auth_login to authenticate first.`
-        );
-      }
-
+    if (sessionId) {
       const session = await getSession(sessionId);
-
-      if (!session?.accessToken) {
-        throw new Error(
-          `Tool "${toolName}" requires authentication. Session expired or ` +
-            `invalid. Use auth_login to authenticate.`
-        );
+      if (session?.accessToken) {
+        accessToken = session.accessToken;
       }
-
-      accessToken = session.accessToken;
     }
 
     // Validate parameters with Zod schema
@@ -149,10 +136,10 @@ export function registerDynamicTools(
       );
     }
 
-    // Proxy request to Drupal JSON-RPC endpoint
+    // Proxy request to Drupal via A2A /mcp/tools/invoke endpoint
     try {
       const result = await makeRequest(
-        context.tool.method,
+        context.tool.name,
         validatedParams,
         accessToken
       );

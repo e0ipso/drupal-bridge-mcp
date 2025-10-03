@@ -29,7 +29,8 @@
       "Bash(pkill:*)",
       "Bash(grep:*)",
       "WebFetch(domain:medium.com)",
-      "WebFetch(domain:www.devturtleblog.com)"
+      "WebFetch(domain:www.devturtleblog.com)",
+      "WebFetch(domain:www.github.com)"
     ],
     "deny": []
   },

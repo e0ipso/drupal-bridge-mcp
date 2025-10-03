@@ -31,9 +31,13 @@ const SAMPLE_TOOLS = [
       },
       required: ['message'],
     },
-    endpoint: '/jsonrpc',
-    method: 'test.simple',
-    requiresAuth: false,
+    title: 'Simple Test Tool',
+    outputSchema: {
+      type: 'object',
+      properties: {
+        result: { type: 'string' },
+      },
+    },
   },
   {
     name: 'test_tool_auth',
@@ -45,9 +49,6 @@ const SAMPLE_TOOLS = [
       },
       required: ['data'],
     },
-    endpoint: '/jsonrpc',
-    method: 'test.auth',
-    requiresAuth: true,
   },
   {
     name: 'test_tool_complex',
@@ -69,9 +70,10 @@ const SAMPLE_TOOLS = [
       },
       required: ['id', 'items'],
     },
-    endpoint: '/jsonrpc',
-    method: 'test.complex',
-    requiresAuth: false,
+    annotations: {
+      category: 'test',
+      complexity: 'high',
+    },
   },
   {
     name: 'test_tool_optional',
@@ -82,9 +84,6 @@ const SAMPLE_TOOLS = [
         filter: { type: 'string' },
       },
     },
-    endpoint: '/jsonrpc',
-    method: 'test.optional',
-    requiresAuth: false,
   },
   {
     name: 'test_tool_auth_complex',
@@ -97,9 +96,6 @@ const SAMPLE_TOOLS = [
       },
       required: ['action'],
     },
-    endpoint: '/jsonrpc',
-    method: 'test.auth.complex',
-    requiresAuth: true,
   },
 ];
 
@@ -119,9 +115,13 @@ describe('Tool Discovery', () => {
 
     expect(tools).toHaveLength(5);
     expect(tools[0]?.name).toBe('test_tool_simple');
-    expect(tools[1]?.requiresAuth).toBe(true);
+    expect(tools[0]?.title).toBe('Simple Test Tool');
+    expect(tools[0]?.outputSchema).toBeDefined();
     expect(tools[2]?.name).toBe('test_tool_complex');
-    expect(tools[4]?.requiresAuth).toBe(true);
+    expect(tools[2]?.annotations).toEqual({
+      category: 'test',
+      complexity: 'high',
+    });
   });
 
   test('throws error on HTTP 404', async () => {
@@ -154,7 +154,7 @@ describe('Tool Discovery', () => {
           {
             name: 'incomplete_tool',
             description: 'Missing fields',
-            // Missing: inputSchema, endpoint, method, requiresAuth
+            // Missing: inputSchema
           },
         ],
       });
@@ -173,9 +173,6 @@ describe('Tool Discovery', () => {
             name: '',
             description: 'Empty name',
             inputSchema: { type: 'object' },
-            endpoint: '/jsonrpc',
-            method: 'test.method',
-            requiresAuth: false,
           },
         ],
       });
@@ -185,24 +182,21 @@ describe('Tool Discovery', () => {
     );
   });
 
-  test('throws error on invalid requiresAuth type', async () => {
+  test('throws error on invalid description', async () => {
     nock(MOCK_DRUPAL_URL)
       .get('/mcp/tools/list')
       .reply(200, {
         tools: [
           {
-            name: 'invalid_auth_tool',
-            description: 'Invalid auth field',
+            name: 'test_tool',
+            description: '',
             inputSchema: { type: 'object' },
-            endpoint: '/jsonrpc',
-            method: 'test.method',
-            requiresAuth: 'yes' as any, // Should be boolean
           },
         ],
       });
 
     await expect(discoverTools(MOCK_DRUPAL_URL)).rejects.toThrow(
-      /invalid requiresAuth: must be boolean/
+      /invalid description: must be non-empty string/
     );
   });
 
@@ -229,6 +223,27 @@ describe('Tool Discovery', () => {
     await discoverTools(MOCK_DRUPAL_URL, 'test-token-123');
 
     expect(scope.isDone()).toBe(true);
+  });
+
+  test('normalizes empty properties array to empty object', async () => {
+    const toolWithEmptyPropertiesArray = {
+      name: 'test_tool_empty_props',
+      description: 'Tool with empty properties array',
+      inputSchema: {
+        type: 'object',
+        properties: [], // Drupal backend quirk - should be {}
+      },
+    };
+
+    nock(MOCK_DRUPAL_URL)
+      .get('/mcp/tools/list')
+      .reply(200, { tools: [toolWithEmptyPropertiesArray] });
+
+    const tools = await discoverTools(MOCK_DRUPAL_URL);
+
+    expect(tools).toHaveLength(1);
+    expect(tools[0]?.inputSchema.properties).toEqual({}); // Normalized to object
+    expect(Array.isArray(tools[0]?.inputSchema.properties)).toBe(false);
   });
 });
 
@@ -373,9 +388,6 @@ describe('Schema Conversion and Dynamic Registration', () => {
         name: 'invalid_schema_tool',
         description: 'Has invalid schema',
         inputSchema: circularSchema,
-        endpoint: '/jsonrpc',
-        method: 'test.invalid',
-        requiresAuth: false,
       },
     ];
 
@@ -424,9 +436,6 @@ describe('Schema Conversion and Dynamic Registration', () => {
         name: 'invalid_tool',
         description: 'Invalid schema',
         inputSchema: circularSchema,
-        endpoint: '/jsonrpc',
-        method: 'test.invalid',
-        requiresAuth: false,
       },
     ];
 
@@ -477,14 +486,14 @@ describe('Tool Invocation and OAuth', () => {
     });
 
     expect(mockMakeRequest).toHaveBeenCalledWith(
-      'test.simple',
+      'test_tool_simple',
       { message: 'Hello' },
       undefined
     );
     expect(result.content[0]?.text).toContain('success');
   });
 
-  test('invokes tool with OAuth token when requiresAuth is true', async () => {
+  test('invokes tool with OAuth token when session is available', async () => {
     nock(MOCK_DRUPAL_URL)
       .get('/mcp/tools/list')
       .reply(200, { tools: SAMPLE_TOOLS });
@@ -508,7 +517,7 @@ describe('Tool Invocation and OAuth', () => {
 
     registerDynamicTools(mockServer, tools, mockMakeRequest, mockGetSession);
 
-    // Invoke authenticated tool
+    // Invoke tool with session
     const result = await capturedHandler(
       {
         params: {
@@ -521,21 +530,21 @@ describe('Tool Invocation and OAuth', () => {
 
     expect(mockGetSession).toHaveBeenCalledWith('test-session-123');
     expect(mockMakeRequest).toHaveBeenCalledWith(
-      'test.auth',
+      'test_tool_auth',
       { data: 'secure-data' },
       'test-oauth-token'
     );
     expect(result.content[0]?.text).toContain('authenticated success');
   });
 
-  test('throws error when auth required but no session provided', async () => {
+  test('invokes tool without token when no session provided', async () => {
     nock(MOCK_DRUPAL_URL)
       .get('/mcp/tools/list')
       .reply(200, { tools: SAMPLE_TOOLS });
 
     const tools = await discoverTools(MOCK_DRUPAL_URL);
 
-    const mockMakeRequest = jest.fn();
+    const mockMakeRequest = jest.fn().mockResolvedValue({ result: 'success' });
     const mockGetSession = jest.fn();
 
     let capturedHandler: any;
@@ -547,25 +556,29 @@ describe('Tool Invocation and OAuth', () => {
 
     registerDynamicTools(mockServer, tools, mockMakeRequest, mockGetSession);
 
-    // Try to invoke auth tool without session
-    await expect(
-      capturedHandler({
-        params: {
-          name: 'test_tool_auth',
-          arguments: { data: 'secure-data' },
-        },
-      })
-    ).rejects.toThrow(/requires authentication but no session ID/);
+    // Invoke tool without session (let Drupal handle auth)
+    await capturedHandler({
+      params: {
+        name: 'test_tool_auth',
+        arguments: { data: 'secure-data' },
+      },
+    });
+
+    expect(mockMakeRequest).toHaveBeenCalledWith(
+      'test_tool_auth',
+      { data: 'secure-data' },
+      undefined
+    );
   });
 
-  test('throws error when session is expired or invalid', async () => {
+  test('invokes tool without token when session is invalid', async () => {
     nock(MOCK_DRUPAL_URL)
       .get('/mcp/tools/list')
       .reply(200, { tools: SAMPLE_TOOLS });
 
     const tools = await discoverTools(MOCK_DRUPAL_URL);
 
-    const mockMakeRequest = jest.fn();
+    const mockMakeRequest = jest.fn().mockResolvedValue({ result: 'success' });
     const mockGetSession = jest.fn().mockResolvedValue(null);
 
     let capturedHandler: any;
@@ -577,18 +590,23 @@ describe('Tool Invocation and OAuth', () => {
 
     registerDynamicTools(mockServer, tools, mockMakeRequest, mockGetSession);
 
-    // Try to invoke auth tool with expired session
-    await expect(
-      capturedHandler(
-        {
-          params: {
-            name: 'test_tool_auth',
-            arguments: { data: 'secure-data' },
-          },
+    // Invoke tool with expired session (let Drupal handle auth)
+    await capturedHandler(
+      {
+        params: {
+          name: 'test_tool_auth',
+          arguments: { data: 'secure-data' },
         },
-        { sessionId: 'expired-session' }
-      )
-    ).rejects.toThrow(/Session expired or invalid/);
+      },
+      { sessionId: 'expired-session' }
+    );
+
+    expect(mockGetSession).toHaveBeenCalledWith('expired-session');
+    expect(mockMakeRequest).toHaveBeenCalledWith(
+      'test_tool_auth',
+      { data: 'secure-data' },
+      undefined
+    );
   });
 
   test('validates parameters and rejects invalid input', async () => {

@@ -23,9 +23,9 @@ export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: JSONSchema;
-  endpoint: string;
-  method: string;
-  requiresAuth: boolean;
+  outputSchema?: JSONSchema;
+  title?: string;
+  annotations?: Record<string, unknown>;
 }
 
 export interface ToolDiscoveryResponse {
@@ -36,14 +36,7 @@ function validateToolDefinition(
   tool: any,
   index: number
 ): asserts tool is ToolDefinition {
-  const requiredFields = [
-    'name',
-    'description',
-    'inputSchema',
-    'endpoint',
-    'method',
-    'requiresAuth',
-  ];
+  const requiredFields = ['name', 'description', 'inputSchema'];
 
   for (const field of requiredFields) {
     if (!(field in tool) || tool[field] === undefined || tool[field] === null) {
@@ -61,15 +54,34 @@ function validateToolDefinition(
     );
   }
 
+  if (typeof tool.description !== 'string' || tool.description.trim() === '') {
+    throw new Error(
+      `Tool at index ${index} has invalid description: must be non-empty string`
+    );
+  }
+
   if (typeof tool.inputSchema !== 'object') {
     throw new Error(
       `Tool "${tool.name}" has invalid inputSchema: must be an object`
     );
   }
 
-  if (typeof tool.requiresAuth !== 'boolean') {
+  // Validate optional fields if present
+  if ('outputSchema' in tool && typeof tool.outputSchema !== 'object') {
     throw new Error(
-      `Tool "${tool.name}" has invalid requiresAuth: must be boolean`
+      `Tool "${tool.name}" has invalid outputSchema: must be an object if provided`
+    );
+  }
+
+  if ('title' in tool && typeof tool.title !== 'string') {
+    throw new Error(
+      `Tool "${tool.name}" has invalid title: must be a string if provided`
+    );
+  }
+
+  if ('annotations' in tool && typeof tool.annotations !== 'object') {
+    throw new Error(
+      `Tool "${tool.name}" has invalid annotations: must be an object if provided`
     );
   }
 }
@@ -145,13 +157,23 @@ export async function discoverTools(
       );
     }
 
-    // Validate each tool definition
-    responseData.tools.forEach((tool, index) => {
+    // Normalize and validate each tool definition
+    const normalizedTools = responseData.tools.map((tool, index) => {
+      // Normalize inputSchema.properties from array to object (Drupal backend quirk)
+      if (
+        tool.inputSchema &&
+        Array.isArray(tool.inputSchema.properties) &&
+        tool.inputSchema.properties.length === 0
+      ) {
+        tool.inputSchema.properties = {};
+      }
+
       validateToolDefinition(tool, index);
+      return tool;
     });
 
-    console.log(`✓ Successfully discovered ${responseData.tools.length} tools`);
-    return responseData.tools;
+    console.log(`✓ Successfully discovered ${normalizedTools.length} tools`);
+    return normalizedTools;
   } catch (error) {
     clearTimeout(timeoutId);
 
