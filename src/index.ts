@@ -312,11 +312,23 @@ export class DrupalMCPHttpServer {
     refreshToken?: string;
     expiresAt: number;
   } | null> {
-    const tokens = this.userTokens.get(sessionId);
-    if (!tokens) {
-      return null;
+    // Step 1: Get user ID from session mapping
+    const userId = this.sessionToUser.get(sessionId);
+    if (!userId) {
+      console.log(
+        `Token lookup failed: session ${sessionId} not mapped to user`
+      );
+      return null; // Session not authenticated
     }
 
+    // Step 2: Get user tokens from user storage
+    const tokens = this.userTokens.get(userId);
+    if (!tokens) {
+      console.log(`Token lookup failed: user ${userId} has no tokens`);
+      return null; // User tokens expired/logged out
+    }
+
+    console.log(`Token lookup success: session ${sessionId} → user ${userId}`);
     return {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
@@ -415,6 +427,35 @@ export class DrupalMCPHttpServer {
   }
 
   /**
+   * Handle explicit user logout
+   * Removes user tokens and session mapping
+   * @param {string} sessionId Session requesting logout
+   * @returns {Promise<void>}
+   */
+  async handleLogout(sessionId: string): Promise<void> {
+    const userId = this.sessionToUser.get(sessionId);
+
+    if (!userId) {
+      console.log(`Logout requested for unauthenticated session: ${sessionId}`);
+      return;
+    }
+
+    // Remove user tokens (persistent storage)
+    this.userTokens.delete(userId);
+    console.log(`User ${userId} logged out - tokens removed`);
+
+    // Remove session-to-user mapping (ephemeral)
+    this.sessionToUser.delete(sessionId);
+
+    // Remove session capabilities
+    this.sessionCapabilities.delete(sessionId);
+
+    console.log(
+      `Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
+    );
+  }
+
+  /**
    * Initializes authentication for a session
    * @param {string} sessionId Session identifier
    * @returns {Promise<void>}
@@ -450,11 +491,21 @@ export class DrupalMCPHttpServer {
         `${this.config.host}:${this.config.port}`,
       ],
       onsessionclosed: async (sessionId: string) => {
-        console.log(`Session closed: ${sessionId}`);
-        // Clean up session tokens when session closes
-        this.userTokens.delete(sessionId);
-        // Clean up session capabilities when session closes
+        const userId = this.sessionToUser.get(sessionId);
+        console.log(
+          `Session closed: ${sessionId} (user: ${userId || 'unauthenticated'})`
+        );
+
+        // Remove session mapping (ephemeral)
+        this.sessionToUser.delete(sessionId);
         this.sessionCapabilities.delete(sessionId);
+
+        // DO NOT remove user tokens - they persist for reconnection
+        // Tokens are only removed on explicit logout
+
+        console.log(
+          `Active sessions: ${this.sessionToUser.size}, Active users: ${this.userTokens.size}`
+        );
       },
     });
 

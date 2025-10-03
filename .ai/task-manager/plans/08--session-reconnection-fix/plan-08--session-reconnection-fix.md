@@ -734,19 +734,19 @@ mapping.
 - ✅ Tokens stored by user ID
 - ✅ Reconnection scenario handled (token reuse)
 
-### Phase 4: Session Lifecycle Management
+### ✅ Phase 4: Session Lifecycle Management
 
 **Parallel Tasks:**
 
-- Task 004: Refactor Session Lifecycle Callbacks and Logout Handler (depends on: 003)
+- ✔️ Task 004: Refactor Session Lifecycle Callbacks and Logout Handler (depends on: 003)
 
 **Phase Objective:** Update session callbacks to preserve user tokens and implement explicit logout.
 
 **Completion Criteria:**
 
-- `onsessionclosed` preserves user tokens
-- `handleLogout` removes tokens on explicit logout
-- `getSession` implements two-step lookup
+- ✅ `onsessionclosed` preserves user tokens
+- ✅ `handleLogout` removes tokens on explicit logout
+- ✅ `getSession` implements two-step lookup
 
 ### Phase 5: Observability & Verification
 
