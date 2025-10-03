@@ -24,6 +24,7 @@ import {
 import { DrupalConnector } from './drupal/connector.js';
 import { DeviceFlow } from './oauth/device-flow.js';
 import type { TokenResponse } from './oauth/device-flow-types.js';
+import { extractUserId } from './oauth/jwt-decoder.js';
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 
 // Discovery imports
@@ -353,8 +354,43 @@ export class DrupalMCPHttpServer {
       // Execute authentication flow
       const tokens = await deviceFlow.authenticate();
 
-      // Store tokens for this session
-      this.userTokens.set(sessionId, tokens);
+      // Extract user ID from access token
+      let userId: string;
+      try {
+        userId = extractUserId(tokens.access_token);
+        console.log(`Extracted user ID from token: ${userId}`);
+      } catch (error) {
+        // Fallback: use session ID as user ID if JWT extraction fails
+        console.warn(
+          `Failed to extract user ID from token, using session ID as fallback:`,
+          error
+        );
+        userId = sessionId;
+      }
+
+      // Check if user already has tokens (reconnection scenario)
+      const existingTokens = this.userTokens.get(userId);
+      if (existingTokens) {
+        console.log(`User ${userId} reconnecting - reusing existing tokens`);
+        // Update session-to-user mapping for new session
+        this.sessionToUser.set(sessionId, userId);
+        console.log(`Session ${sessionId} mapped to existing user ${userId}`);
+        console.log(
+          `Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
+        );
+        return existingTokens; // Reuse existing tokens
+      }
+
+      // New user authentication: store tokens by user ID
+      this.userTokens.set(userId, tokens);
+      console.log(`Stored tokens for new user ${userId}`);
+
+      // Map session to user (ephemeral)
+      this.sessionToUser.set(sessionId, userId);
+      console.log(`Session ${sessionId} authenticated as user ${userId}`);
+      console.log(
+        `Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
+      );
 
       return tokens;
     } catch (error) {
