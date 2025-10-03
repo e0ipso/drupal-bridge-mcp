@@ -1,6 +1,7 @@
 # Minimal Drupal MCP Server
 
-> **336 lines vs 6000 lines** - A radically simplified Model Context Protocol server for Drupal integration
+> **336 lines vs 6000 lines** - A radically simplified Model Context Protocol server for Drupal
+> integration
 
 ## 🎯 **The Transformation**
 
@@ -56,7 +57,9 @@ drupal-bridge-mcp
 ## 🛠️ Available Tools
 
 ### `search_tutorials`
+
 Search Drupal tutorials and educational content
+
 ```json
 {
   "keywords": "views",
@@ -67,7 +70,9 @@ Search Drupal tutorials and educational content
 ```
 
 ### `load_node`
+
 Load a Drupal node by ID
+
 ```json
 {
   "nodeId": "12345"
@@ -75,7 +80,9 @@ Load a Drupal node by ID
 ```
 
 ### `create_node`
+
 Create a new Drupal node
+
 ```json
 {
   "type": "article",
@@ -86,23 +93,25 @@ Create a new Drupal node
 ```
 
 ### `test_connection`
+
 Test connection to Drupal server
+
 ```json
 {}
 ```
 
 ## 📊 Implementation Comparison
 
-| Aspect | Before | After |
-|--------|---------|-------|
-| **Lines of Code** | 5,955 | 336 |
-| **Files** | 25+ | 1 |
-| **Dependencies** | 20+ packages | 1 package |
-| **Error Handling** | Custom 500-line system | MCP SDK built-in |
-| **Validation** | Custom 300-line framework | MCP SDK schemas |
-| **Logging** | Complex Pino system | Simple console.error |
-| **Authentication** | 1,500-line OAuth system | 50-line OAuth client |
-| **Configuration** | 200-line env parser | Direct env access |
+| Aspect             | Before                    | After                |
+| ------------------ | ------------------------- | -------------------- |
+| **Lines of Code**  | 5,955                     | 336                  |
+| **Files**          | 25+                       | 1                    |
+| **Dependencies**   | 20+ packages              | 1 package            |
+| **Error Handling** | Custom 500-line system    | MCP SDK built-in     |
+| **Validation**     | Custom 300-line framework | MCP SDK schemas      |
+| **Logging**        | Complex Pino system       | Simple console.error |
+| **Authentication** | 1,500-line OAuth system   | 50-line OAuth client |
+| **Configuration**  | 200-line env parser       | Direct env access    |
 
 ## 🏗️ Architecture
 
@@ -111,15 +120,15 @@ The minimal server consists of just 3 classes:
 ```typescript
 // 1. Simple OAuth Client (~50 lines)
 class SimpleOAuth {
-  async getToken(): Promise<string> // Token management
+  async getToken(): Promise<string>; // Token management
 }
 
 // 2. Drupal JSON-RPC Client (~80 lines)
 class DrupalClient {
-  async searchTutorials(params): Promise<any>
-  async loadNode(id): Promise<any>
-  async createNode(params): Promise<any>
-  async testConnection(): Promise<boolean>
+  async searchTutorials(params): Promise<any>;
+  async loadNode(id): Promise<any>;
+  async createNode(params): Promise<any>;
+  async testConnection(): Promise<boolean>;
 }
 
 // 3. MCP Server (~200 lines)
@@ -128,9 +137,68 @@ class MinimalDrupalMcpServer {
 }
 ```
 
+## 🔄 Session Management & Reconnection
+
+The server implements a robust session management system that enables clients (like MCP Inspector)
+to reconnect without re-authentication.
+
+### Architecture
+
+**User-Level Token Storage**: Tokens are stored by user ID (extracted from JWT), not by transport
+session ID:
+
+```typescript
+Map<userId, tokens>; // Persistent user-level tokens
+Map<sessionId, userId>; // Ephemeral session-to-user mapping
+```
+
+### Session Lifecycle
+
+1. **Authentication**: User authenticates → JWT decoded → userId extracted → tokens stored
+2. **Session Close**: Transport disconnects → session mapping removed → **tokens preserved**
+3. **Reconnection**: New session ID → same userId from JWT → existing tokens reused
+4. **Explicit Logout**: User logout → tokens removed from storage
+
+**Key Distinction**: Session close ≠ Logout
+
+- Disconnecting preserves your authentication
+- Only explicit logout removes tokens
+
+### Debug Endpoints
+
+Monitor session state during development:
+
+**Health Check** - Shows active users and sessions:
+
+```bash
+curl http://localhost:3000/health
+```
+
+**Debug Sessions** - Detailed session mappings:
+
+```bash
+curl http://localhost:3000/debug/sessions
+```
+
+### Troubleshooting
+
+**Problem**: Tool calls return 403 after reconnection **Solution**: Check if tokens persisted across
+reconnection:
+
+1. Call `/health` to see activeUsers count
+2. Call `/debug/sessions` to verify session → user mapping
+3. Check server logs for "Token lookup failed" messages
+
+**Problem**: Multiple reconnections create duplicate users **Solution**: This should not happen -
+JWT extraction ensures same userId reused. If seeing this:
+
+1. Verify JWT contains valid `sub`, `user_id`, or `uid` claim
+2. Check logs for "User reconnecting - reusing existing tokens"
+
 ## 🎓 Key Learnings
 
 ### What MCP SDK Provides (That We Were Building Custom):
+
 - ✅ **JSON-RPC Transport** - Built-in STDIO transport
 - ✅ **Error Handling** - Automatic JSON-RPC error responses
 - ✅ **Input Validation** - Works seamlessly with JSON schemas
@@ -138,6 +206,7 @@ class MinimalDrupalMcpServer {
 - ✅ **Tool Registration** - Simple handler pattern
 
 ### OAuth Simplified:
+
 - ✅ **OAuth Required** - Drupal headless APIs need authentication
 - ❌ **Complex Discovery** - Simple client_credentials flow sufficient
 - ❌ **PKCE/Stateless** - Unnecessary complexity for MCP servers
@@ -160,7 +229,8 @@ npm run type-check
 
 ## 📂 Backup
 
-The original 6000-line implementation is preserved in `/backup/` for reference, demonstrating how enterprise-level complexity can emerge when simple patterns would suffice.
+The original 6000-line implementation is preserved in `/backup/` for reference, demonstrating how
+enterprise-level complexity can emerge when simple patterns would suffice.
 
 ## 📄 License
 
