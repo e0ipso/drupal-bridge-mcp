@@ -64,6 +64,7 @@ describe('Session Reconnection and Token Management', () => {
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMyIsImlhdCI6MTUxNjIzOTAyMn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
         token_type: 'Bearer',
         expires_in: 3600,
+        scope: 'profile email',
       };
 
       // Extract user ID and store tokens
@@ -109,6 +110,7 @@ describe('Session Reconnection and Token Management', () => {
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLWEiLCJpYXQiOjE1MTYyMzkwMjJ9.fake_sig_a',
         token_type: 'Bearer',
         expires_in: 3600,
+        scope: 'profile email',
       };
 
       const userIdA = extractUserId(tokensA.access_token);
@@ -122,6 +124,7 @@ describe('Session Reconnection and Token Management', () => {
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLWIiLCJpYXQiOjE1MTYyMzkwMjJ9.fake_sig_b',
         token_type: 'Bearer',
         expires_in: 3600,
+        scope: 'profile email',
       };
 
       const userIdB = extractUserId(tokensB.access_token);
@@ -147,6 +150,7 @@ describe('Session Reconnection and Token Management', () => {
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMyIsImlhdCI6MTUxNjIzOTAyMn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
         token_type: 'Bearer',
         expires_in: 3600,
+        scope: 'profile email',
       };
 
       const userId = extractUserId(tokens.access_token);
@@ -174,6 +178,7 @@ describe('Session Reconnection and Token Management', () => {
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMyIsImlhdCI6MTUxNjIzOTAyMn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
         token_type: 'Bearer',
         expires_in: 3600,
+        scope: 'profile email',
       };
       const userId = extractUserId(tokens.access_token);
       const originalToken = tokens.access_token;
@@ -227,6 +232,7 @@ describe('Session Reconnection and Token Management', () => {
           'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTEyMyIsImlhdCI6MTUxNjIzOTAyMn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
         token_type: 'Bearer',
         expires_in: 3600,
+        scope: 'profile email',
       };
       const userId = extractUserId(tokens.access_token);
       userTokens.set(userId, tokens);
@@ -274,7 +280,9 @@ describe('Session Reconnection and Token Management', () => {
       expect(lookupUserId).toBe(userId);
 
       // Step 2: fails
-      const lookupTokens = userTokens.get(lookupUserId);
+      const lookupTokens = lookupUserId
+        ? userTokens.get(lookupUserId)
+        : undefined;
       expect(lookupTokens).toBeUndefined();
     });
   });

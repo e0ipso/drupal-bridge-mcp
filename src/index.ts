@@ -76,13 +76,18 @@ const DEFAULT_HTTP_CONFIG: HttpServerConfig = {
  * OAuth-enabled HTTP MCP server class
  */
 export class DrupalMCPHttpServer {
-  private server: Server;
+  private transports: Map<
+    string,
+    {
+      server: Server;
+      transport: StreamableHTTPServerTransport;
+    }
+  >;
   private app: Application;
   private config: HttpServerConfig;
   private oauthConfigManager?: OAuthConfigManager;
   private oauthProvider?: DrupalOAuthProvider;
   private drupalConnector?: DrupalConnector;
-  private transport?: StreamableHTTPServerTransport;
 
   // User-level token storage (persistent across reconnections)
   private userTokens: Map<string, TokenResponse> = new Map();
@@ -98,24 +103,16 @@ export class DrupalMCPHttpServer {
 
   constructor(config: HttpServerConfig = DEFAULT_HTTP_CONFIG) {
     this.config = config;
-    this.server = new Server(
-      {
-        name: this.config.name,
-        version: this.config.version,
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
-    );
+
+    // Initialize transports map
+    this.transports = new Map();
 
     this.app = express();
     this.setupMiddleware();
     this.setupHandlers();
 
     console.log(
-      'Token storage initialized: user-level tokens + session-to-user mapping'
+      'Transport map initialized for per-session Server+Transport instances'
     );
   }
 
@@ -151,8 +148,9 @@ export class DrupalMCPHttpServer {
         );
         res.setHeader(
           'Access-Control-Allow-Headers',
-          'Content-Type, Authorization, Last-Event-ID'
+          'Content-Type, Authorization, Last-Event-ID, mcp-session-id'
         );
+        res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id');
         res.setHeader('Access-Control-Allow-Credentials', 'true');
       }
 
