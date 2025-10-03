@@ -82,8 +82,18 @@ export class DrupalMCPHttpServer {
   private oauthProvider?: DrupalOAuthProvider;
   private drupalConnector?: DrupalConnector;
   private transport?: StreamableHTTPServerTransport;
-  private sessionTokens: Map<string, TokenResponse> = new Map();
+
+  // User-level token storage (persistent across reconnections)
+  private userTokens: Map<string, TokenResponse> = new Map();
+  // userId → { access_token, refresh_token, expires_in }
+
+  // Session-to-user mapping (ephemeral)
+  private sessionToUser: Map<string, string> = new Map();
+  // sessionId → userId
+
+  // Session capabilities (ephemeral)
   private sessionCapabilities: Map<string, ClientCapabilities> = new Map();
+  // sessionId → capabilities
 
   constructor(config: HttpServerConfig = DEFAULT_HTTP_CONFIG) {
     this.config = config;
@@ -102,6 +112,10 @@ export class DrupalMCPHttpServer {
     this.app = express();
     this.setupMiddleware();
     this.setupHandlers();
+
+    console.log(
+      'Token storage initialized: user-level tokens + session-to-user mapping'
+    );
   }
 
   /**
@@ -244,11 +258,11 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Make a JSON-RPC request to Drupal
+   * Invoke a tool via A2A /mcp/tools/invoke endpoint
    * Used by dynamic tool handlers
    */
   private async makeRequest(
-    method: string,
+    toolName: string,
     params: unknown,
     token?: string
   ): Promise<unknown> {
@@ -256,43 +270,36 @@ export class DrupalMCPHttpServer {
       throw new Error('Drupal connector not initialized');
     }
 
-    if (!token) {
-      throw new Error('OAuth token required for JSON-RPC requests');
+    // Build headers - include auth if available
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
 
-    // Create a JSON-RPC client for this request
-    const response = await fetch(
-      `${process.env.DRUPAL_BASE_URL}${process.env.DRUPAL_JSONRPC_ENDPOINT || '/jsonrpc'}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method,
-          params,
-          id: randomUUID(),
-        }),
-      }
-    );
+    // Use A2A standard /mcp/tools/invoke endpoint
+    const endpoint = process.env.DRUPAL_JSONRPC_ENDPOINT || '/mcp/tools/invoke';
+    const response = await fetch(`${process.env.DRUPAL_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: toolName,
+        arguments: params,
+      }),
+    });
 
     if (!response.ok) {
       throw new Error(
-        `JSON-RPC request failed: HTTP ${response.status} ${response.statusText}`
+        `Tool invocation failed: HTTP ${response.status} ${response.statusText}`
       );
     }
 
-    const jsonRpcResponse = await response.json();
+    const result = await response.json();
 
-    if (jsonRpcResponse.error) {
-      throw new Error(
-        `JSON-RPC error: ${jsonRpcResponse.error.message || 'Unknown error'}`
-      );
-    }
-
-    return jsonRpcResponse.result;
+    // A2A response is direct result (no JSON-RPC envelope)
+    return result;
   }
 
   /**
@@ -304,7 +311,7 @@ export class DrupalMCPHttpServer {
     refreshToken?: string;
     expiresAt: number;
   } | null> {
-    const tokens = this.sessionTokens.get(sessionId);
+    const tokens = this.userTokens.get(sessionId);
     if (!tokens) {
       return null;
     }
@@ -347,7 +354,7 @@ export class DrupalMCPHttpServer {
       const tokens = await deviceFlow.authenticate();
 
       // Store tokens for this session
-      this.sessionTokens.set(sessionId, tokens);
+      this.userTokens.set(sessionId, tokens);
 
       return tokens;
     } catch (error) {
@@ -409,7 +416,7 @@ export class DrupalMCPHttpServer {
       onsessionclosed: async (sessionId: string) => {
         console.log(`Session closed: ${sessionId}`);
         // Clean up session tokens when session closes
-        this.sessionTokens.delete(sessionId);
+        this.userTokens.delete(sessionId);
         // Clean up session capabilities when session closes
         this.sessionCapabilities.delete(sessionId);
       },
@@ -599,8 +606,10 @@ export class DrupalMCPHttpServer {
       }
     }
 
-    // Clear session tokens
-    this.sessionTokens.clear();
+    // Clear all session and user data
+    this.userTokens.clear();
+    this.sessionToUser.clear();
+    this.sessionCapabilities.clear();
   }
 }
 
