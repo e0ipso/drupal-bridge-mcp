@@ -16,6 +16,11 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import debug from 'debug';
+
+// Debug loggers
+const debugRequestIn = debug('mcp:request:in');
+const debugOAuth = debug('mcp:oauth');
 
 // Read version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -419,47 +424,38 @@ export class DrupalMCPHttpServer {
     refreshToken?: string;
     expiresAt: number;
   } | null> {
-    console.log(
-      `\n🔍 [Token Lookup] Searching for tokens for session ${sessionId}`
-    );
-    console.log(
-      `🔍 [Token Lookup] Total sessions tracked: ${this.sessionToUser.size}`
-    );
-    console.log(
-      `🔍 [Token Lookup] Total users with tokens: ${this.userTokens.size}`
+    debugOAuth(`Token lookup for session ${sessionId}`);
+    debugOAuth(
+      `Sessions tracked: ${this.sessionToUser.size}, Users with tokens: ${this.userTokens.size}`
     );
 
     // Step 1: Get user ID from session mapping
     const userId = this.sessionToUser.get(sessionId);
     if (!userId) {
-      console.log(
-        `❌ [Token Lookup] FAILED: session ${sessionId} not mapped to user`
+      debugOAuth(
+        `Token lookup FAILED: session ${sessionId} not mapped to user`
       );
-      console.log(
-        `❌ [Token Lookup] Available sessions:`,
-        Array.from(this.sessionToUser.keys())
+      debugOAuth(
+        `Available sessions: ${JSON.stringify(Array.from(this.sessionToUser.keys()))}`
       );
       return null; // Session not authenticated
     }
 
-    console.log(`✅ [Token Lookup] Session ${sessionId} → User ${userId}`);
+    debugOAuth(`Session ${sessionId} → User ${userId}`);
 
     // Step 2: Get user tokens from user storage
     const tokens = this.userTokens.get(userId);
     if (!tokens) {
-      console.log(`❌ [Token Lookup] FAILED: user ${userId} has no tokens`);
-      console.log(
-        `❌ [Token Lookup] Available users:`,
-        Array.from(this.userTokens.keys())
+      debugOAuth(`Token lookup FAILED: user ${userId} has no tokens`);
+      debugOAuth(
+        `Available users: ${JSON.stringify(Array.from(this.userTokens.keys()))}`
       );
       return null; // User tokens expired/logged out
     }
 
     const redactedToken = this.redactToken(tokens.access_token);
-    console.log(
-      `✅ [Token Lookup] SUCCESS: session ${sessionId} → user ${userId}`
-    );
-    console.log(`✅ [Token Lookup] Token found (redacted): ${redactedToken}`);
+    debugOAuth(`Token lookup SUCCESS: session ${sessionId} → user ${userId}`);
+    debugOAuth(`Token found (redacted): ${redactedToken}`);
     return {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
@@ -627,30 +623,26 @@ export class DrupalMCPHttpServer {
     sessionId: string,
     req: express.Request
   ): void {
-    console.log(
-      `\n🔐 [OAuth] Token extraction attempt for session ${sessionId}`
-    );
+    debugOAuth(`Token extraction attempt for session ${sessionId}`);
 
     // Step 1: Extract Authorization Header
     const authHeader = req.headers['authorization'] as string | undefined;
 
-    console.log(`🔐 [OAuth] Authorization header present: ${!!authHeader}`);
+    debugOAuth(`Authorization header present: ${!!authHeader}`);
 
     if (!authHeader) {
-      console.log(
-        `🔐 [OAuth] No Authorization header found - skipping token extraction`
-      );
+      debugOAuth(`No Authorization header - skipping token extraction`);
       return; // No token present - not an error, exit gracefully
     }
 
-    console.log(
-      `🔐 [OAuth] Authorization header format: ${authHeader.startsWith('Bearer ') ? 'Bearer token' : 'Unknown format'}`
+    debugOAuth(
+      `Authorization header format: ${authHeader.startsWith('Bearer ') ? 'Bearer token' : 'Unknown format'}`
     );
 
     // Step 2: Validate Bearer Token Format
     if (!authHeader.startsWith('Bearer ')) {
-      console.warn(
-        `⚠️  [OAuth] Invalid Authorization header format for session ${sessionId} - expected "Bearer <token>"`
+      debugOAuth(
+        `Invalid Authorization header format for session ${sessionId} - expected "Bearer <token>"`
       );
       return;
     }
@@ -659,20 +651,19 @@ export class DrupalMCPHttpServer {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     const redactedToken = this.redactToken(token);
 
-    console.log(`🔐 [OAuth] Token extracted (redacted): ${redactedToken}`);
-    console.log(`🔐 [OAuth] Token length: ${token.length} characters`);
+    debugOAuth(`Token extracted (redacted): ${redactedToken}`);
+    debugOAuth(`Token length: ${token.length} characters`);
 
     // Step 4: Decode JWT with Error Handling
     let userId: string;
     try {
       userId = extractUserId(token); // Existing utility from jwt-decoder.ts
-      console.log(`🔐 [OAuth] JWT decoded successfully - User ID: ${userId}`);
+      debugOAuth(`JWT decoded successfully - User ID: ${userId}`);
     } catch (error) {
-      console.warn(
-        `⚠️  [OAuth] Token decode failed for session ${sessionId}:`,
-        error instanceof Error ? error.message : String(error)
+      debugOAuth(
+        `Token decode failed for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
       );
-      console.warn(`⚠️  [OAuth] Failed token (redacted): ${redactedToken}`);
+      debugOAuth(`Failed token (redacted): ${redactedToken}`);
       return; // Invalid token - log warning, exit gracefully
     }
 
@@ -681,11 +672,11 @@ export class DrupalMCPHttpServer {
     if (existingTokens) {
       // User reconnecting - just update session mapping, reuse tokens
       this.sessionToUser.set(sessionId, userId);
-      console.log(
-        `✅ [OAuth] User ${userId} reconnecting - mapped session ${sessionId} to existing tokens`
+      debugOAuth(
+        `User ${userId} reconnecting - mapped session ${sessionId} to existing tokens`
       );
-      console.log(
-        `📊 [OAuth] Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
+      debugOAuth(
+        `Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
       );
       return;
     }
@@ -707,12 +698,12 @@ export class DrupalMCPHttpServer {
     this.sessionToUser.set(sessionId, userId);
 
     // Step 8: Log Success
-    console.log(
-      `✅ [OAuth] Token extracted and stored for session ${sessionId} → user ${userId}`
+    debugOAuth(
+      `Token extracted and stored for session ${sessionId} → user ${userId}`
     );
-    console.log(`✅ [OAuth] Token stored (redacted): ${redactedToken}`);
-    console.log(
-      `📊 [OAuth] Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
+    debugOAuth(`Token stored (redacted): ${redactedToken}`);
+    debugOAuth(
+      `Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
     );
   }
 
@@ -742,20 +733,30 @@ export class DrupalMCPHttpServer {
     this.app.all('/mcp', async (req, res) => {
       try {
         // Step 0: Log incoming request details
-        console.log(`\n📨 [Request] ${req.method} ${req.path}`);
-        console.log(`📨 [Request] Headers:`);
-        console.log(
-          `   - mcp-session-id: ${req.headers['mcp-session-id'] || '(none)'}`
+        const authHeader = req.headers['authorization'];
+        const redactedAuth = authHeader
+          ? `Bearer ${this.redactToken(authHeader.substring(7))}`
+          : '(none)';
+
+        debugRequestIn(`${req.method} ${req.path}`);
+        debugRequestIn(
+          `Headers: ${JSON.stringify(
+            {
+              'mcp-session-id': req.headers['mcp-session-id'] || '(none)',
+              authorization: redactedAuth,
+              'content-type': req.headers['content-type'] || '(none)',
+              'content-length': req.headers['content-length'] || '(none)',
+              'user-agent': req.headers['user-agent'] || '(none)',
+            },
+            null,
+            2
+          )}`
         );
-        console.log(
-          `   - authorization: ${req.headers['authorization'] ? `Bearer ${this.redactToken(req.headers['authorization'].substring(7))}` : '(none)'}`
-        );
-        console.log(
-          `   - content-type: ${req.headers['content-type'] || '(none)'}`
-        );
-        console.log(
-          `   - content-length: ${req.headers['content-length'] || '(none)'}`
-        );
+
+        // Log request body if present (for debugging)
+        if (req.body) {
+          debugRequestIn(`Body: ${JSON.stringify(req.body)}`);
+        }
 
         // Step 1: Extract session ID from header
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -764,50 +765,42 @@ export class DrupalMCPHttpServer {
         if (!sessionId) {
           // Scenario 1: New session request
           const newSessionId = randomUUID();
-          console.log(`\n🆕 [Session] Creating new session: ${newSessionId}`);
+          debugRequestIn(`Creating new session: ${newSessionId}`);
 
           const { server, transport } =
             await this.createSessionInstance(newSessionId);
           this.transports.set(newSessionId, { server, transport });
 
-          console.log(
-            `✅ [Session] Session ${newSessionId} created. Active sessions: ${this.transports.size}`
+          debugRequestIn(
+            `Session ${newSessionId} created. Active sessions: ${this.transports.size}`
           );
 
           // Extract OAuth token if auth is enabled
           if (this.config.enableAuth) {
-            console.log(
-              `🔑 [Session] Auth enabled - extracting token for new session`
-            );
+            debugOAuth(`Auth enabled - extracting token for new session`);
             this.extractAndStoreTokenFromRequest(newSessionId, req);
           } else {
-            console.log(
-              `⚪ [Session] Auth disabled - skipping token extraction`
-            );
+            debugOAuth(`Auth disabled - skipping token extraction`);
           }
 
           await transport.handleRequest(req, res);
         } else if (sessionId && this.transports.has(sessionId)) {
           // Scenario 2: Existing session
-          console.log(`\n🔄 [Session] Using existing session: ${sessionId}`);
+          debugRequestIn(`Using existing session: ${sessionId}`);
           const { transport } = this.transports.get(sessionId)!;
 
           // Extract OAuth token if auth is enabled
           if (this.config.enableAuth) {
-            console.log(
-              `🔑 [Session] Auth enabled - extracting token for existing session`
-            );
+            debugOAuth(`Auth enabled - extracting token for existing session`);
             this.extractAndStoreTokenFromRequest(sessionId, req);
           } else {
-            console.log(
-              `⚪ [Session] Auth disabled - skipping token extraction`
-            );
+            debugOAuth(`Auth disabled - skipping token extraction`);
           }
 
           await transport.handleRequest(req, res);
         } else {
           // Scenario 3: Invalid session ID
-          console.warn(`\n❌ [Session] Invalid session ID: ${sessionId}`);
+          debugRequestIn(`Invalid session ID: ${sessionId}`);
           res.status(404).json({
             error: 'Session not found',
             sessionId,
