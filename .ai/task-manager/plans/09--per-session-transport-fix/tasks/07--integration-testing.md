@@ -2,8 +2,9 @@
 id: 7
 group: 'testing'
 dependencies: [1, 2, 3, 4, 5, 6]
-status: 'pending'
+status: 'completed'
 created: '2025-10-03'
+completed: '2025-10-03'
 skills:
   - 'testing'
 ---

@@ -616,22 +616,22 @@ graph TD
 - ✅ Session routing logic handles initialize requests and existing sessions
 - ✅ Health endpoints show accurate transport counts
 
-### Phase 3: Lifecycle Management
+### ✅ Phase 3: Lifecycle Management
 
 **Parallel Tasks:**
 
-- **Task 03**: Update Session Lifecycle (depends on: 02) - Implement proper cleanup in
+- **✔️ Task 03**: Update Session Lifecycle (depends on: 02) - Implement proper cleanup in
   onsessionclosed
-- **Task 05**: Update Shutdown Logic (depends on: 01, 02, 03) - Gracefully close all transports on
-  shutdown
+- **✔️ Task 05**: Update Shutdown Logic (depends on: 01, 02, 03) - Gracefully close all transports
+  on shutdown
 
 **Phase Objective**: Ensure proper resource cleanup and prevent memory leaks
 
 **Completion Criteria**:
 
-- Server+Transport instances cleaned up on disconnect
-- Shutdown closes all active sessions gracefully
-- No memory leaks after repeated connect/disconnect cycles
+- ✅ Server+Transport instances cleaned up on disconnect
+- ✅ Shutdown closes all active sessions gracefully
+- ✅ No memory leaks after repeated connect/disconnect cycles
 
 ### Phase 4: Validation
 
