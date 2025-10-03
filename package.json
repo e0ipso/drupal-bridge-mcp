@@ -12,8 +12,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx --env-file=.env src/index.ts",
+    "dev": "DEBUG=mcp:* tsx --env-file=.env src/index.ts",
     "start": "node --env-file=.env dist/index.js",
+    "start:debug": "DEBUG=mcp:* node --env-file=.env dist/index.js",
     "type-check": "tsc --noEmit",
     "test": "jest",
     "semantic-release": "semantic-release"
@@ -36,6 +37,7 @@
     "@commitlint/cli": "^20.0.0",
     "@commitlint/config-conventional": "^20.0.0",
     "@eslint/js": "^9.36.0",
+    "@modelcontextprotocol/inspector": "0.15.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^11.0.6",
@@ -60,6 +62,10 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.5",
+    "@types/debug": "^4.1.12",
+    "boxen": "^8.0.1",
+    "chalk": "^5.6.2",
+    "debug": "^4.4.3",
     "express": "^5.1.0",
     "json-rpc-2.0": "^1.7.1",
     "zod-from-json-schema": "^0.5.0"
