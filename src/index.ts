@@ -13,6 +13,17 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { mcpAuthMetadataRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+// Read version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(
+  readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')
+);
+const PKG_VERSION = packageJson.version;
 import {
   OAuthConfigManager,
   createOAuthConfigFromEnv,
@@ -34,6 +45,15 @@ import {
   type ToolDefinition,
 } from './discovery/index.js';
 
+// Console utilities
+import {
+  printSection,
+  printSuccess,
+  printInfo,
+  printWarning,
+  printStartupBanner,
+} from './utils/console.js';
+
 /**
  * Discovered tool definitions from /mcp/tools/list endpoint
  * Set during server initialization via setDiscoveredTools()
@@ -45,8 +65,9 @@ let discoveredToolDefinitions: ToolDefinition[] = [];
  */
 function setDiscoveredTools(tools: ToolDefinition[]): void {
   discoveredToolDefinitions = tools;
+  // Note: This is called before utilities are imported, so we use plain console
   console.log(
-    `Stored ${tools.length} tool definitions for ListToolsRequest handler`
+    `📦 Stored ${tools.length} tool definitions for ListToolsRequest handler`
   );
 }
 
@@ -65,8 +86,8 @@ interface HttpServerConfig {
  * Default HTTP server configuration
  */
 const DEFAULT_HTTP_CONFIG: HttpServerConfig = {
-  name: process.env.MCP_SERVER_NAME || 'drupal-mcp-server',
-  version: process.env.MCP_SERVER_VERSION || '1.0.0',
+  name: process.env.MCP_SERVER_NAME || 'dme-mcp',
+  version: process.env.MCP_SERVER_VERSION || PKG_VERSION,
   port: parseInt(process.env.HTTP_PORT || '6200', 10),
   host: process.env.HTTP_HOST || 'localhost',
   enableAuth: process.env.AUTH_ENABLED?.toLowerCase() === 'true',
@@ -110,8 +131,8 @@ export class DrupalMCPHttpServer {
     this.app = express();
     this.setupMiddleware();
 
-    console.log(
-      'Transport map initialized for per-session Server+Transport instances'
+    printInfo(
+      '🔄 Transport map initialized for per-session Server+Transport instances'
     );
   }
 
@@ -184,12 +205,10 @@ export class DrupalMCPHttpServer {
 
       // Fetch metadata to validate configuration
       const metadata = await this.oauthConfigManager.fetchMetadata();
-      console.log('OAuth metadata discovered successfully');
-      console.log(`  Issuer: ${metadata.issuer}`);
-      console.log(
-        `  Authorization endpoint: ${metadata.authorization_endpoint}`
-      );
-      console.log(`  Token endpoint: ${metadata.token_endpoint}`);
+      printSuccess('OAuth metadata discovered successfully');
+      printInfo(`Issuer: ${metadata.issuer}`, 2);
+      printInfo(`Authorization: ${metadata.authorization_endpoint}`, 2);
+      printInfo(`Token: ${metadata.token_endpoint}`, 2);
 
       // Create OAuth provider and Drupal connector as shared instances
       this.oauthProvider = createDrupalOAuthProvider(this.oauthConfigManager);
@@ -201,14 +220,15 @@ export class DrupalMCPHttpServer {
         `http://${this.config.host}:${this.config.port}`
       );
 
-      console.log('Setting up OAuth metadata router...');
-      console.log(`  Resource server URL: ${resourceServerUrl.href}`);
-      console.log(`  Expected well-known endpoints:`);
+      printInfo('🔧 Setting up OAuth metadata router...');
+      printInfo(`Resource server: ${resourceServerUrl.href}`, 2);
+      printInfo(`Expected well-known endpoints:`, 2);
       const rsPath = resourceServerUrl.pathname;
       const wellKnownPath = `/.well-known/oauth-protected-resource${rsPath === '/' ? '' : rsPath}`;
-      console.log(`    - ${resourceServerUrl.origin}${wellKnownPath}`);
-      console.log(
-        `    - ${resourceServerUrl.origin}/.well-known/oauth-authorization-server`
+      printInfo(`- ${resourceServerUrl.origin}${wellKnownPath}`, 4);
+      printInfo(
+        `- ${resourceServerUrl.origin}/.well-known/oauth-authorization-server`,
+        4
       );
 
       this.app.use(
@@ -220,17 +240,18 @@ export class DrupalMCPHttpServer {
         })
       );
 
-      console.log('OAuth authentication initialized');
-      console.log(`  Resource server: ${resourceServerUrl}`);
-      console.log(`  Scopes: ${oauthConfig.scopes.join(', ')}`);
+      printSuccess('OAuth authentication initialized');
+      printInfo(`Resource server: ${resourceServerUrl}`, 2);
+      printInfo(`Scopes: ${oauthConfig.scopes.join(', ')}`, 2);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      console.warn('⚠️  OAuth initialization failed:', errorMessage);
-      console.warn(
-        '   Server will start without OAuth. Check your DRUPAL_BASE_URL and network connectivity.'
+      printWarning(`OAuth initialization failed: ${errorMessage}`);
+      printInfo(
+        'Server will start without OAuth. Check DRUPAL_BASE_URL and network.',
+        2
       );
-      console.warn('   To disable this warning, set AUTH_ENABLED=false');
+      printInfo('To disable this warning, set AUTH_ENABLED=false', 2);
       // Don't throw - allow server to start without OAuth
       this.config.enableAuth = false;
     }
@@ -562,6 +583,80 @@ export class DrupalMCPHttpServer {
   }
 
   /**
+   * Extracts OAuth token from Authorization header and stores session/user mappings
+   * @param sessionId - MCP session identifier
+   * @param req - Express Request object
+   */
+  private extractAndStoreTokenFromRequest(
+    sessionId: string,
+    req: express.Request
+  ): void {
+    // Step 1: Extract Authorization Header
+    const authHeader = req.headers['authorization'] as string | undefined;
+    if (!authHeader) {
+      return; // No token present - not an error, exit gracefully
+    }
+
+    // Step 2: Validate Bearer Token Format
+    if (!authHeader.startsWith('Bearer ')) {
+      console.warn(
+        `Invalid Authorization header format for session ${sessionId}`
+      );
+      return;
+    }
+
+    // Step 3: Parse Token
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    // Step 4: Decode JWT with Error Handling
+    let userId: string;
+    try {
+      userId = extractUserId(token); // Existing utility from jwt-decoder.ts
+    } catch (error) {
+      console.warn(
+        `Token decode failed for session ${sessionId}:`,
+        error instanceof Error ? error.message : String(error)
+      );
+      return; // Invalid token - log warning, exit gracefully
+    }
+
+    // Step 5: Check for Reconnection (same user, new session)
+    const existingTokens = this.userTokens.get(userId);
+    if (existingTokens) {
+      // User reconnecting - just update session mapping, reuse tokens
+      this.sessionToUser.set(sessionId, userId);
+      console.log(
+        `User ${userId} reconnecting - mapped session ${sessionId} to existing tokens`
+      );
+      return;
+    }
+
+    // Step 6: Create TokenResponse Structure
+    const tokenData: TokenResponse = {
+      access_token: token,
+      token_type: 'Bearer',
+      expires_in: 3600, // Default expiry (actual expiry in JWT exp claim)
+      refresh_token: undefined, // Not available from Authorization header
+      scope: '', // Not available from Authorization header
+    };
+
+    // Step 7: Store in Maps
+    // Persistent user token storage
+    this.userTokens.set(userId, tokenData);
+
+    // Ephemeral session-to-user mapping
+    this.sessionToUser.set(sessionId, userId);
+
+    // Step 8: Log Success
+    console.log(
+      `Token extracted and stored for session ${sessionId} → user ${userId}`
+    );
+    console.log(
+      `Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
+    );
+  }
+
+  /**
    * Sets up MCP HTTP endpoint with per-session Server+Transport instances
    *
    * ARCHITECTURE: Each client session gets its own Server and Transport pair.
@@ -578,8 +673,9 @@ export class DrupalMCPHttpServer {
    * 6. Client disconnects → onsessionclosed callback fires (cleanup in Task 3)
    */
   private async setupMcpEndpoint(): Promise<void> {
-    console.log(
-      'Setting up MCP endpoint with per-session Server+Transport architecture...'
+    printInfo(
+      'Setting up MCP endpoint with per-session Server+Transport architecture...',
+      2
     );
 
     // Handle all MCP requests with session routing
@@ -626,7 +722,7 @@ export class DrupalMCPHttpServer {
       }
     });
 
-    console.log('✓ MCP endpoint configured with per-session routing');
+    printSuccess('MCP endpoint configured with per-session routing');
   }
 
   /**
@@ -638,15 +734,13 @@ export class DrupalMCPHttpServer {
       await this.initializeOAuth();
 
       // ========== NEW: Tool Discovery ==========
-      console.log('\n=== Discovering Tools ===');
+      printSection('Discovering Tools', '🔍');
 
       const DRUPAL_BASE_URL = process.env.DRUPAL_BASE_URL;
       if (!DRUPAL_BASE_URL) {
-        console.error(
-          'ERROR: DRUPAL_BASE_URL environment variable is required'
-        );
-        console.error('Set it in your .env file or environment:');
-        console.error('  DRUPAL_BASE_URL=https://your-drupal-site.com');
+        printWarning('DRUPAL_BASE_URL environment variable is required');
+        printInfo('Set it in your .env file or environment:', 2);
+        printInfo('DRUPAL_BASE_URL=https://your-drupal-site.com', 2);
         process.exit(1);
       }
 
@@ -654,33 +748,35 @@ export class DrupalMCPHttpServer {
       try {
         tools = await getDiscoveredTools(DRUPAL_BASE_URL);
       } catch (error) {
-        console.error('\n❌ FATAL: Tool discovery failed');
-        console.error(
-          'Error:',
-          error instanceof Error ? error.message : String(error)
+        printWarning('FATAL: Tool discovery failed');
+        printInfo(
+          `Error: ${error instanceof Error ? error.message : String(error)}`,
+          2
         );
-        console.error('\nTroubleshooting:');
-        console.error('  1. Verify DRUPAL_BASE_URL is correct');
-        console.error('  2. Ensure /mcp/tools/list endpoint exists on Drupal');
-        console.error('  3. Check network connectivity to Drupal server');
-        console.error('  4. Review Drupal logs for errors');
+        printInfo('Troubleshooting:', 2);
+        printInfo('1. Verify DRUPAL_BASE_URL is correct', 4);
+        printInfo('2. Ensure /mcp/tools/list endpoint exists on Drupal', 4);
+        printInfo('3. Check network connectivity to Drupal server', 4);
+        printInfo('4. Review Drupal logs for errors', 4);
         process.exit(1);
       }
 
       // Validate we have tools
       if (tools.length === 0) {
-        console.error('\n❌ FATAL: No tools discovered from /mcp/tools/list');
-        console.error('The MCP server cannot start without any tools.');
-        console.error(
-          '\nEnsure Drupal backend has configured tools at /mcp/tools/list endpoint.'
+        printWarning('FATAL: No tools discovered from /mcp/tools/list');
+        printInfo('The MCP server cannot start without any tools.', 2);
+        printInfo(
+          'Ensure Drupal backend has configured tools at /mcp/tools/list endpoint.',
+          2
         );
         process.exit(1);
       }
 
-      console.log(`✓ Discovered ${tools.length} tools from Drupal`);
+      printSuccess(`Discovered ${tools.length} tools from Drupal`);
       tools.forEach(tool => {
-        console.log(
-          `  - ${tool.name}: ${tool.description.substring(0, 60)}${tool.description.length > 60 ? '...' : ''}`
+        printInfo(
+          `${tool.name}: ${tool.description.substring(0, 60)}${tool.description.length > 60 ? '...' : ''}`,
+          2
         );
       });
 
@@ -688,11 +784,12 @@ export class DrupalMCPHttpServer {
       setDiscoveredTools(tools);
 
       // Note: Dynamic handlers are registered per-session in createSessionInstance()
-      console.log('✓ Tool definitions stored for per-session registration');
+      printSuccess('Tool definitions stored for per-session registration');
 
       // ========== END: Tool Discovery ==========
 
       // Set up MCP endpoint
+      printInfo('🚀 Setting up MCP endpoint...');
       await this.setupMcpEndpoint();
 
       // Health check endpoint
@@ -741,34 +838,16 @@ export class DrupalMCPHttpServer {
       return new Promise((resolve, reject) => {
         try {
           this.app.listen(this.config.port, this.config.host, () => {
-            console.log('\n=== MCP Server Started ===');
-            console.log('='.repeat(60));
-            console.log(`${this.config.name} v${this.config.version}`);
-            console.log('='.repeat(60));
-            console.log(
-              `HTTP Server: http://${this.config.host}:${this.config.port}`
-            );
-            console.log(
-              `MCP Endpoint: http://${this.config.host}:${this.config.port}/mcp`
-            );
-            console.log(
-              `Health Check: http://${this.config.host}:${this.config.port}/health`
-            );
-            console.log(
-              `Auth Enabled: ${this.config.enableAuth ? 'Yes' : 'No'}`
-            );
-            if (this.config.enableAuth && this.oauthConfigManager) {
-              const config = this.oauthConfigManager.getConfig();
-              console.log(`OAuth Server: ${config.drupalUrl}`);
-              console.log(`OAuth Client: ${config.clientId}`);
-            }
-            console.log(
-              `Tools Registered: ${discoveredToolDefinitions.length}`
-            );
-            console.log('='.repeat(60));
-            console.log(
-              `\n✅ MCP Server started successfully with ${discoveredToolDefinitions.length} tools`
-            );
+            printStartupBanner({
+              name: this.config.name,
+              version: this.config.version,
+              host: this.config.host,
+              port: this.config.port,
+              authEnabled: this.config.enableAuth,
+              oauthServer: this.oauthConfigManager?.getConfig().drupalUrl,
+              oauthClient: this.oauthConfigManager?.getConfig().clientId,
+              toolsCount: discoveredToolDefinitions.length,
+            });
             resolve();
           });
         } catch (error) {

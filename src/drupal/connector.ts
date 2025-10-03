@@ -1,11 +1,15 @@
 import { JSONRPCClient, JSONRPCRequest } from 'json-rpc-2.0';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import debug from 'debug';
 import {
   Tutorial,
   TutorialSchema,
   SearchResponse,
   SearchResponseSchema,
 } from './types.js';
+
+// Debug logger for Drupal connector requests
+const debugRequestOut = debug('mcp:request:out');
 
 /**
  * DrupalConnector handles JSON-RPC 2.0 communication with Drupal API
@@ -40,7 +44,21 @@ export class DrupalConnector {
       jsonRPCRequest: JSONRPCRequest
     ): Promise<void> => {
       try {
-        const response = await fetch(`${this.baseUrl}${this.jsonrpcEndpoint}`, {
+        const url = `${this.baseUrl}${this.jsonrpcEndpoint}`;
+
+        // Debug: Log outgoing JSON-RPC request
+        if (debugRequestOut.enabled) {
+          debugRequestOut('Outgoing request to Drupal (JSON-RPC):');
+          debugRequestOut('  URL: %s', url);
+          debugRequestOut('  Method: POST');
+          debugRequestOut('  Headers: %O', {
+            'Content-Type': 'application/json',
+            Authorization: '[REDACTED]',
+          });
+          debugRequestOut('  Body: %O', jsonRPCRequest);
+        }
+
+        const response = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -51,12 +69,21 @@ export class DrupalConnector {
 
         // Map HTTP errors to MCP errors
         if (!response.ok) {
+          debugRequestOut('Request failed: HTTP %d', response.status);
           throw this.mapHttpErrorToMcpError(response.status);
         }
 
         if (response.status === 200) {
           // Parse JSON response and feed it back to the client
           const jsonRPCResponse = await response.json();
+
+          // Debug: Log response
+          if (debugRequestOut.enabled) {
+            debugRequestOut('Response from Drupal:');
+            debugRequestOut('  Status: %d', response.status);
+            debugRequestOut('  Result: %O', jsonRPCResponse);
+          }
+
           const client = clientInstance[0];
           if (!client) {
             throw new McpError(

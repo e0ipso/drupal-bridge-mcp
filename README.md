@@ -137,6 +137,38 @@ class MinimalDrupalMcpServer {
 }
 ```
 
+<details>
+<summary>
+<strong>🐛 Debug Logging</strong>
+</summary>
+
+The server includes detailed request/response logging using the `debug` package. Enable debug output
+by setting the `DEBUG` environment variable:
+
+```bash
+# All debug output
+DEBUG=mcp:* npm start
+
+# Only incoming MCP requests
+DEBUG=mcp:request:in npm start
+
+# Only outgoing requests to Drupal
+DEBUG=mcp:request:out npm start
+
+# Or run in development mode
+DEBUG=mcp:* npm run dev
+```
+
+**Debug Namespaces:**
+
+- `mcp:bootstrap` - Server startup and tool discovery
+- `mcp:request:in` - Incoming MCP requests (method, path, headers, session ID, body)
+- `mcp:request:out` - Outgoing requests to Drupal (URL, headers, body, response)
+
+**Note:** Authorization tokens are automatically redacted in debug output for security.
+
+</details>
+
 ## 🔄 Session Management & Reconnection
 
 The server implements a robust session management system that enables clients (like MCP Inspector)

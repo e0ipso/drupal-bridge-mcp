@@ -17,6 +17,7 @@
     "start:debug": "DEBUG=mcp:* node --env-file=.env dist/index.js",
     "type-check": "tsc --noEmit",
     "test": "jest",
+    "test:e2e:oauth": "NODE_ENV=test node --env-file=.env.test npx jest src/__tests__/e2e/oauth-flow.e2e.test.ts --testTimeout=120000",
     "semantic-release": "semantic-release"
   },
   "keywords": [
