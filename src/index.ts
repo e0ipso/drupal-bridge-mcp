@@ -237,13 +237,6 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Check if request body contains an initialize method
-   */
-  private isInitializeRequest(body: any): boolean {
-    return body && body.method === 'initialize';
-  }
-
-  /**
    * Create a new Server and Transport instance for a session
    */
   private async createSessionInstance(sessionId: string): Promise<{
@@ -596,8 +589,8 @@ export class DrupalMCPHttpServer {
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
         // Step 2: Session routing logic
-        if (!sessionId && this.isInitializeRequest(req.body)) {
-          // Scenario 1: New initialize request
+        if (!sessionId) {
+          // Scenario 1: New session request
           const newSessionId = randomUUID();
           console.log(`Creating new session: ${newSessionId}`);
 
@@ -614,19 +607,12 @@ export class DrupalMCPHttpServer {
           // Scenario 2: Existing session
           const { transport } = this.transports.get(sessionId)!;
           await transport.handleRequest(req, res);
-        } else if (sessionId) {
+        } else {
           // Scenario 3: Invalid session ID
           console.warn(`Invalid session ID: ${sessionId}`);
           res.status(404).json({
             error: 'Session not found',
             sessionId,
-          });
-        } else {
-          // Scenario 4: No session ID and not initialize request
-          console.warn('Request without session ID and not initialize request');
-          res.status(400).json({
-            error:
-              'Bad Request: Session ID required or send initialize request',
           });
         }
       } catch (error) {
