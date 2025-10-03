@@ -109,7 +109,6 @@ export class DrupalMCPHttpServer {
 
     this.app = express();
     this.setupMiddleware();
-    this.setupHandlers();
 
     console.log(
       'Transport map initialized for per-session Server+Transport instances'
@@ -238,22 +237,74 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Sets up MCP request handlers
+   * Check if request body contains an initialize method
    */
-  private setupHandlers(): void {
-    // List available tools - returns dynamically discovered tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+  private isInitializeRequest(body: any): boolean {
+    return body && body.method === 'initialize';
+  }
+
+  /**
+   * Create a new Server and Transport instance for a session
+   */
+  private async createSessionInstance(sessionId: string): Promise<{
+    server: Server;
+    transport: StreamableHTTPServerTransport;
+  }> {
+    // Create server with same configuration
+    const server = new Server(
+      {
+        name: this.config.name,
+        version: this.config.version,
+      },
+      {
+        capabilities: {
+          tools: {},
+        },
+      }
+    );
+
+    // Set up tool handlers (same as original setupHandlers)
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
         tools: discoveredToolDefinitions.map(tool => ({
           name: tool.name,
           description: tool.description,
-          inputSchema: tool.inputSchema, // Already JSON Schema from discovery
+          inputSchema: tool.inputSchema,
         })),
       };
     });
 
-    // CallToolRequestSchema handler is now registered dynamically
-    // via registerDynamicTools() during server startup
+    // Register dynamic tool handlers for this server instance
+    registerDynamicTools(
+      server,
+      discoveredToolDefinitions,
+      this.makeRequest.bind(this),
+      this.getSession.bind(this)
+    );
+
+    // Create transport
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => sessionId,
+      enableDnsRebindingProtection: true,
+      allowedHosts: [
+        this.config.host,
+        'localhost',
+        `localhost:${this.config.port}`,
+        `${this.config.host}:${this.config.port}`,
+      ],
+      onsessionclosed: async (closedSessionId: string) => {
+        // Placeholder - will be implemented in Task 3
+        console.log(
+          `Session ${closedSessionId} closed (cleanup pending Task 3)`
+        );
+      },
+    });
+
+    // Connect server to transport
+    await server.connect(transport);
+    console.log(`Server+Transport created for session ${sessionId}`);
+
+    return { server, transport };
   }
 
   /**
@@ -474,78 +525,66 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Sets up MCP HTTP endpoint with single long-lived transport
+   * Sets up MCP HTTP endpoint with per-session Server+Transport instances
    *
-   * ARCHITECTURE: Uses one StreamableHTTPServerTransport instance that handles
-   * multiple sessions internally. The transport is connected to the MCP server
-   * ONCE during startup. Each client connection receives a unique session ID,
-   * but all sessions share the same transport and server instance.
-   *
-   * This pattern prevents "Server already initialized" errors that occur when
-   * trying to create multiple Server instances or call server.connect() multiple times.
+   * ARCHITECTURE: Each client session gets its own Server and Transport pair.
+   * When a client sends an initialize request without a session ID, we create
+   * a new session with dedicated Server+Transport instances. Subsequent requests
+   * from that client include the session ID and are routed to the correct transport.
    *
    * Session lifecycle:
-   * 1. Client connects → Transport generates new session ID
-   * 2. Client sends initialize request → Transport routes to server
-   * 3. Server handles request with session context
-   * 4. Client disconnects → onsessionclosed callback fires
-   * 5. Next client connects → New session ID, same transport/server
+   * 1. Client sends initialize request → New session ID generated
+   * 2. Server+Transport pair created for that session ID
+   * 3. Stored in transports map: sessionId → {server, transport}
+   * 4. Client sends subsequent requests with session ID header
+   * 5. Requests routed to correct transport based on session ID
+   * 6. Client disconnects → onsessionclosed callback fires (cleanup in Task 3)
    */
   private async setupMcpEndpoint(): Promise<void> {
     console.log(
-      'Setting up MCP endpoint with StreamableHTTPServerTransport...'
+      'Setting up MCP endpoint with per-session Server+Transport architecture...'
     );
 
-    // Create a single transport instance that handles all sessions
-    this.transport = new StreamableHTTPServerTransport({
-      // Let the transport generate session IDs automatically
-      sessionIdGenerator: () => randomUUID(),
-      enableDnsRebindingProtection: true,
-      allowedHosts: [
-        this.config.host,
-        'localhost',
-        `localhost:${this.config.port}`,
-        `${this.config.host}:${this.config.port}`,
-      ],
-      onsessionclosed: async (sessionId: string) => {
-        const userId = this.sessionToUser.get(sessionId);
-        console.log(
-          `Session closed: ${sessionId} (user: ${userId || 'unauthenticated'})`
-        );
-
-        // Remove session mapping (ephemeral)
-        this.sessionToUser.delete(sessionId);
-        this.sessionCapabilities.delete(sessionId);
-
-        // DO NOT remove user tokens - they persist for reconnection
-        // Tokens are only removed on explicit logout
-
-        console.log(
-          `Active sessions: ${this.sessionToUser.size}, Active users: ${this.userTokens.size}`
-        );
-      },
-    });
-
-    console.log('StreamableHTTPServerTransport instance created');
-
-    // Connect the transport to the MCP server
-    await this.server.connect(this.transport);
-    console.log('✓ Transport connected to MCP server (handles all sessions)');
-    console.log('✓ Single long-lived transport pattern verified');
-
-    // Log client capabilities when available
-    const capabilities = this.server.getClientCapabilities();
-    if (capabilities) {
-      console.log('Client capabilities detected:', {
-        sampling: capabilities.sampling !== undefined,
-        experimental: capabilities.experimental !== undefined,
-      });
-    }
-
-    // Handle all MCP requests through the single transport
+    // Handle all MCP requests with session routing
     this.app.all('/mcp', async (req, res) => {
       try {
-        await this.transport!.handleRequest(req, res);
+        // Step 1: Extract session ID from header
+        const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+        // Step 2: Session routing logic
+        if (!sessionId && this.isInitializeRequest(req.body)) {
+          // Scenario 1: New initialize request
+          const newSessionId = randomUUID();
+          console.log(`Creating new session: ${newSessionId}`);
+
+          const { server, transport } =
+            await this.createSessionInstance(newSessionId);
+          this.transports.set(newSessionId, { server, transport });
+
+          console.log(
+            `Session ${newSessionId} created. Active sessions: ${this.transports.size}`
+          );
+
+          await transport.handleRequest(req, res);
+        } else if (sessionId && this.transports.has(sessionId)) {
+          // Scenario 2: Existing session
+          const { transport } = this.transports.get(sessionId)!;
+          await transport.handleRequest(req, res);
+        } else if (sessionId) {
+          // Scenario 3: Invalid session ID
+          console.warn(`Invalid session ID: ${sessionId}`);
+          res.status(404).json({
+            error: 'Session not found',
+            sessionId,
+          });
+        } else {
+          // Scenario 4: No session ID and not initialize request
+          console.warn('Request without session ID and not initialize request');
+          res.status(400).json({
+            error:
+              'Bad Request: Session ID required or send initialize request',
+          });
+        }
       } catch (error) {
         console.error('Error handling MCP request:', error);
         if (!res.headersSent) {
@@ -556,6 +595,8 @@ export class DrupalMCPHttpServer {
         }
       }
     });
+
+    console.log('✓ MCP endpoint configured with per-session routing');
   }
 
   /**
@@ -616,23 +657,8 @@ export class DrupalMCPHttpServer {
       // Store tools for ListToolsRequest handler
       setDiscoveredTools(tools);
 
-      // Register dynamic handlers
-      console.log('\n=== Registering Dynamic Handlers ===');
-      try {
-        registerDynamicTools(
-          this.server,
-          tools,
-          this.makeRequest.bind(this),
-          this.getSession.bind(this)
-        );
-      } catch (error) {
-        console.error('\n❌ FATAL: Dynamic handler registration failed');
-        console.error(
-          'Error:',
-          error instanceof Error ? error.message : String(error)
-        );
-        process.exit(1);
-      }
+      // Note: Dynamic handlers are registered per-session in createSessionInstance()
+      console.log('✓ Tool definitions stored for per-session registration');
 
       // ========== END: Tool Discovery ==========
 
@@ -651,6 +677,7 @@ export class DrupalMCPHttpServer {
           // Session and authentication state
           activeUsers: this.userTokens.size,
           activeSessions: this.sessionToUser.size,
+          activeTransports: this.transports.size,
           sessionMappings: Object.fromEntries(this.sessionToUser.entries()),
         });
       });
@@ -664,12 +691,15 @@ export class DrupalMCPHttpServer {
               userId,
               hasTokens: this.userTokens.has(userId),
               hasCapabilities: this.sessionCapabilities.has(sessionId),
+              hasTransport: this.transports.has(sessionId),
             })
           ),
+          transports: Array.from(this.transports.keys()),
           users: Array.from(this.userTokens.keys()),
           summary: {
             totalSessions: this.sessionToUser.size,
             totalUsers: this.userTokens.size,
+            totalTransports: this.transports.size,
             authenticatedSessions: Array.from(
               this.sessionToUser.values()
             ).filter(userId => this.userTokens.has(userId)).length,
@@ -731,15 +761,21 @@ export class DrupalMCPHttpServer {
   async stop(): Promise<void> {
     console.log('Shutting down HTTP server...');
 
-    // Close the transport if it exists
-    if (this.transport) {
+    // Close all transports
+    for (const [sessionId, { transport }] of this.transports.entries()) {
       try {
-        await this.transport.close();
-        console.log('Transport closed');
+        await transport.close();
+        console.log(`Transport closed for session ${sessionId}`);
       } catch (error) {
-        console.error('Error closing transport:', error);
+        console.error(
+          `Error closing transport for session ${sessionId}:`,
+          error
+        );
       }
     }
+
+    // Clear transports map
+    this.transports.clear();
 
     // Clear all session and user data
     this.userTokens.clear();
