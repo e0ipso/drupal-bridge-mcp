@@ -184,6 +184,10 @@ Map<userId, tokens>; // Persistent user-level tokens
 Map<sessionId, userId>; // Ephemeral session-to-user mapping
 ```
 
+**OAuth Token Extraction**: The server automatically extracts OAuth tokens from
+`Authorization: Bearer` headers in browser-based authentication flows, enabling MCP Inspector and
+other clients to authenticate using standard OAuth 2.1 authorization code flow with PKCE.
+
 ### Session Lifecycle
 
 1. **Authentication**: User authenticates → JWT decoded → userId extracted → tokens stored

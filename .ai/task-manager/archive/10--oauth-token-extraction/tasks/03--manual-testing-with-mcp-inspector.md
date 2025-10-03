@@ -2,7 +2,7 @@
 id: 3
 group: 'validation'
 dependencies: [1, 2]
-status: 'pending'
+status: 'blocked'
 created: '2025-10-03'
 skills:
   - testing
@@ -104,6 +104,7 @@ Token lookup success: session <session-id> → user <user-id>
    - Creates/updates `dist/index.js`
 
 3. **Start MCP Server**:
+
    ```bash
    AUTH_ENABLED=true npm start
    ```

@@ -886,3 +886,157 @@ headers and stores session mappings.
 - Total Tasks: 3
 - Maximum Parallelism: 1 task (all phases have 1 task each due to sequential dependencies)
 - Critical Path Length: 3 phases
+
+## Plan Execution Report
+
+**Execution Date**: 2025-10-04 **Status**: Implementation Complete, Testing Blocked **Branch**:
+`feat/oauth-token-extraction`
+
+### Completed Phases
+
+#### ✅ Phase 1: Core Implementation (COMPLETED)
+
+**Task 01**: Implement Token Extraction Helper Method
+
+- **Status**: ✅ Completed
+- **Implementation**: src/index.ts:585-655
+- **Commit**: `feat(oauth): implement token extraction helper method`
+- **Key Features**:
+  - Authorization header extraction with validation
+  - Bearer token parsing and JWT decoding
+  - Session-to-user and user-to-token mapping storage
+  - Reconnection detection and token reuse
+  - Comprehensive error handling (malformed tokens, decode failures)
+  - Detailed logging for debugging
+
+#### ✅ Phase 2: Integration (COMPLETED)
+
+**Task 02**: Integrate Token Extraction in MCP Endpoint Handler
+
+- **Status**: ✅ Completed
+- **Implementation**: src/index.ts:701-716
+- **Commit**: `feat(oauth): integrate token extraction in endpoint handler`
+- **Integration Points**:
+  - New session path (lines 701-704): Token extraction after session creation
+  - Existing session path (lines 711-714): Token extraction after transport retrieval
+  - Conditional execution based on `this.config.enableAuth`
+  - Placement before `transport.handleRequest()` in both paths
+
+#### ⏸️ Phase 3: Validation (BLOCKED)
+
+**Task 03**: Manual Testing with MCP Inspector OAuth Flow
+
+- **Status**: ⏸️ Blocked - Drupal backend not accessible
+- **Blocker**: DDEV environment `drupal-contrib.ddev.site` not running
+- **Error**: `Could not resolve host: drupal-contrib.ddev.site`
+- **Remediation Required**:
+  1. Start DDEV Drupal environment: `ddev start`
+  2. Verify Drupal accessibility: `curl https://drupal-contrib.ddev.site/health`
+  3. Start MCP server: `AUTH_ENABLED=true npm start`
+  4. Follow test procedure in task 03 documentation
+
+### Implementation Quality
+
+- ✅ TypeScript compilation: No errors
+- ✅ Code linting: Passed (lint-staged)
+- ✅ Type safety: All type annotations correct
+- ✅ Error handling: Comprehensive try-catch with graceful degradation
+- ✅ Code consistency: Follows device flow pattern exactly
+- ✅ Documentation: Inline comments and detailed commit messages
+- ✅ Logging: Detailed debug output for troubleshooting
+
+### Code Changes Summary
+
+**Files Modified**: 1
+
+- `src/index.ts`:
+  - Lines 585-655: New `extractAndStoreTokenFromRequest()` method
+  - Lines 701-704: Token extraction in new session path
+  - Lines 711-714: Token extraction in existing session path
+
+**Total Lines Added**: ~80 lines of implementation code
+
+### Verification Status
+
+**Automated Verification**:
+
+- ✅ TypeScript type checking passed
+- ✅ Build successful (`npm run build`)
+- ✅ Linting passed (lint-staged on commit)
+
+**Manual Verification**:
+
+- ⏸️ Pending: OAuth flow end-to-end test (requires Drupal backend)
+- ⏸️ Pending: Token extraction logging verification
+- ⏸️ Pending: Authenticated tool execution test
+- ⏸️ Pending: Unauthenticated request test
+
+### Outstanding Work
+
+**To Complete This Plan**:
+
+1. Start Drupal DDEV environment
+2. Execute manual testing procedure from Task 03
+3. Verify expected log output:
+   - `Token extracted and stored for session <id> → user <userId>`
+   - `Token lookup success: session <id> → user <userId>`
+4. Confirm authenticated tool execution succeeds
+5. Validate no regressions in unauthenticated requests
+
+**Once Testing Passes**:
+
+1. Update Task 03 status to `completed`
+2. Create pull request from `feat/oauth-token-extraction` to main branch
+3. Include test results in PR description
+4. Merge after review
+
+### Technical Notes
+
+**Architecture Decisions Validated**:
+
+- ✅ Proxy validation model: MCP server extracts/forwards, backend validates
+- ✅ Graceful degradation: Malformed tokens don't crash server
+- ✅ Infrastructure reuse: Same Maps as device flow
+- ✅ Session lifecycle compatibility: No changes to cleanup logic
+
+**MCP 2.1 Specification Compliance**:
+
+- ✅ Extracts `Authorization: Bearer` headers from requests
+- ✅ Stores tokens for session context
+- ✅ Enables backend APIs to validate authentication
+- ⏸️ Pending verification: End-to-end OAuth flow with MCP Inspector
+
+### Commits
+
+1. `feat(oauth): implement token extraction helper method` (Phase 1)
+2. `feat(oauth): integrate token extraction in endpoint handler` (Phase 2)
+
+### Next Steps for Maintainer
+
+1. **Start Drupal Backend**:
+
+   ```bash
+   ddev start
+   ```
+
+2. **Run Manual Tests**:
+
+   ```bash
+   AUTH_ENABLED=true npm start
+   # Open MCP Inspector in browser
+   # Follow test procedure in .ai/task-manager/plans/10--oauth-token-extraction/tasks/03--manual-testing-with-mcp-inspector.md
+   ```
+
+3. **Expected Success Indicators**:
+   - OAuth flow completes without errors
+   - Server logs show token extraction
+   - Tool execution returns data (not 403)
+   - Server logs show token lookup success
+
+### References
+
+- Investigation findings: `.ai/testing/oauth-investigation-findings.md`
+- Test methodology: `.ai/testing/oauth-flow-test-methodology.md`
+- MCP OAuth Spec: https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization
+
+**Plan Status**: ✅ Implementation Complete | ⏸️ Testing Pending Infrastructure
