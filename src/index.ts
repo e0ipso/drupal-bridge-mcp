@@ -476,9 +476,28 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Sets up MCP HTTP endpoint
+   * Sets up MCP HTTP endpoint with single long-lived transport
+   *
+   * ARCHITECTURE: Uses one StreamableHTTPServerTransport instance that handles
+   * multiple sessions internally. The transport is connected to the MCP server
+   * ONCE during startup. Each client connection receives a unique session ID,
+   * but all sessions share the same transport and server instance.
+   *
+   * This pattern prevents "Server already initialized" errors that occur when
+   * trying to create multiple Server instances or call server.connect() multiple times.
+   *
+   * Session lifecycle:
+   * 1. Client connects → Transport generates new session ID
+   * 2. Client sends initialize request → Transport routes to server
+   * 3. Server handles request with session context
+   * 4. Client disconnects → onsessionclosed callback fires
+   * 5. Next client connects → New session ID, same transport/server
    */
   private async setupMcpEndpoint(): Promise<void> {
+    console.log(
+      'Setting up MCP endpoint with StreamableHTTPServerTransport...'
+    );
+
     // Create a single transport instance that handles all sessions
     this.transport = new StreamableHTTPServerTransport({
       // Let the transport generate session IDs automatically
@@ -509,8 +528,12 @@ export class DrupalMCPHttpServer {
       },
     });
 
+    console.log('StreamableHTTPServerTransport instance created');
+
     // Connect the transport to the MCP server
     await this.server.connect(this.transport);
+    console.log('✓ Transport connected to MCP server (handles all sessions)');
+    console.log('✓ Single long-lived transport pattern verified');
 
     // Log client capabilities when available
     const capabilities = this.server.getClientCapabilities();
@@ -626,6 +649,33 @@ export class DrupalMCPHttpServer {
           version: this.config.version,
           authEnabled: this.config.enableAuth,
           timestamp: new Date().toISOString(),
+
+          // Session and authentication state
+          activeUsers: this.userTokens.size,
+          activeSessions: this.sessionToUser.size,
+          sessionMappings: Object.fromEntries(this.sessionToUser.entries()),
+        });
+      });
+
+      // Debug sessions endpoint
+      this.app.get('/debug/sessions', (_req, res) => {
+        res.json({
+          sessions: Array.from(this.sessionToUser.entries()).map(
+            ([sessionId, userId]) => ({
+              sessionId,
+              userId,
+              hasTokens: this.userTokens.has(userId),
+              hasCapabilities: this.sessionCapabilities.has(sessionId),
+            })
+          ),
+          users: Array.from(this.userTokens.keys()),
+          summary: {
+            totalSessions: this.sessionToUser.size,
+            totalUsers: this.userTokens.size,
+            authenticatedSessions: Array.from(
+              this.sessionToUser.values()
+            ).filter(userId => this.userTokens.has(userId)).length,
+          },
         });
       });
 
