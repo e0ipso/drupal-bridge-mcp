@@ -293,9 +293,53 @@ export class DrupalMCPHttpServer {
         `${this.config.host}:${this.config.port}`,
       ],
       onsessionclosed: async (closedSessionId: string) => {
-        // Placeholder - will be implemented in Task 3
+        const userId = this.sessionToUser.get(closedSessionId);
         console.log(
-          `Session ${closedSessionId} closed (cleanup pending Task 3)`
+          `Session closed: ${closedSessionId} (user: ${userId || 'unauthenticated'})`
+        );
+
+        // Step 1: Retrieve Server+Transport for cleanup
+        const sessionInstance = this.transports.get(closedSessionId);
+
+        if (sessionInstance) {
+          const { server, transport } = sessionInstance;
+
+          // Step 2: Close transport
+          try {
+            await transport.close();
+            console.log(`Transport closed for session ${closedSessionId}`);
+          } catch (error) {
+            console.error(
+              `Error closing transport for session ${closedSessionId}:`,
+              error
+            );
+          }
+
+          // Step 3: Close server (if method exists)
+          try {
+            if (typeof server.close === 'function') {
+              await server.close();
+              console.log(`Server closed for session ${closedSessionId}`);
+            }
+          } catch (error) {
+            console.error(
+              `Error closing server for session ${closedSessionId}:`,
+              error
+            );
+          }
+
+          // Step 4: Remove from transports map
+          this.transports.delete(closedSessionId);
+        }
+
+        // Step 5: Clean session mappings (existing Plan 8 logic)
+        this.sessionToUser.delete(closedSessionId);
+        this.sessionCapabilities.delete(closedSessionId);
+
+        // Step 6: DO NOT remove user tokens - they persist for reconnection
+
+        console.log(
+          `Active sessions: ${this.transports.size}, Active users: ${this.userTokens.size}`
         );
       },
     });
@@ -761,21 +805,32 @@ export class DrupalMCPHttpServer {
   async stop(): Promise<void> {
     console.log('Shutting down HTTP server...');
 
-    // Close all transports
-    for (const [sessionId, { transport }] of this.transports.entries()) {
+    // Close all transports in the map
+    console.log(`Closing ${this.transports.size} active sessions...`);
+
+    for (const [
+      sessionId,
+      { server, transport },
+    ] of this.transports.entries()) {
       try {
+        // Close transport
         await transport.close();
         console.log(`Transport closed for session ${sessionId}`);
+
+        // Close server (if method exists)
+        if (typeof server.close === 'function') {
+          await server.close();
+          console.log(`Server closed for session ${sessionId}`);
+        }
       } catch (error) {
-        console.error(
-          `Error closing transport for session ${sessionId}:`,
-          error
-        );
+        console.error(`Error closing session ${sessionId}:`, error);
+        // Continue with next session even if this one fails
       }
     }
 
-    // Clear transports map
+    // Clear the map
     this.transports.clear();
+    console.log('All transports closed');
 
     // Clear all session and user data
     this.userTokens.clear();

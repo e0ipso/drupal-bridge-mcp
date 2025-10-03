@@ -2,8 +2,9 @@
 id: 6
 group: 'observability'
 dependencies: [1, 2]
-status: 'pending'
+status: 'completed'
 created: '2025-10-03'
+completed: '2025-10-03'
 skills:
   - 'typescript'
 ---
