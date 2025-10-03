@@ -2,7 +2,7 @@
 id: 4
 group: 'documentation'
 dependencies: [2, 3]
-status: 'pending'
+status: 'completed'
 created: '2025-10-03'
 skills:
   - 'documentation'

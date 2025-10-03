@@ -698,10 +698,21 @@ export class DrupalMCPHttpServer {
             `Session ${newSessionId} created. Active sessions: ${this.transports.size}`
           );
 
+          // Extract OAuth token if auth is enabled
+          if (this.config.enableAuth) {
+            this.extractAndStoreTokenFromRequest(newSessionId, req);
+          }
+
           await transport.handleRequest(req, res);
         } else if (sessionId && this.transports.has(sessionId)) {
           // Scenario 2: Existing session
           const { transport } = this.transports.get(sessionId)!;
+
+          // Extract OAuth token if auth is enabled
+          if (this.config.enableAuth) {
+            this.extractAndStoreTokenFromRequest(sessionId, req);
+          }
+
           await transport.handleRequest(req, res);
         } else {
           // Scenario 3: Invalid session ID
