@@ -4,16 +4,18 @@ import { z } from 'zod';
  * Zod schema for tutorial response validation from Drupal JSON-RPC API
  */
 export const TutorialSchema = z.object({
+  score: z.number(),
   id: z.string(),
+  bundle: z.string(),
   title: z.string(),
   summary: z.string().optional(),
-  body: z.string().optional(),
+  excerpt: z.string().optional(),
   url: z.string().url().optional(),
   author: z.string().optional(),
   created: z.string().optional(),
   updated: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+  drupal_version: z.array(z.string()).optional(),
+  category: z.string(),
 });
 
 /**
