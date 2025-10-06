@@ -154,10 +154,12 @@ export class DrupalMCPHttpServer {
         'http://localhost:6200',
         'http://localhost:6201',
         'http://localhost:6202',
+        'http://localhost:6274', // Default MCP Inspector port
         'http://localhost:5173', // Common Vite dev server port
         'http://127.0.0.1:6200',
         'http://127.0.0.1:6201',
         'http://127.0.0.1:6202',
+        'http://127.0.0.1:6274',
         'http://127.0.0.1:5173',
       ];
 
@@ -173,9 +175,12 @@ export class DrupalMCPHttpServer {
         );
         res.setHeader(
           'Access-Control-Allow-Headers',
-          'Content-Type, Authorization, Last-Event-ID, mcp-session-id'
+          'Content-Type, Authorization, Last-Event-ID, mcp-session-id, mcp-protocol-version'
         );
-        res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id');
+        res.setHeader(
+          'Access-Control-Expose-Headers',
+          'mcp-session-id, mcp-protocol-version'
+        );
         res.setHeader('Access-Control-Allow-Credentials', 'true');
       }
 
