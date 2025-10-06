@@ -59,7 +59,7 @@ export function printStartupBanner(config: {
     '',
     `${chalk.cyan('🌐 HTTP Server:')} ${chalk.white(`http://${config.host}:${config.port}`)}`,
     `${chalk.cyan('🔌 MCP Endpoint:')} ${chalk.white(`http://${config.host}:${config.port}/mcp`)}`,
-    `${chalk.cyan('❤️  Health Check:')} ${chalk.white(`http://${config.host}:${config.port}/health`)}`,
+    `${chalk.cyan('❤️ Health Check:')} ${chalk.white(`http://${config.host}:${config.port}/health`)}`,
     `${chalk.cyan('🔒 Auth Enabled:')} ${config.authEnabled ? chalk.green('Yes') : chalk.yellow('No')}`,
   ];
 
@@ -76,7 +76,7 @@ export function printStartupBanner(config: {
   }
 
   content.push(
-    `${chalk.cyan('🛠️  Tools Available:')} ${chalk.bold.green(config.toolsCount.toString())}`
+    `${chalk.cyan('🛠️ Tools Available:')} ${chalk.bold.green(config.toolsCount.toString())}`
   );
 
   const box = boxen(content.join('\n'), {
