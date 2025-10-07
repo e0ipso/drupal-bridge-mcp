@@ -17,6 +17,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import debug from 'debug';
+import pinoHttp from 'pino-http';
+import { logger, requestSerializer } from './utils/logger.js';
 
 // Debug loggers
 const debugRequestIn = debug('mcp:request:in');
@@ -192,11 +194,34 @@ export class DrupalMCPHttpServer {
       next();
     });
 
-    // Request logging
-    this.app.use((req, _res, next) => {
-      console.log(`${req.method} ${req.path}`);
-      next();
-    });
+    // Request logging with pino-http
+    this.app.use(
+      pinoHttp({
+        logger,
+        customLogLevel: (_req, res, err) => {
+          if (res.statusCode >= 500 || err) {
+            return 'error';
+          }
+          if (res.statusCode >= 400) {
+            return 'warn';
+          }
+          return 'info';
+        },
+        customSuccessMessage: (req, res) => {
+          return `${req.method} ${req.url} ${res.statusCode}`;
+        },
+        customErrorMessage: (req, res, err) => {
+          return `${req.method} ${req.url} ${res.statusCode} - ${err.message}`;
+        },
+        serializers: {
+          req: req =>
+            requestSerializer(req as any, {
+              includeHeaders: true,
+              includeBody: false,
+            }),
+        },
+      })
+    );
   }
 
   /**
