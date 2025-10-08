@@ -1081,4 +1081,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 // Export for programmatic use
 export { type HttpServerConfig };
+export { handleError };
 export default main;
