@@ -16,8 +16,7 @@
         "LOG_LEVEL": "${LOG_LEVEL:-info}",
         "DEBUG": "${DEBUG:-mcp:*}",
         "PORT": "${PORT:-3000}",
-        "MCP_SERVER_NAME": "${MCP_SERVER_NAME:-dme-mcp}",
-        "MCP_SERVER_VERSION": "${MCP_SERVER_VERSION:-1.0.0}"
+        "MCP_SERVER_NAME": "${MCP_SERVER_NAME:-dme-mcp}"
       }
     }
   }

@@ -16,8 +16,7 @@
     "start": "node --env-file=.env dist/index.js",
     "start:debug": "DEBUG=mcp:* node --env-file=.env dist/index.js",
     "type-check": "tsc --noEmit",
-    "test": "jest",
-    "test:e2e:oauth": "NODE_ENV=test node --env-file=.env.test npx jest src/__tests__/e2e/oauth-flow.e2e.test.ts --testTimeout=120000",
+    "test": "npm run build && jest",
     "semantic-release": "semantic-release"
   },
   "keywords": [
@@ -38,7 +37,7 @@
     "@commitlint/cli": "^20.0.0",
     "@commitlint/config-conventional": "^20.0.0",
     "@eslint/js": "^9.36.0",
-    "@modelcontextprotocol/inspector": "0.17.0",
+    "@modelcontextprotocol/inspector": "^0.17.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^11.0.6",

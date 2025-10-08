@@ -6,34 +6,38 @@ const tutorialFixtures = {
   searchResponse: {
     results: [
       {
+        score: 0.95,
         id: 'tutorial-123',
+        bundle: 'tutorial',
         title: 'Introduction to MCP',
+        category: 'beginner',
         summary: 'Learn the basics of Model Context Protocol',
         url: 'https://drupal.site/tutorial/123',
-        difficulty: 'beginner' as const,
       },
       {
+        score: 0.87,
         id: 'tutorial-456',
+        bundle: 'tutorial',
         title: 'Advanced OAuth Integration',
+        category: 'advanced',
         summary: 'Deep dive into OAuth 2.1',
         url: 'https://drupal.site/tutorial/456',
-        difficulty: 'advanced' as const,
       },
     ],
     total: 2,
     limit: 10,
   },
   tutorialDetail: {
+    score: 1.0,
     id: 'tutorial-123',
+    bundle: 'tutorial',
     title: 'Introduction to MCP',
+    category: 'beginner',
     summary: 'Learn the basics of Model Context Protocol',
-    body: '<p>Full tutorial content here...</p>',
     url: 'https://drupal.site/tutorial/123',
     author: 'Jane Doe',
     created: '2025-01-15T10:30:00Z',
     updated: '2025-01-20T14:45:00Z',
-    tags: ['mcp', 'tutorial', 'beginner'],
-    difficulty: 'beginner' as const,
   },
 };
 
@@ -148,7 +152,7 @@ describe('Drupal Integration', () => {
 
       expect(result.id).toBe('tutorial-123');
       expect(result.title).toBe('Introduction to MCP');
-      expect(result.body).toContain('Full tutorial content');
+      expect(result.summary).toBeDefined();
     });
 
     it('should throw error for 404 response', async () => {
@@ -206,9 +210,9 @@ describe('Drupal Integration', () => {
 
       expect(tutorial.id).toBe('tutorial-123');
       expect(tutorial.title).toBe('Introduction to MCP');
-      expect(tutorial.body).toBeDefined();
+      expect(tutorial.summary).toBeDefined();
       expect(tutorial.author).toBe('Jane Doe');
-      expect(tutorial.tags).toContain('mcp');
+      expect(tutorial.category).toBe('beginner');
     });
   });
 
