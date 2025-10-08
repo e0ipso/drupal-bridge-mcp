@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.5.0...v1.6.0) (2025-10-08)
+
+
+### Features
+
+* create dedicated server entry point ([e5b7f33](https://github.com/e0ipso/drupal-bridge-mcp/commit/e5b7f335722aa9466653be8dd17c31554b11b0ea))
+
 # [1.5.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.4.0...v1.5.0) (2025-10-08)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@e0ipso/drupal-bridge-mcp",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Minimal Drupal MCP Server - 336 lines vs 6000 lines (94% reduction!)",
   "main": "dist/index.js",
   "bin": {
