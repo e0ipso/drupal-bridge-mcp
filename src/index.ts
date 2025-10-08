@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * OAuth-Enabled Drupal MCP Server with HTTP Transport
  *
@@ -1074,11 +1072,7 @@ async function main(): Promise<void> {
   }
 }
 
-// Start the server if this module is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(handleError);
-}
-
 // Export for programmatic use
 export { type HttpServerConfig };
+export { handleError };
 export default main;

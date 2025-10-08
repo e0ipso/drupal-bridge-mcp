@@ -4,7 +4,7 @@
   "description": "Minimal Drupal MCP Server - 336 lines vs 6000 lines (94% reduction!)",
   "main": "dist/index.js",
   "bin": {
-    "drupal-bridge-mcp": "dist/index.js"
+    "drupal-bridge-mcp": "dist/server.js"
   },
   "type": "module",
   "engines": {
@@ -12,9 +12,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "DEBUG=mcp:* tsx --env-file=.env src/index.ts",
-    "start": "node --env-file=.env dist/index.js",
-    "start:debug": "DEBUG=mcp:* node --env-file=.env dist/index.js",
+    "dev": "DEBUG=mcp:* tsx --env-file=.env src/server.ts",
+    "start": "node --env-file=.env dist/server.js",
+    "start:debug": "DEBUG=mcp:* node --env-file=.env dist/server.js",
     "type-check": "tsc --noEmit",
     "test": "npm run build && jest",
     "semantic-release": "semantic-release"
