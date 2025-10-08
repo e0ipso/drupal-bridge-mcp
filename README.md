@@ -384,4 +384,4 @@ Proprietary
 
 ## 👨‍💻 Author
 
-Mateu Aguil� Bosch (e0ipso) <mateu@mateuaguilo.com>
+Mateu Aguiló Bosch (e0ipso) <mateu@mateuaguilo.com>
