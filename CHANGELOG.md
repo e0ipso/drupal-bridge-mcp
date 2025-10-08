@@ -1,3 +1,35 @@
+# [1.5.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.4.0...v1.5.0) (2025-10-08)
+
+
+### Bug Fixes
+
+* cleanup whitespace in console start up message ([8df243d](https://github.com/e0ipso/drupal-bridge-mcp/commit/8df243d27351be9c8e45b43e52a602072f7e5561))
+* fix allowed headers and add default inspector port (6274) to default CORS origins ([b929e48](https://github.com/e0ipso/drupal-bridge-mcp/commit/b929e488950b0dae3111d1020ba090294e4a566c))
+* make Tutorial object schema match what is coming form Drupal ([9f4d7a0](https://github.com/e0ipso/drupal-bridge-mcp/commit/9f4d7a0e36edcb5e151e2eb0092178ea9af7c459))
+* remove body parsing check to preserve streaming ([5ff3848](https://github.com/e0ipso/drupal-bridge-mcp/commit/5ff3848164b4fb33a38bf99f0daea3a3f8774a1b))
+* update mapping ([f2e7cde](https://github.com/e0ipso/drupal-bridge-mcp/commit/f2e7cde28e174ab9f58eb1ed7d0302c74e2375fb))
+
+
+### Features
+
+* add debugging endpoints and transport verification ([547d156](https://github.com/e0ipso/drupal-bridge-mcp/commit/547d15646818dc8c57a194c7d4c94921fd3a1a78))
+* add transport tracking to health and debug endpoints ([132a6fe](https://github.com/e0ipso/drupal-bridge-mcp/commit/132a6fe465313bf4be56dbe2b433af6b3e1ba9d6))
+* add/archive multiple plans ([781ad12](https://github.com/e0ipso/drupal-bridge-mcp/commit/781ad12c26d0326fbcd2f4e4a8d57d6162730dd3))
+* **debug:** add comprehensive OAuth token extraction logging ([b02f114](https://github.com/e0ipso/drupal-bridge-mcp/commit/b02f1145e2dbb68d3a36118af9c6f36ae7c3e73b))
+* finally add AGENTS.md ([fe47e8b](https://github.com/e0ipso/drupal-bridge-mcp/commit/fe47e8b74c1eed03530fa7b9adab7fab6923a150))
+* implement JWT decoder utility for user ID extraction ([484ed42](https://github.com/e0ipso/drupal-bridge-mcp/commit/484ed42cab24e1921ad7dc3348c21eaabbbd29a2))
+* implement session lifecycle cleanup and graceful shutdown ([ab13d08](https://github.com/e0ipso/drupal-bridge-mcp/commit/ab13d08296e5a9d1e352cc2c5cb36c1882ab3067))
+* implement user-level token storage in device flow ([35fba4d](https://github.com/e0ipso/drupal-bridge-mcp/commit/35fba4dcebe1eb8cd053f75f568579e09553d121))
+* **logging:** add unit tests and integrate pino-http middleware ([5350395](https://github.com/e0ipso/drupal-bridge-mcp/commit/5350395305d07be1aa0b8c98052bc4e53e3b610a))
+* **logging:** create logger configuration module ([3ac0d8b](https://github.com/e0ipso/drupal-bridge-mcp/commit/3ac0d8ba374085720826239a944d83ad031075b7))
+* **logging:** install pino logging dependencies ([8a3fd6f](https://github.com/e0ipso/drupal-bridge-mcp/commit/8a3fd6fb02a8c8591f80c53c3f1993fe029aa788))
+* **oauth:** implement token extraction helper method ([850eeb1](https://github.com/e0ipso/drupal-bridge-mcp/commit/850eeb10f0f93a97fba4d249ffa5f52ebdf84b77))
+* **oauth:** integrate token extraction in endpoint handler ([b753c5e](https://github.com/e0ipso/drupal-bridge-mcp/commit/b753c5e724276ab1356f872a06d92a06e5269309))
+* refactor to per-session Server+Transport architecture (Phase 1) ([554dbbf](https://github.com/e0ipso/drupal-bridge-mcp/commit/554dbbf5725eb7310387898fbb825c22e2a8b417))
+* remove broken e2e test ([16b16a7](https://github.com/e0ipso/drupal-bridge-mcp/commit/16b16a76f9f342b4b80d58bce8a1fa659dfb24c9))
+* **test:** add MCP Inspector CLI for OAuth e2e testing ([a2fd080](https://github.com/e0ipso/drupal-bridge-mcp/commit/a2fd0804a5ecc7e7ca813e3568746e6ee57f3e27))
+* **test:** implement OAuth e2e test suite with Inspector CLI ([1013c1a](https://github.com/e0ipso/drupal-bridge-mcp/commit/1013c1a19f4cdc0f9e3c49054f69e4546036c5a8))
+
 # [1.4.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.3.0...v1.4.0) (2025-10-02)
 
 
