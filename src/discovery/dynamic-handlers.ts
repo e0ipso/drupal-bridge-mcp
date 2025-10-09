@@ -7,7 +7,10 @@
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  type CallToolResult,
+} from '@modelcontextprotocol/sdk/types.js';
 import { convertJsonSchemaToZod } from 'zod-from-json-schema';
 import type { z } from 'zod';
 import type { ToolDefinition } from './tool-discovery.js';
@@ -16,6 +19,11 @@ interface DynamicToolContext {
   tool: ToolDefinition;
   schema: z.ZodTypeAny;
 }
+
+export type LocalToolHandler = (
+  params: unknown,
+  extra: { sessionId?: string }
+) => Promise<CallToolResult>;
 
 /**
  * Session interface matching the existing OAuth provider session structure
@@ -88,7 +96,8 @@ export function registerDynamicTools(
     params: unknown,
     token?: string
   ) => Promise<unknown>,
-  getSession: (sessionId: string) => Promise<Session | null>
+  getSession: (sessionId: string) => Promise<Session | null>,
+  localHandlers: Map<string, LocalToolHandler> = new Map()
 ): void {
   // Convert schemas and create tool contexts
   const toolContexts = convertToolSchemas(tools);
@@ -106,7 +115,7 @@ export function registerDynamicTools(
     const context = toolContexts.get(toolName);
 
     // Handle unknown tool
-    if (!context) {
+    if (!context && !localHandlers.has(toolName)) {
       const availableTools = Array.from(toolContexts.keys()).join(', ');
       throw new Error(
         `Unknown tool: "${toolName}". Available tools: ${availableTools}`
@@ -127,13 +136,24 @@ export function registerDynamicTools(
     // Validate parameters with Zod schema
     let validatedParams: unknown;
     try {
-      validatedParams = context.schema.parse(request.params.arguments || {});
+      validatedParams = context
+        ? context.schema.parse(request.params.arguments || {})
+        : request.params.arguments || {};
     } catch (zodError) {
       // Format Zod validation errors nicely
       throw new Error(
         `Invalid parameters for tool "${toolName}": ` +
           `${zodError instanceof Error ? zodError.message : String(zodError)}`
       );
+    }
+
+    const localHandler = localHandlers.get(toolName);
+    if (localHandler) {
+      return await localHandler(validatedParams, { sessionId });
+    }
+
+    if (!context) {
+      throw new Error(`Tool "${toolName}" is not available`);
     }
 
     // Proxy request to Drupal via A2A /mcp/tools/invoke endpoint
