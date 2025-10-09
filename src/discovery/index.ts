@@ -8,3 +8,5 @@ export {
 export { getDiscoveredTools, clearToolCache } from './tool-cache.js';
 
 export { registerDynamicTools, type Session } from './dynamic-handlers.js';
+
+export { type LocalToolHandler } from './local-handlers';

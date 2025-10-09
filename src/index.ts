@@ -39,8 +39,6 @@ import {
 } from './oauth/provider.js';
 import { DrupalConnector } from './drupal/connector.js';
 import { DeviceFlow } from './oauth/device-flow.js';
-import type { TokenResponse } from './oauth/device-flow-types.js';
-import { extractUserId } from './oauth/jwt-decoder.js';
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 
 // Discovery imports
@@ -48,7 +46,11 @@ import {
   getDiscoveredTools,
   registerDynamicTools,
   type ToolDefinition,
+  type LocalToolHandler,
 } from './discovery/index.js';
+
+// Local tools
+import { authLogin } from './tools/auth/login.js';
 
 // Console utilities
 import {
@@ -115,17 +117,11 @@ export class DrupalMCPHttpServer {
   private oauthProvider?: DrupalOAuthProvider;
   private drupalConnector?: DrupalConnector;
 
-  // User-level token storage (persistent across reconnections)
-  private userTokens: Map<string, TokenResponse> = new Map();
-  // userId → { access_token, refresh_token, expires_in }
-
-  // Session-to-user mapping (ephemeral)
-  private sessionToUser: Map<string, string> = new Map();
-  // sessionId → userId
-
   // Session capabilities (ephemeral)
   private sessionCapabilities: Map<string, ClientCapabilities> = new Map();
   // sessionId → capabilities
+
+  private localToolHandlers: Map<string, LocalToolHandler> = new Map();
 
   constructor(config: HttpServerConfig = DEFAULT_HTTP_CONFIG) {
     this.config = config;
@@ -326,7 +322,8 @@ export class DrupalMCPHttpServer {
       server,
       discoveredToolDefinitions,
       this.makeRequest.bind(this),
-      this.getSession.bind(this)
+      this.getSession.bind(this),
+      this.localToolHandlers
     );
 
     // Create transport
@@ -340,7 +337,9 @@ export class DrupalMCPHttpServer {
         `${this.config.host}:${this.config.port}`,
       ],
       onsessionclosed: async (closedSessionId: string) => {
-        const userId = this.sessionToUser.get(closedSessionId);
+        const userId = this.oauthProvider?.getUserIdForSession(
+          closedSessionId
+        );
         console.log(
           `Session closed: ${closedSessionId} (user: ${userId || 'unauthenticated'})`
         );
@@ -380,13 +379,14 @@ export class DrupalMCPHttpServer {
         }
 
         // Step 5: Clean session mappings (existing Plan 8 logic)
-        this.sessionToUser.delete(closedSessionId);
         this.sessionCapabilities.delete(closedSessionId);
+        this.oauthProvider?.detachSession(closedSessionId);
 
-        // Step 6: DO NOT remove user tokens - they persist for reconnection
+        const activeUsers = this.oauthProvider?.getActiveUserCount() ?? 0;
+        const activeSessions = this.oauthProvider?.getActiveSessionCount() ?? 0;
 
         console.log(
-          `Active sessions: ${this.transports.size}, Active users: ${this.userTokens.size}`
+          `Active transports: ${this.transports.size}, Active sessions: ${activeSessions}, Active users: ${activeUsers}`
         );
       },
     });
@@ -452,52 +452,43 @@ export class DrupalMCPHttpServer {
     refreshToken?: string;
     expiresAt: number;
   } | null> {
-    debugOAuth(`Token lookup for session ${sessionId}`);
-    debugOAuth(
-      `Sessions tracked: ${this.sessionToUser.size}, Users with tokens: ${this.userTokens.size}`
-    );
-
-    // Step 1: Get user ID from session mapping
-    const userId = this.sessionToUser.get(sessionId);
-    if (!userId) {
-      debugOAuth(
-        `Token lookup FAILED: session ${sessionId} not mapped to user`
-      );
-      debugOAuth(
-        `Available sessions: ${JSON.stringify(Array.from(this.sessionToUser.keys()))}`
-      );
-      return null; // Session not authenticated
+    if (!this.oauthProvider) {
+      return null;
     }
 
-    debugOAuth(`Session ${sessionId} → User ${userId}`);
-
-    // Step 2: Get user tokens from user storage
-    const tokens = this.userTokens.get(userId);
-    if (!tokens) {
-      debugOAuth(`Token lookup FAILED: user ${userId} has no tokens`);
-      debugOAuth(
-        `Available users: ${JSON.stringify(Array.from(this.userTokens.keys()))}`
+    try {
+      const authorization = await this.oauthProvider.getSessionAuthorization(
+        sessionId
       );
-      return null; // User tokens expired/logged out
-    }
 
-    const redactedToken = this.redactToken(tokens.access_token);
-    debugOAuth(`Token lookup SUCCESS: session ${sessionId} → user ${userId}`);
-    debugOAuth(`Token found (redacted): ${redactedToken}`);
-    return {
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      expiresAt: Date.now() + (tokens.expires_in || 3600) * 1000,
-    };
+      if (!authorization) {
+        debugOAuth(
+          `Token lookup FAILED: session ${sessionId} not mapped to an authenticated user`
+        );
+        return null;
+      }
+
+      const redactedToken = this.redactToken(authorization.accessToken);
+      debugOAuth(
+        `Token lookup SUCCESS: session ${sessionId} (token: ${redactedToken})`
+      );
+
+      return authorization;
+    } catch (error) {
+      debugOAuth(
+        `Token lookup error for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      throw error;
+    }
   }
 
   /**
    * Handles device flow authentication for a session
    * @param {string} sessionId Session identifier
-   * @returns {Promise<TokenResponse>} OAuth tokens
+   * @returns {Promise<void>} Resolves when authentication succeeds
    * @throws {Error} If device flow is not appropriate or authentication fails
    */
-  async handleDeviceFlow(sessionId: string): Promise<TokenResponse> {
+  async handleDeviceFlow(sessionId: string): Promise<void> {
     if (!DeviceFlow.shouldUseDeviceFlow()) {
       throw new Error(
         'Device flow not appropriate for this environment. ' +
@@ -505,61 +496,12 @@ export class DrupalMCPHttpServer {
       );
     }
 
-    if (!this.oauthConfigManager) {
-      throw new Error(
-        'OAuth is not configured. Set AUTH_ENABLED=true to enable OAuth.'
-      );
+    if (!this.oauthProvider) {
+      throw new Error('OAuth provider not initialized');
     }
 
     try {
-      const config = this.oauthConfigManager.getConfig();
-      const metadata = await this.oauthConfigManager.fetchMetadata();
-
-      // Create device flow handler
-      const deviceFlow = new DeviceFlow(config, metadata);
-
-      // Execute authentication flow
-      const tokens = await deviceFlow.authenticate();
-
-      // Extract user ID from access token
-      let userId: string;
-      try {
-        userId = extractUserId(tokens.access_token);
-        console.log(`Extracted user ID from token: ${userId}`);
-      } catch (error) {
-        // Fallback: use session ID as user ID if JWT extraction fails
-        console.warn(
-          `Failed to extract user ID from token, using session ID as fallback:`,
-          error
-        );
-        userId = sessionId;
-      }
-
-      // Check if user already has tokens (reconnection scenario)
-      const existingTokens = this.userTokens.get(userId);
-      if (existingTokens) {
-        console.log(`User ${userId} reconnecting - reusing existing tokens`);
-        // Update session-to-user mapping for new session
-        this.sessionToUser.set(sessionId, userId);
-        console.log(`Session ${sessionId} mapped to existing user ${userId}`);
-        console.log(
-          `Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
-        );
-        return existingTokens; // Reuse existing tokens
-      }
-
-      // New user authentication: store tokens by user ID
-      this.userTokens.set(userId, tokens);
-      console.log(`Stored tokens for new user ${userId}`);
-
-      // Map session to user (ephemeral)
-      this.sessionToUser.set(sessionId, userId);
-      console.log(`Session ${sessionId} authenticated as user ${userId}`);
-      console.log(
-        `Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
-      );
-
-      return tokens;
+      await this.oauthProvider.authenticateDeviceFlow(sessionId);
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Device flow authentication failed: ${error.message}`);
@@ -588,25 +530,31 @@ export class DrupalMCPHttpServer {
    * @returns {Promise<void>}
    */
   async handleLogout(sessionId: string): Promise<void> {
-    const userId = this.sessionToUser.get(sessionId);
-
-    if (!userId) {
-      console.log(`Logout requested for unauthenticated session: ${sessionId}`);
+    if (!this.oauthProvider) {
+      console.log(
+        `Logout requested for session ${sessionId}, but OAuth provider is not initialized`
+      );
+      this.sessionCapabilities.delete(sessionId);
       return;
     }
 
-    // Remove user tokens (persistent storage)
-    this.userTokens.delete(userId);
-    console.log(`User ${userId} logged out - tokens removed`);
+    const userId = this.oauthProvider.getUserIdForSession(sessionId);
 
-    // Remove session-to-user mapping (ephemeral)
-    this.sessionToUser.delete(sessionId);
+    if (!userId) {
+      console.log(`Logout requested for unauthenticated session: ${sessionId}`);
+      this.oauthProvider.detachSession(sessionId);
+      this.sessionCapabilities.delete(sessionId);
+      return;
+    }
+
+    await this.oauthProvider.logoutSession(sessionId);
 
     // Remove session capabilities
     this.sessionCapabilities.delete(sessionId);
 
+    console.log(`User ${userId} logged out - tokens removed`);
     console.log(
-      `Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
+      `Active users: ${this.oauthProvider.getActiveUserCount()}, Active sessions: ${this.oauthProvider.getActiveSessionCount()}`
     );
   }
 
@@ -682,57 +630,32 @@ export class DrupalMCPHttpServer {
     debugOAuth(`Token extracted (redacted): ${redactedToken}`);
     debugOAuth(`Token length: ${token.length} characters`);
 
-    // Step 4: Decode JWT with Error Handling
-    let userId: string;
-    try {
-      userId = extractUserId(token); // Existing utility from jwt-decoder.ts
-      debugOAuth(`JWT decoded successfully - User ID: ${userId}`);
-    } catch (error) {
-      debugOAuth(
-        `Token decode failed for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
-      );
-      debugOAuth(`Failed token (redacted): ${redactedToken}`);
-      return; // Invalid token - log warning, exit gracefully
-    }
-
-    // Step 5: Check for Reconnection (same user, new session)
-    const existingTokens = this.userTokens.get(userId);
-    if (existingTokens) {
-      // User reconnecting - just update session mapping, reuse tokens
-      this.sessionToUser.set(sessionId, userId);
-      debugOAuth(
-        `User ${userId} reconnecting - mapped session ${sessionId} to existing tokens`
-      );
-      debugOAuth(
-        `Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
-      );
+    if (!this.oauthProvider) {
+      debugOAuth('OAuth provider not initialized. Skipping token capture.');
       return;
     }
 
-    // Step 6: Create TokenResponse Structure
-    const tokenData: TokenResponse = {
-      access_token: token,
-      token_type: 'Bearer',
-      expires_in: 3600, // Default expiry (actual expiry in JWT exp claim)
-      refresh_token: undefined, // Not available from Authorization header
-      scope: '', // Not available from Authorization header
-    };
+    try {
+      const stored = this.oauthProvider.captureSessionToken(sessionId, token);
+      const userId = this.oauthProvider.getUserIdForSession(sessionId);
 
-    // Step 7: Store in Maps
-    // Persistent user token storage
-    this.userTokens.set(userId, tokenData);
+      debugOAuth(
+        `Token stored for session ${sessionId} → user ${userId || 'unknown'}`
+      );
+      debugOAuth(
+        `Active users: ${this.oauthProvider.getActiveUserCount()}, Active sessions: ${this.oauthProvider.getActiveSessionCount()}`
+      );
 
-    // Ephemeral session-to-user mapping
-    this.sessionToUser.set(sessionId, userId);
-
-    // Step 8: Log Success
-    debugOAuth(
-      `Token extracted and stored for session ${sessionId} → user ${userId}`
-    );
-    debugOAuth(`Token stored (redacted): ${redactedToken}`);
-    debugOAuth(
-      `Active users: ${this.userTokens.size}, Active sessions: ${this.sessionToUser.size}`
-    );
+      if (!stored.refresh_token) {
+        debugOAuth(
+          'Captured token does not include a refresh token. Automatic refresh will not be available.'
+        );
+      }
+    } catch (error) {
+      debugOAuth(
+        `Failed to capture token for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   /**
@@ -859,6 +782,7 @@ export class DrupalMCPHttpServer {
       // ========== NEW: Tool Discovery ==========
       printSection('Discovering Tools', '🔍');
 
+      // Discover dynamic tools from Drupal.
       const DRUPAL_BASE_URL = process.env.DRUPAL_BASE_URL;
       if (!DRUPAL_BASE_URL) {
         printWarning('DRUPAL_BASE_URL environment variable is required');
@@ -903,6 +827,41 @@ export class DrupalMCPHttpServer {
         );
       });
 
+      // Discover local tools.
+      this.localToolHandlers.clear();
+      if (this.config.enableAuth && this.oauthProvider) {
+        const authLoginTool: ToolDefinition = {
+          name: 'auth_login',
+          description:
+            'Authenticate the current session using the device authorization flow.',
+          inputSchema: {
+            type: 'object',
+            description: 'No parameters required.',
+            properties: {},
+            additionalProperties: false,
+          },
+        };
+
+        if (!tools.some(tool => tool.name === authLoginTool.name)) {
+          tools.push(authLoginTool);
+        }
+
+        this.localToolHandlers.set('auth_login', async (_params, extra) => {
+          const sessionId = extra.sessionId;
+          if (!sessionId) {
+            throw new Error('Session ID is required to execute auth_login');
+          }
+
+          return authLogin(
+            {},
+            {
+              sessionId,
+              oauthProvider: this.oauthProvider!,
+            }
+          );
+        });
+      }
+
       // Store tools for ListToolsRequest handler
       setDiscoveredTools(tools);
 
@@ -917,6 +876,12 @@ export class DrupalMCPHttpServer {
 
       // Health check endpoint
       this.app.get('/health', (_req, res) => {
+        const activeUsers = this.oauthProvider?.getActiveUserCount() ?? 0;
+        const activeSessions = this.oauthProvider?.getActiveSessionCount() ?? 0;
+        const sessionMappings = this.oauthProvider
+          ? Object.fromEntries(this.oauthProvider.getSessionMappings())
+          : {};
+
         res.json({
           status: 'healthy',
           server: this.config.name,
@@ -925,34 +890,38 @@ export class DrupalMCPHttpServer {
           timestamp: new Date().toISOString(),
 
           // Session and authentication state
-          activeUsers: this.userTokens.size,
-          activeSessions: this.sessionToUser.size,
+          activeUsers,
+          activeSessions,
           activeTransports: this.transports.size,
-          sessionMappings: Object.fromEntries(this.sessionToUser.entries()),
+          sessionMappings,
         });
       });
 
       // Debug sessions endpoint
       this.app.get('/debug/sessions', (_req, res) => {
+        const sessionMappings = this.oauthProvider
+          ? this.oauthProvider.getSessionMappings()
+          : [];
+        const activeUsers = this.oauthProvider?.getActiveUserIds() ?? [];
+        const authenticatedSessions = this.oauthProvider
+          ? this.oauthProvider.getAuthenticatedSessionCount()
+          : 0;
+
         res.json({
-          sessions: Array.from(this.sessionToUser.entries()).map(
-            ([sessionId, userId]) => ({
-              sessionId,
-              userId,
-              hasTokens: this.userTokens.has(userId),
-              hasCapabilities: this.sessionCapabilities.has(sessionId),
-              hasTransport: this.transports.has(sessionId),
-            })
-          ),
+          sessions: sessionMappings.map(([sessionId, userId]) => ({
+            sessionId,
+            userId,
+            hasTokens: this.oauthProvider?.hasUserTokens(userId) ?? false,
+            hasCapabilities: this.sessionCapabilities.has(sessionId),
+            hasTransport: this.transports.has(sessionId),
+          })),
           transports: Array.from(this.transports.keys()),
-          users: Array.from(this.userTokens.keys()),
+          users: activeUsers,
           summary: {
-            totalSessions: this.sessionToUser.size,
-            totalUsers: this.userTokens.size,
+            totalSessions: this.oauthProvider?.getActiveSessionCount() ?? 0,
+            totalUsers: this.oauthProvider?.getActiveUserCount() ?? 0,
             totalTransports: this.transports.size,
-            authenticatedSessions: Array.from(
-              this.sessionToUser.values()
-            ).filter(userId => this.userTokens.has(userId)).length,
+            authenticatedSessions,
           },
         });
       });
@@ -1021,9 +990,8 @@ export class DrupalMCPHttpServer {
     console.log('All transports closed');
 
     // Clear all session and user data
-    this.userTokens.clear();
-    this.sessionToUser.clear();
     this.sessionCapabilities.clear();
+    this.oauthProvider?.clearAllSessions();
   }
 }
 
