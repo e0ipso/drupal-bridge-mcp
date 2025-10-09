@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.6.0...v1.7.0) (2025-10-09)
+
+
+### Features
+
+* add an auth_login tool that can manage device_code authorization flow end-to-end. ([42ffada](https://github.com/e0ipso/drupal-bridge-mcp/commit/42ffada988066488686fc15c53e6c5cb8ab15ca0))
+
 # [1.6.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.5.0...v1.6.0) (2025-10-08)
 
 
