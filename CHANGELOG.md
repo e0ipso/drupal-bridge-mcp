@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.7.0...v1.8.0) (2025-10-14)
+
+
+### Features
+
+* more local mounts ([7743d74](https://github.com/e0ipso/drupal-bridge-mcp/commit/7743d746536b7630a0f7365880d8d43eb41c4d9b))
+
 # [1.7.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.6.0...v1.7.0) (2025-10-09)
 
 
