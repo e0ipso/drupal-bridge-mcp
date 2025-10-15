@@ -11,14 +11,15 @@ import {
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 
 /**
- * OAuth configuration interface
+ * OAuth configuration for the MCP resource server.
+ * Note: This server acts as a resource server only, not an OAuth client.
+ * Token verification is performed via JWT signature validation using Drupal's JWKS.
  */
 export interface OAuthConfig {
   drupalUrl: string;
-  clientId: string;
-  clientSecret: string;
   scopes: string[];
   resourceServerUrl?: string;
+  // clientId and clientSecret removed - not needed for resource server
 }
 
 /**

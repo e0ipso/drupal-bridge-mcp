@@ -390,3 +390,129 @@ server to have OAuth client credentials.
 - Monitor JWT verification failures to detect key rotation issues
 - Use Drupal's client management UI to review registered clients
 - Consider implementing rate limiting on authenticated endpoints
+
+## Task Dependencies
+
+```mermaid
+graph TD
+    001[Task 01: Install JWT Library]
+    002[Task 02: Create JWT Verifier]
+    003[Task 03: Update OAuth Config Interface]
+    004[Task 04: Update OAuth Config Factory]
+    005[Task 05: Replace Token Verification]
+    006[Task 06: Remove getClientInfo Method]
+    007[Task 07: Remove Device Flow Infrastructure]
+    008[Task 08: Remove auth_login Tool]
+    009[Task 09: Remove Device Flow from Provider]
+    010[Task 10: Update OAuth Config Tests]
+    011[Task 11: Update Test Setup]
+    012[Task 12: Create JWT Verification Tests]
+    013[Task 13: Integration Test Metadata Discovery]
+    014[Task 14: Update Documentation]
+
+    001 --> 002
+    003 --> 004
+    002 --> 005
+    004 --> 005
+    005 --> 006
+    007 --> 008
+    008 --> 009
+    004 --> 010
+    010 --> 011
+    002 --> 012
+    006 --> 013
+    005 --> 013
+    004 --> 013
+    013 --> 014
+```
+
+## Execution Blueprint
+
+**Validation Gates:**
+
+- Reference: `.ai/task-manager/config/hooks/POST_PHASE.md`
+
+### Phase 1: Foundation Setup
+
+**Parallel Tasks:**
+
+- Task 01: Install JWT Library
+- Task 03: Update OAuth Config Interface
+- Task 07: Remove Device Flow Infrastructure
+
+**Rationale**: These tasks have no dependencies and can be executed simultaneously. Task 01 installs
+dependencies, Task 03 updates TypeScript interfaces, and Task 07 removes obsolete files.
+
+### Phase 2: Core Configuration Changes
+
+**Parallel Tasks:**
+
+- Task 02: Create JWT Verifier (depends on: 01)
+- Task 04: Update OAuth Config Factory (depends on: 03)
+
+**Rationale**: Task 02 requires the jose library from Phase 1. Task 04 requires the updated
+interface from Phase 1. These can run in parallel since they modify different parts of the codebase.
+
+### Phase 3: OAuth Provider Refactoring
+
+**Parallel Tasks:**
+
+- Task 05: Replace Token Verification (depends on: 02, 04)
+- Task 08: Remove auth_login Tool (depends on: 07)
+
+**Rationale**: Task 05 integrates JWT verification and updated config. Task 08 removes the tool that
+depended on device flow. Both are independent and can run in parallel.
+
+### Phase 4: Provider Cleanup
+
+**Parallel Tasks:**
+
+- Task 06: Remove getClientInfo Method (depends on: 05)
+- Task 09: Remove Device Flow from Provider (depends on: 07, 08)
+
+**Rationale**: Task 06 cleans up methods no longer needed after JWT verification. Task 09 removes
+device flow code from the provider. Both are cleanup tasks that can run in parallel.
+
+### Phase 5: Test Infrastructure Updates
+
+**Parallel Tasks:**
+
+- Task 10: Update OAuth Config Tests (depends on: 04)
+- Task 12: Create JWT Verification Tests (depends on: 02)
+
+**Rationale**: Task 10 updates tests for the new config structure. Task 12 adds tests for JWT
+verification. Both are independent test updates.
+
+### Phase 6: Test Finalization
+
+**Parallel Tasks:**
+
+- Task 11: Update Test Setup (depends on: 10)
+
+**Rationale**: Task 11 updates global test configuration after individual test files are updated.
+
+### Phase 7: Integration Testing
+
+**Parallel Tasks:**
+
+- Task 13: Integration Test Metadata Discovery (depends on: 04, 05, 06)
+
+**Rationale**: This integration test validates the entire OAuth flow works correctly with all
+changes in place.
+
+### Phase 8: Documentation
+
+**Parallel Tasks:**
+
+- Task 14: Update Documentation (depends on: 13)
+
+**Rationale**: Documentation is updated last after all implementation and testing is complete.
+
+### Execution Summary
+
+- Total Phases: 8
+- Total Tasks: 14
+- Maximum Parallelism: 3 tasks (in Phase 1)
+- Critical Path Length: 8 phases
+- Estimated Duration: The critical path follows: Task 01 → Task 02 → Task 05 → Task 06 → Task 13 →
+  Task 14
