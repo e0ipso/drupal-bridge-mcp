@@ -49,9 +49,6 @@ import {
   type LocalToolHandler,
 } from './discovery/index.js';
 
-// Local tools
-import { authLogin } from './tools/auth/login.js';
-
 // Console utilities
 import {
   printSection,
@@ -337,9 +334,7 @@ export class DrupalMCPHttpServer {
         `${this.config.host}:${this.config.port}`,
       ],
       onsessionclosed: async (closedSessionId: string) => {
-        const userId = this.oauthProvider?.getUserIdForSession(
-          closedSessionId
-        );
+        const userId = this.oauthProvider?.getUserIdForSession(closedSessionId);
         console.log(
           `Session closed: ${closedSessionId} (user: ${userId || 'unauthenticated'})`
         );
@@ -457,9 +452,8 @@ export class DrupalMCPHttpServer {
     }
 
     try {
-      const authorization = await this.oauthProvider.getSessionAuthorization(
-        sessionId
-      );
+      const authorization =
+        await this.oauthProvider.getSessionAuthorization(sessionId);
 
       if (!authorization) {
         debugOAuth(
@@ -826,41 +820,6 @@ export class DrupalMCPHttpServer {
           2
         );
       });
-
-      // Discover local tools.
-      this.localToolHandlers.clear();
-      if (this.config.enableAuth && this.oauthProvider) {
-        const authLoginTool: ToolDefinition = {
-          name: 'auth_login',
-          description:
-            'Authenticate the current session using the device authorization flow.',
-          inputSchema: {
-            type: 'object',
-            description: 'No parameters required.',
-            properties: {},
-            additionalProperties: false,
-          },
-        };
-
-        if (!tools.some(tool => tool.name === authLoginTool.name)) {
-          tools.push(authLoginTool);
-        }
-
-        this.localToolHandlers.set('auth_login', async (_params, extra) => {
-          const sessionId = extra.sessionId;
-          if (!sessionId) {
-            throw new Error('Session ID is required to execute auth_login');
-          }
-
-          return authLogin(
-            {},
-            {
-              sessionId,
-              oauthProvider: this.oauthProvider!,
-            }
-          );
-        });
-      }
 
       // Store tools for ListToolsRequest handler
       setDiscoveredTools(tools);

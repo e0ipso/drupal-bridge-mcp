@@ -48,7 +48,7 @@ export async function getTutorial(
   if (!token) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      'Authentication required. Please login first using auth_login tool.'
+      'Authentication required. Please use the Authenticate button to login.'
     );
   }
 
