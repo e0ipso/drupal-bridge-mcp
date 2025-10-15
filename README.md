@@ -39,8 +39,7 @@ Create a `.env` file:
 
 ```env
 DRUPAL_BASE_URL=https://drupalize.me
-OAUTH_CLIENT_ID=your-client-id
-OAUTH_CLIENT_SECRET=your-client-secret  # Optional for public clients
+AUTH_ENABLED=true
 ```
 
 ### Usage
@@ -293,8 +292,7 @@ interactive OAuth approval steps.
 
    ```env
    DRUPAL_BASE_URL=https://your-drupal-site.com
-   OAUTH_CLIENT_ID=your-client-id
-   OAUTH_CLIENT_SECRET=your-client-secret  # Optional
+   AUTH_ENABLED=true
    E2E_TEST_TIMEOUT=120000
    ```
 
