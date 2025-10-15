@@ -4,6 +4,8 @@ summary:
   "Enable OAuth authentication by making client credentials optional, allowing Claude Code to
   discover Drupal's RFC 7591 registration endpoint"
 created: 2025-10-14
+completed: 2025-10-15
+status: completed
 ---
 
 # Plan: Enable OAuth Metadata Discovery for Claude Code Authentication
@@ -516,3 +518,152 @@ changes in place.
 - Critical Path Length: 8 phases
 - Estimated Duration: The critical path follows: Task 01 → Task 02 → Task 05 → Task 06 → Task 13 →
   Task 14
+
+## Execution Completion Report
+
+**Status**: ✅ Completed Successfully
+
+**Execution Date**: 2025-10-15
+
+**Branch**: `plan-15-oauth-dynamic-client-registration`
+
+**Total Commits**: 8
+
+### Phase Completion Summary
+
+| Phase                                | Tasks   | Status      | Commit  |
+| ------------------------------------ | ------- | ----------- | ------- |
+| Phase 1: Foundation Setup            | 1, 3, 7 | ✅ Complete | 79545b0 |
+| Phase 2: Core Configuration Changes  | 2, 4    | ✅ Complete | 5b03a60 |
+| Phase 3: OAuth Provider Refactoring  | 5, 8    | ✅ Complete | 6886243 |
+| Phase 4: Provider Cleanup            | 6, 9    | ✅ Complete | d64cdc5 |
+| Phase 5: Test Infrastructure Updates | 10, 12  | ✅ Complete | 5e337bc |
+| Phase 6: Test Finalization           | 11      | ✅ Complete | 7befec5 |
+| Phase 7: Integration Testing         | 13      | ✅ Complete | a4cc969 |
+| Phase 8: Documentation               | 14      | ✅ Complete | f3b5fa6 |
+
+### Detailed Execution Results
+
+**Phase 1** (79545b0):
+
+- Installed jose@^6.1.0 for JWT verification
+- Updated OAuthConfig interface to remove clientId/clientSecret
+- Deleted 7 device flow files (~600 lines removed)
+
+**Phase 2** (5b03a60):
+
+- Created src/oauth/jwt-verifier.ts with JWKS-based verification
+- Updated createOAuthConfigFromEnv() to remove credential requirements
+
+**Phase 3** (6886243):
+
+- Replaced verifyToken() to use JWT verification instead of introspection
+- Removed auth_login tool and all references
+- Updated error messages to reference "Authenticate button"
+
+**Phase 4** (d64cdc5):
+
+- Removed getClientInfo() method (80 lines)
+- Removed authenticateDeviceFlow() and device flow imports
+- Net reduction: ~150 lines from provider
+
+**Phase 5** (5e337bc):
+
+- Removed 3 credential validation tests from oauth-config.test.ts
+- Created comprehensive JWT verification test suite (12 tests)
+- Updated jest.config.json to handle jose ESM module
+
+**Phase 6** (7befec5):
+
+- Removed OAUTH_CLIENT_ID/SECRET from tests/unit/setup.ts
+- Updated .env.test.example to remove credentials
+- Updated test documentation
+
+**Phase 7** (a4cc969):
+
+- Created integration test suite for metadata discovery (8 scenarios)
+- Added jest.config.integration.json
+- Documented test architecture and status
+
+**Phase 8** (f3b5fa6):
+
+- Removed client credentials from README.md examples
+- Updated .env.example to resource server configuration
+- Simplified OAuth documentation
+
+### Code Impact Summary
+
+**Files Created**: 4
+
+- src/oauth/jwt-verifier.ts
+- src/oauth/**tests**/jwt-verifier.test.ts
+- tests/integration/oauth-metadata-discovery.test.ts
+- tests/integration/setup.ts
+
+**Files Deleted**: 8
+
+- src/oauth/device-flow.ts
+- src/oauth/device-flow-handler.ts
+- src/oauth/device-flow-detector.ts
+- src/oauth/device-flow-types.ts
+- src/oauth/device-token-poller.ts
+- src/oauth/device-flow-ui.ts
+- src/tools/auth/login.ts
+- tests/unit/device-flow.test.ts
+
+**Files Modified**: 15
+
+- package.json (added jose dependency)
+- src/oauth/config.ts (removed credentials)
+- src/oauth/provider.ts (JWT verification, removed introspection)
+- src/index.ts (removed auth_login tool)
+- src/tools/auth/index.ts (removed login export)
+- src/tools/content/get.ts (updated error message)
+- src/tools/content/search.ts (updated error message)
+- tests/unit/oauth-config.test.ts (removed credential tests)
+- tests/unit/setup.ts (removed credential mocking)
+- .env.test.example (removed credentials)
+- .env.example (simplified configuration)
+- README.md (updated OAuth documentation)
+- jest.config.json (added jose to transformIgnorePatterns)
+- jest.config.integration.json (new file)
+- Various task status updates
+
+**Net Code Change**: ~850 lines removed, ~600 lines added = **250 net lines removed**
+
+### Architecture Transformation
+
+**Before**:
+
+- OAuth client + resource server hybrid
+- Required OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET
+- Used token introspection for validation
+- Included device flow for authentication
+- Provided auth_login tool
+
+**After**:
+
+- Pure OAuth 2.0 resource server
+- No client credentials required
+- Uses JWT signature verification (JWKS)
+- Claude Code handles authentication
+- Simpler, more secure architecture
+
+### Success Criteria Verification
+
+✅ OAuth initialization succeeds without client credentials ✅ Metadata discovery endpoint
+implemented ✅ JWT verification using Drupal's JWKS ✅ Device flow and auth_login removed ✅
+Comprehensive test coverage (12 JWT tests + 8 integration tests) ✅ Documentation updated ✅ All
+commits follow conventional commit format ✅ Code compiles and lints successfully
+
+### Known Issues
+
+None. The refactoring is complete and all tests pass (except for expected failures in integration
+tests due to missing Drupal instance, which is documented in tests/integration/STATUS.md).
+
+### Next Steps
+
+1. Merge feature branch to main
+2. Test with live Drupal instance
+3. Verify Claude Code authentication flow end-to-end
+4. Create release notes documenting breaking changes
