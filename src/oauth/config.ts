@@ -59,14 +59,6 @@ export class OAuthConfigManager {
       throw new Error('DRUPAL_URL must be a valid URL');
     }
 
-    if (!this.config.clientId) {
-      throw new Error('OAUTH_CLIENT_ID is required');
-    }
-
-    if (!this.config.clientSecret) {
-      throw new Error('OAUTH_CLIENT_SECRET is required');
-    }
-
     if (!Array.isArray(this.config.scopes) || this.config.scopes.length === 0) {
       throw new Error('OAUTH_SCOPES must be a non-empty array');
     }
@@ -147,8 +139,6 @@ export class OAuthConfigManager {
  */
 export function createOAuthConfigFromEnv(): OAuthConfig {
   const drupalUrl = process.env.DRUPAL_URL || process.env.DRUPAL_BASE_URL;
-  const clientId = process.env.OAUTH_CLIENT_ID;
-  const clientSecret = process.env.OAUTH_CLIENT_SECRET;
   const scopesString = process.env.OAUTH_SCOPES;
   const resourceServerUrl = process.env.OAUTH_RESOURCE_SERVER_URL;
 
@@ -156,14 +146,6 @@ export function createOAuthConfigFromEnv(): OAuthConfig {
     throw new Error(
       'DRUPAL_URL or DRUPAL_BASE_URL environment variable is required'
     );
-  }
-
-  if (!clientId) {
-    throw new Error('OAUTH_CLIENT_ID environment variable is required');
-  }
-
-  if (!clientSecret) {
-    throw new Error('OAUTH_CLIENT_SECRET environment variable is required');
   }
 
   // Parse scopes from space or comma-separated string
@@ -176,8 +158,6 @@ export function createOAuthConfigFromEnv(): OAuthConfig {
 
   return {
     drupalUrl,
-    clientId,
-    clientSecret,
     scopes,
     resourceServerUrl,
   };

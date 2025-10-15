@@ -2,7 +2,7 @@
 id: 2
 group: 'jwt-verification-infrastructure'
 dependencies: [1]
-status: 'pending'
+status: 'completed'
 created: '2025-10-15'
 skills:
   - 'typescript'
@@ -23,11 +23,11 @@ endpoint.
 
 ## Acceptance Criteria
 
-- [ ] Create `src/oauth/jwt-verifier.ts` with `verifyJWT()` function
-- [ ] Function uses JWKS URI from OAuth metadata (not hard-coded)
-- [ ] Function validates JWT signature and issuer
-- [ ] Function returns decoded payload on success
-- [ ] Function throws descriptive errors on failure
+- [x] Create `src/oauth/jwt-verifier.ts` with `verifyJWT()` function
+- [x] Function uses JWKS URI from OAuth metadata (not hard-coded)
+- [x] Function validates JWT signature and issuer
+- [x] Function returns decoded payload on success
+- [x] Function throws descriptive errors on failure
 
 Use your internal Todo tool to track these and keep on track.
 
