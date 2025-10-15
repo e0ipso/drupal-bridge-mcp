@@ -2,7 +2,7 @@
 id: 6
 group: 'oauth-provider-refactor'
 dependencies: [5]
-status: 'pending'
+status: 'completed'
 created: '2025-10-15'
 skills:
   - 'typescript'

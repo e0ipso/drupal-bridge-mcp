@@ -2,9 +2,7 @@
 id: 9
 group: 'oauth-client-removal'
 dependencies: [7, 8]
-status: 'pending'
-created: '2025-10-15'
-skills:
+status: 'completed'
   - 'typescript'
 ---
 

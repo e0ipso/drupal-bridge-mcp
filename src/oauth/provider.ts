@@ -11,20 +11,22 @@ import {
   type ProxyEndpoints,
   type ProxyOptions,
 } from '@modelcontextprotocol/sdk/server/auth/providers/proxyProvider.js';
-import {
-  OAuthClientInformationFull,
-  OAuthClientInformationFullSchema,
-  type OAuthMetadata,
-} from '@modelcontextprotocol/sdk/shared/auth.js';
+import { type OAuthMetadata } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import debug from 'debug';
 import { extractUserId } from './jwt-decoder.js';
 import { verifyJWT } from './jwt-verifier.js';
 import type { OAuthConfigManager, OAuthConfig } from './config.js';
-import type { TokenResponse } from './device-flow-types.js';
-import { DeviceFlow } from './device-flow.js';
 
 const debugOAuth = debug('mcp:oauth');
+
+interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in?: number;
+  refresh_token?: string;
+  scope?: string;
+}
 
 interface StoredToken extends TokenResponse {
   issuedAt: number;
@@ -44,7 +46,6 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
 
   private readonly configManager: OAuthConfigManager;
   private readonly drupalUrl: string;
-  private clientCache: Map<string, OAuthClientInformationFull> = new Map();
 
   private sessionTokens: Map<string, StoredToken> = new Map();
   private userTokens: Map<string, StoredToken> = new Map();
@@ -63,7 +64,7 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     const options: ProxyOptions = {
       endpoints,
       verifyAccessToken: async (token: string) => this.verifyToken(token),
-      getClient: async (clientId: string) => this.getClientInfo(clientId),
+      getClient: async () => undefined,
     };
 
     super(options);
@@ -147,59 +148,6 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
       }
       throw new Error('Token verification failed: Unknown error');
     }
-  }
-
-  /**
-   * Gets OAuth client information
-   */
-  private async getClientInfo(
-    clientId: string
-  ): Promise<OAuthClientInformationFull | undefined> {
-    if (this.clientCache.has(clientId)) {
-      return this.clientCache.get(clientId);
-    }
-
-    const config = this.configManager.getConfig();
-
-    if (clientId === config.clientId) {
-      const metadata = await this.configManager.fetchMetadata();
-      const clientInfo: OAuthClientInformationFull = {
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        redirect_uris: [],
-        grant_types: metadata.grant_types_supported || [
-          'authorization_code',
-          'refresh_token',
-        ],
-        response_types: metadata.response_types_supported || ['code'],
-        token_endpoint_auth_method:
-          metadata.token_endpoint_auth_methods_supported?.[0] ||
-          'client_secret_basic',
-        scope: config.scopes.join(' '),
-      };
-
-      const validated = OAuthClientInformationFullSchema.parse(clientInfo);
-      this.clientCache.set(clientId, validated);
-      return validated;
-    }
-
-    return undefined;
-  }
-
-  clearClientCache(): void {
-    this.clientCache.clear();
-  }
-
-  /**
-   * Authenticates using device authorization grant flow
-   */
-  async authenticateDeviceFlow(sessionId: string): Promise<TokenResponse> {
-    const config = this.configManager.getConfig();
-    const metadata = await this.configManager.fetchMetadata();
-    const deviceFlow = new DeviceFlow(config, metadata);
-    const tokens = await deviceFlow.authenticate();
-    this.storeSessionTokens(sessionId, tokens);
-    return tokens;
   }
 
   /**
@@ -370,24 +318,6 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
    * Clears the session and removes stored tokens for that session
    */
   async clearSession(sessionId: string): Promise<void> {
-    const tokenResponse = this.sessionTokens.get(sessionId);
-
-    if (tokenResponse && this.revokeToken) {
-      try {
-        const clientInfo = await this.getClientInfo(
-          this.configManager.getConfig().clientId
-        );
-        if (clientInfo) {
-          await this.revokeToken(clientInfo, {
-            token: tokenResponse.access_token,
-            token_type_hint: 'access_token',
-          });
-        }
-      } catch (error) {
-        console.error('Token revocation failed:', error);
-      }
-    }
-
     this.sessionTokens.delete(sessionId);
     this.sessionToUser.delete(sessionId);
   }

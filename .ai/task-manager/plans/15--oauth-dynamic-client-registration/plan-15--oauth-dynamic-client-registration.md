@@ -453,12 +453,12 @@ dependencies, Task 03 updates TypeScript interfaces, and Task 07 removes obsolet
 **Rationale**: Task 02 requires the jose library from Phase 1. Task 04 requires the updated
 interface from Phase 1. These can run in parallel since they modify different parts of the codebase.
 
-### Phase 3: OAuth Provider Refactoring
+### ✅ Phase 3: OAuth Provider Refactoring
 
 **Parallel Tasks:**
 
-- Task 05: Replace Token Verification (depends on: 02, 04)
-- Task 08: Remove auth_login Tool (depends on: 07)
+- ✔️ Task 05: Replace Token Verification (depends on: 02, 04)
+- ✔️ Task 08: Remove auth_login Tool (depends on: 07)
 
 **Rationale**: Task 05 integrates JWT verification and updated config. Task 08 removes the tool that
 depended on device flow. Both are independent and can run in parallel.
