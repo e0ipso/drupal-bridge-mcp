@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from '@jest/globals';
 import { decodeJwt, extractUserId } from '../oauth/jwt-decoder.js';
-import type { TokenResponse } from '../oauth/device-flow-types.js';
+import type { TokenResponse } from '../oauth/provider.js';
 
 describe('Session Reconnection and Token Management', () => {
   describe('JWT User ID Extraction', () => {

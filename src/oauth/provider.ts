@@ -20,7 +20,7 @@ import type { OAuthConfigManager, OAuthConfig } from './config.js';
 
 const debugOAuth = debug('mcp:oauth');
 
-interface TokenResponse {
+export interface TokenResponse {
   access_token: string;
   token_type: string;
   expires_in?: number;
@@ -429,7 +429,6 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
       throw new Error('Refresh token is not available');
     }
 
-    const config = this.configManager.getConfig();
     const metadata = await this.configManager.fetchMetadata();
     const tokenEndpoint = metadata.token_endpoint;
 
@@ -437,15 +436,11 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
       throw new Error('Token endpoint not available in OAuth metadata');
     }
 
+    // OAuth 2.1 supports refresh without client credentials for public clients
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: tokens.refresh_token,
-      client_id: config.clientId,
     });
-
-    if (config.clientSecret) {
-      params.append('client_secret', config.clientSecret);
-    }
 
     const response = await fetch(tokenEndpoint, {
       method: 'POST',

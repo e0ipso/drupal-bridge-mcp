@@ -38,7 +38,6 @@ import {
   createDrupalOAuthProvider,
 } from './oauth/provider.js';
 import { DrupalConnector } from './drupal/connector.js';
-import { DeviceFlow } from './oauth/device-flow.js';
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 
 // Discovery imports
@@ -477,47 +476,6 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Handles device flow authentication for a session
-   * @param {string} sessionId Session identifier
-   * @returns {Promise<void>} Resolves when authentication succeeds
-   * @throws {Error} If device flow is not appropriate or authentication fails
-   */
-  async handleDeviceFlow(sessionId: string): Promise<void> {
-    if (!DeviceFlow.shouldUseDeviceFlow()) {
-      throw new Error(
-        'Device flow not appropriate for this environment. ' +
-          'Set OAUTH_FORCE_DEVICE_FLOW=true to force device flow usage.'
-      );
-    }
-
-    if (!this.oauthProvider) {
-      throw new Error('OAuth provider not initialized');
-    }
-
-    try {
-      await this.oauthProvider.authenticateDeviceFlow(sessionId);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Device flow authentication failed: ${error.message}`);
-      }
-      throw new Error('Device flow authentication failed: Unknown error');
-    }
-  }
-
-  /**
-   * Handles browser-based OAuth flow for a session
-   * @param {string} sessionId Session identifier
-   * @returns {Promise<void>}
-   * @throws {Error} If browser flow is not implemented
-   */
-  async handleBrowserFlow(_sessionId: string): Promise<void> {
-    throw new Error(
-      'Browser-based OAuth flow not yet implemented. ' +
-        'Use device flow for headless environments by setting OAUTH_FORCE_DEVICE_FLOW=true.'
-    );
-  }
-
-  /**
    * Handle explicit user logout
    * Removes user tokens and session mapping
    * @param {string} sessionId Session requesting logout
@@ -550,26 +508,6 @@ export class DrupalMCPHttpServer {
     console.log(
       `Active users: ${this.oauthProvider.getActiveUserCount()}, Active sessions: ${this.oauthProvider.getActiveSessionCount()}`
     );
-  }
-
-  /**
-   * Initializes authentication for a session
-   * @param {string} sessionId Session identifier
-   * @returns {Promise<void>}
-   */
-  async initializeAuthentication(sessionId: string): Promise<void> {
-    if (!this.config.enableAuth) {
-      console.log('OAuth authentication is disabled');
-      return;
-    }
-
-    if (DeviceFlow.shouldUseDeviceFlow()) {
-      console.log('Using device flow for authentication');
-      await this.handleDeviceFlow(sessionId);
-    } else {
-      console.log('Using browser-based flow for authentication');
-      await this.handleBrowserFlow(sessionId);
-    }
   }
 
   /**
@@ -896,7 +834,7 @@ export class DrupalMCPHttpServer {
               port: this.config.port,
               authEnabled: this.config.enableAuth,
               oauthServer: this.oauthConfigManager?.getConfig().drupalUrl,
-              oauthClient: this.oauthConfigManager?.getConfig().clientId,
+              oauthClient: undefined,
               toolsCount: discoveredToolDefinitions.length,
             });
             resolve();
