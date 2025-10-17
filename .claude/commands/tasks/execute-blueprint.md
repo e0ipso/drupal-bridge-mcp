@@ -69,6 +69,7 @@ If either `$TASK_COUNT` is 0 or `$BLUEPRINT_EXISTS` is "no":
    ```
    /tasks:generate-tasks $1
    ```
+   - **CRITICAL**: After task generation completes successfully, you MUST immediately proceed with blueprint execution without waiting for user input. The workflow should continue seamlessly.
    - If generation fails: Halt execution with clear error message:
      ```
      ❌ Error: Automatic task generation failed.
@@ -77,7 +78,7 @@ If either `$TASK_COUNT` is 0 or `$BLUEPRINT_EXISTS` is "no":
      /tasks:generate-tasks $1
      ```
 
-**After successful validation or generation**, proceed with the execution process below.
+**After successful validation or generation**, immediately proceed with the execution process below without pausing.
 
 ## Execution Process
 
@@ -138,6 +139,37 @@ Read and execute .ai/task-manager/config/hooks/POST_PHASE.md
 Read and execute .ai/task-manager/config/hooks/POST_ERROR_DETECTION.md
 
 ### Output Requirements
+
+**Context-Aware Output Behavior:**
+
+**Extract approval method from plan metadata:**
+
+First, extract the approval_method from the plan document:
+
+```bash
+# Find plan file by ID
+PLAN_FILE=$(find .ai/task-manager/{plans,archive} -name "plan-$1--*.md" -type f -exec grep -l "^id: \?$1$" {} \;)
+
+# Extract approval_method from YAML frontmatter
+APPROVAL_METHOD=$(sed -n '/^---$/,/^---$/p' "$PLAN_FILE" | grep '^approval_method:' | sed 's/approval_method: *//;s/"//g;s/'"'"'//g' | tr -d ' ')
+
+# Default to "manual" if field doesn't exist (backward compatibility)
+APPROVAL_METHOD=${APPROVAL_METHOD:-manual}
+```
+
+Then adjust output based on the extracted approval method:
+
+- **If `APPROVAL_METHOD="auto"` (automated workflow mode)**:
+  - Provide minimal progress updates at phase boundaries
+  - Do NOT instruct user to review implementation details
+  - Do NOT add any prompts that would pause execution
+  - Example output: "Phase 1/3 completed. Proceeding to Phase 2."
+
+- **If `APPROVAL_METHOD="manual"` or empty (standalone mode)**:
+  - Provide detailed execution summary with phase results
+  - List completed tasks and any noteworthy events
+  - Instruct user to review the execution summary in the plan document
+  - Example output: "Execution completed. Review summary: `.ai/task-manager/archive/[plan]/plan-[id].md`"
 
 ## Optimization Guidelines
 
