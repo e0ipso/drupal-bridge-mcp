@@ -4,6 +4,20 @@ description: Execute the task in the plan
 ---
 # Task Execution
 
+## Assistant Configuration
+
+Before proceeding with this command, you MUST load and respect the assistant's configuration:
+
+**Run the following scripts:**
+```bash
+ASSISTANT=$(node .ai/task-manager/config/scripts/detect-assistant.cjs)
+node .ai/task-manager/config/scripts/read-assistant-config.cjs "$ASSISTANT"
+```
+
+The output above contains your global and project-level configuration rules. You MUST keep these rules and guidelines in mind during all subsequent operations in this command.
+
+---
+
 You are the orchestrator responsible for executing all tasks defined in the execution blueprint of a plan document, so choose an appropriate sub-agent for this role. Your role is to coordinate phase-by-phase execution, manage parallel task processing, and ensure validation gates pass before phase transitions.
 
 ## Critical Rules
@@ -20,13 +34,57 @@ You are the orchestrator responsible for executing all tasks defined in the exec
 - Validation gates document: `/config/hooks/POST_PHASE.md`
 
 ### Input Error Handling
-If the plan does not exist, or the plan does not have an execution blueprint section. Stop immediately and show an error to the user.
+
+If the plan does not exist, stop immediately and show an error to the user.
+
+**Note**: If tasks or the execution blueprint section are missing, they will be automatically generated before execution begins (see Task and Blueprint Validation below).
+
+### Task and Blueprint Validation
+
+Before proceeding with execution, validate that tasks exist and the execution blueprint has been generated. If either is missing, automatically invoke task generation.
+
+**Validation Steps:**
+
+1. **Locate the plan document**:
+```bash
+PLAN_FILE=$(find .ai/task-manager/{plans,archive} -name "plan-[0-9][0-9]*--*.md" -type f -exec grep -l "^id: \?$1$" {} \;)
+PLAN_DIR=$(dirname "$PLAN_FILE")
+```
+
+2. **Check for task files**:
+```bash
+TASK_COUNT=$(ls "$PLAN_DIR"/tasks/*.md 2>/dev/null | wc -l)
+```
+
+3. **Check for execution blueprint section**:
+```bash
+BLUEPRINT_EXISTS=$(grep -q "^## Execution Blueprint" "$PLAN_FILE" && echo "yes" || echo "no")
+```
+
+4. **Automatic task generation**:
+
+If either `$TASK_COUNT` is 0 or `$BLUEPRINT_EXISTS` is "no":
+   - Display notification to user: "⚠️ Tasks or execution blueprint not found. Generating tasks automatically..."
+   - Use the SlashCommand tool to invoke task generation:
+   ```
+   /tasks:generate-tasks $1
+   ```
+   - If generation fails: Halt execution with clear error message:
+     ```
+     ❌ Error: Automatic task generation failed.
+
+     Please run the following command manually to generate tasks:
+     /tasks:generate-tasks $1
+     ```
+
+**After successful validation or generation**, proceed with the execution process below.
 
 ## Execution Process
 
 Use your internal Todo task tool to track the execution of all phases, and the final update of the plan with the summary. Example:
 
 - [ ] Create feature branch from the main branch.
+- [ ] Validate or auto-generate tasks and execution blueprint if missing.
 - [ ] Execute .ai/task-manager/config/hooks/PRE_PHASE.md hook before Phase 1.
 - [ ] Phase 1: Execute 1 task(s) in parallel.
 - [ ] Execute .ai/task-manager/config/hooks/POST_PHASE.md hook after Phase 1.
@@ -36,7 +94,8 @@ Use your internal Todo task tool to track the execution of all phases, and the f
 - [ ] Execute .ai/task-manager/config/hooks/PRE_PHASE.md hook before Phase 3.
 - [ ] Phase 3: Execute 1 task(s) in parallel.
 - [ ] Execute .ai/task-manager/config/hooks/POST_PHASE.md hook after Phase 3.
-- [ ] Update the Plan 7 with execution summary, and the archive it.
+- [ ] Update the Plan 7 with execution summary using .ai/task-manager/config/hooks/EXECUTION_SUMMARY_TEMPLATE.md.
+- [ ] Archive Plan 7.
 
 ### Phase Pre-Execution
 
