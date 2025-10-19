@@ -69,7 +69,7 @@ async function validateToolAccessForSession(
     // Require OAuth provider and session
     if (!oauthProvider || !sessionId) {
       throw new McpError(
-        ErrorCode.InvalidRequest,
+        ErrorCode.InvalidParams,
         `Tool "${tool.name}" requires authentication. Please authenticate first.`
       );
     }
@@ -79,7 +79,7 @@ async function validateToolAccessForSession(
 
     if (!sessionScopes || sessionScopes.length === 0) {
       throw new McpError(
-        ErrorCode.InvalidRequest,
+        ErrorCode.InvalidParams,
         `Tool "${tool.name}" requires authentication. No valid session found.`
       );
     }
@@ -89,7 +89,7 @@ async function validateToolAccessForSession(
       validateToolAccess(tool, sessionScopes);
     } catch (error) {
       throw new McpError(
-        ErrorCode.InvalidRequest,
+        ErrorCode.InvalidParams,
         error instanceof Error ? error.message : 'Access denied'
       );
     }
