@@ -483,12 +483,12 @@ graph TD
 **Description:** Establish type system foundations and OAuth infrastructure to support scope-aware
 operations.
 
-### Phase 2: Server Integration
+### ✅ Phase 2: Server Integration
 
 **Parallel Tasks:**
 
-- Task 04: Reorder Server Initialization Sequence (depends on: 01, 02)
-- Task 05: Implement Runtime Tool Access Validation (depends on: 01, 03)
+- ✔️ Task 04: Reorder Server Initialization Sequence (depends on: 01, 02) - **Status: completed**
+- ✔️ Task 05: Implement Runtime Tool Access Validation (depends on: 01, 03) - **Status: completed**
 
 **Description:** Integrate scope discovery into server startup and enforce runtime access control.
 

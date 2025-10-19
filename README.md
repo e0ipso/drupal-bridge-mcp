@@ -230,6 +230,110 @@ JWT extraction ensures same userId reused. If seeing this:
 1. Verify JWT contains valid `sub`, `user_id`, or `uid` claim
 2. Check logs for "User reconnecting - reusing existing tokens"
 
+## 🔐 OAuth Scope Management
+
+The MCP server automatically discovers required OAuth scopes from Drupal's tool definitions at
+startup, eliminating manual scope configuration.
+
+### How It Works
+
+1. Server fetches tool definitions from `/mcp/tools/list`
+2. Extracts required scopes from each tool's `annotations.auth.scopes`
+3. Combines discovered scopes with any additional scopes from `OAUTH_ADDITIONAL_SCOPES`
+4. Requests combined scope set during OAuth authentication
+
+This eliminates manual scope configuration and automatically adapts to backend tool changes.
+
+### Automatic Scope Discovery
+
+Scopes are extracted from tool metadata:
+
+```json
+{
+  "name": "examples.contentTypes.create",
+  "annotations": {
+    "auth": {
+      "scopes": ["content_type:write"],
+      "level": "required"
+    }
+  }
+}
+```
+
+The server automatically requests the `content_type:write` scope during OAuth flow.
+
+### Adding Extra Scopes
+
+Use `OAUTH_ADDITIONAL_SCOPES` to request scopes beyond what tools declare:
+
+```bash
+# .env
+OAUTH_ADDITIONAL_SCOPES="admin:access experimental:features"
+```
+
+**Common use cases:**
+
+- Administrative or debugging scopes not tied to specific tools
+- Experimental features in development
+- Cross-domain permissions
+- Future-proofing for upcoming features
+
+**Supported formats:**
+
+```bash
+# Space-separated
+OAUTH_ADDITIONAL_SCOPES="admin:access experimental:features"
+
+# Comma-separated
+OAUTH_ADDITIONAL_SCOPES="admin:access, experimental:features"
+```
+
+### Tool Access Validation
+
+Before invoking a tool, the server validates:
+
+1. **Authentication** - Tool requires auth and session is authenticated
+2. **Scopes** - Session has all required OAuth scopes
+3. **Permissions** - Drupal validates permissions server-side
+
+**Error example:**
+
+```
+Insufficient OAuth scopes for tool "examples.contentTypes.create".
+Required: content_type:write
+Missing: content_type:write
+Current: profile, content_type:read
+```
+
+This error means the OAuth access token doesn't include the `content_type:write` scope. To resolve:
+
+1. Check that the Drupal OAuth server supports the required scope
+2. Re-authenticate to obtain a new token with the correct scopes
+3. Verify tool metadata correctly declares required scopes
+
+### Scope Discovery Logs
+
+Check server startup logs to see discovered scopes:
+
+```
+✓ Discovered 15 tools from Drupal
+  Extracted 8 scopes from tool definitions
+  Additional scopes: admin:access
+  Total scopes: admin:access, content:read, content:write, content_type:read, profile, ...
+```
+
+This transparency helps debug scope-related issues and verify configuration.
+
+### Authentication Levels
+
+Tools can declare three authentication levels:
+
+- **`none`**: Public tools, no authentication required
+- **`optional`**: Enhanced functionality with auth, but works without
+- **`required`**: Enforces authentication and scope validation
+
+If a tool doesn't declare `annotations.auth`, it defaults to `level='none'` (public access).
+
 ## 🎓 Key Learnings
 
 ### What MCP SDK Provides (That We Were Building Custom):
