@@ -303,15 +303,63 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     return expiresAt ? new Date(expiresAt).toISOString() : null;
   }
 
-  async getTokenScopes(sessionId: string): Promise<string[] | null> {
-    const tokens = await this.ensureSessionToken(sessionId);
-    if (!tokens) {
-      return null;
+  /**
+   * Extracts OAuth scopes from a session's access token.
+   *
+   * Decodes the JWT access token and extracts the scope claim from the payload.
+   * Handles both space-separated string format (e.g., "profile content:read")
+   * and array format (e.g., ["profile", "content:read"]).
+   *
+   * @param sessionId - Session identifier
+   * @returns Array of scope strings granted to the session, or empty array if session not found
+   */
+  async getTokenScopes(sessionId: string): Promise<string[]> {
+    try {
+      const tokens = await this.ensureSessionToken(sessionId);
+      if (!tokens) {
+        return [];
+      }
+
+      // Decode JWT to extract scope claim from payload
+      const payload = this.decodeJwtPayload(tokens.access_token);
+      const scopeClaim = payload.scope;
+
+      if (!scopeClaim) {
+        return [];
+      }
+
+      // Handle both string (space-separated) and array formats
+      if (typeof scopeClaim === 'string') {
+        return scopeClaim.split(/\s+/).filter(s => s.length > 0);
+      } else if (Array.isArray(scopeClaim)) {
+        return scopeClaim.filter(s => typeof s === 'string' && s.length > 0);
+      }
+
+      return [];
+    } catch (error) {
+      debugOAuth(
+        `Failed to extract scopes for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Decodes JWT payload without verification
+   * @private
+   */
+  private decodeJwtPayload(token: string): Record<string, any> {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error('Invalid JWT format: expected 3 parts');
     }
 
-    const scopeSource =
-      tokens.scope || this.configManager.getConfig().scopes.join(' ');
-    return scopeSource.split(/[\s,]+/).filter(scope => scope.length > 0);
+    const payload = parts[1];
+    if (!payload) {
+      throw new Error('Invalid JWT format: missing payload');
+    }
+
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'));
   }
 
   /**
