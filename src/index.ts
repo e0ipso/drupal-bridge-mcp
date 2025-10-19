@@ -42,7 +42,8 @@ import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 
 // Discovery imports
 import {
-  getDiscoveredTools,
+  discoverTools,
+  extractRequiredScopes,
   registerDynamicTools,
   type ToolDefinition,
   type LocalToolHandler,
@@ -205,81 +206,13 @@ export class DrupalMCPHttpServer {
         },
         serializers: {
           req: req =>
-            requestSerializer(req as any, {
+            requestSerializer(req, {
               includeHeaders: true,
               includeBody: false,
             }),
         },
       })
     );
-  }
-
-  /**
-   * Initializes OAuth if enabled
-   */
-  private async initializeOAuth(): Promise<void> {
-    if (!this.config.enableAuth) {
-      console.log('OAuth authentication is disabled');
-      return;
-    }
-
-    try {
-      // Create OAuth configuration from environment
-      const oauthConfig = createOAuthConfigFromEnv();
-      this.oauthConfigManager = new OAuthConfigManager(oauthConfig);
-
-      // Fetch metadata to validate configuration
-      const metadata = await this.oauthConfigManager.fetchMetadata();
-      printSuccess('OAuth metadata discovered successfully');
-      printInfo(`Issuer: ${metadata.issuer}`, 2);
-      printInfo(`Authorization: ${metadata.authorization_endpoint}`, 2);
-      printInfo(`Token: ${metadata.token_endpoint}`, 2);
-
-      // Create OAuth provider and Drupal connector as shared instances
-      this.oauthProvider = createDrupalOAuthProvider(this.oauthConfigManager);
-      this.drupalConnector = new DrupalConnector();
-
-      // Set up OAuth metadata router
-      // Use the MCP server's URL as the resource server URL, not Drupal's URL
-      const resourceServerUrl = new URL(
-        `http://${this.config.host}:${this.config.port}`
-      );
-
-      printInfo('🔧 Setting up OAuth metadata router...');
-      printInfo(`Resource server: ${resourceServerUrl.href}`, 2);
-      printInfo(`Expected well-known endpoints:`, 2);
-      const rsPath = resourceServerUrl.pathname;
-      const wellKnownPath = `/.well-known/oauth-protected-resource${rsPath === '/' ? '' : rsPath}`;
-      printInfo(`- ${resourceServerUrl.origin}${wellKnownPath}`, 4);
-      printInfo(
-        `- ${resourceServerUrl.origin}/.well-known/oauth-authorization-server`,
-        4
-      );
-
-      this.app.use(
-        mcpAuthMetadataRouter({
-          oauthMetadata: metadata,
-          resourceServerUrl,
-          scopesSupported: oauthConfig.scopes,
-          resourceName: this.config.name,
-        })
-      );
-
-      printSuccess('OAuth authentication initialized');
-      printInfo(`Resource server: ${resourceServerUrl}`, 2);
-      printInfo(`Scopes: ${oauthConfig.scopes.join(', ')}`, 2);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      printWarning(`OAuth initialization failed: ${errorMessage}`);
-      printInfo(
-        'Server will start without OAuth. Check DRUPAL_BASE_URL and network.',
-        2
-      );
-      printInfo('To disable this warning, set AUTH_ENABLED=false', 2);
-      // Don't throw - allow server to start without OAuth
-      this.config.enableAuth = false;
-    }
   }
 
   /**
@@ -319,7 +252,8 @@ export class DrupalMCPHttpServer {
       discoveredToolDefinitions,
       this.makeRequest.bind(this),
       this.getSession.bind(this),
-      this.localToolHandlers
+      this.localToolHandlers,
+      this.oauthProvider
     );
 
     // Create transport
@@ -508,6 +442,27 @@ export class DrupalMCPHttpServer {
     console.log(
       `Active users: ${this.oauthProvider.getActiveUserCount()}, Active sessions: ${this.oauthProvider.getActiveSessionCount()}`
     );
+  }
+
+  /**
+   * Validates that requested scopes are supported by the OAuth server.
+   */
+  private validateScopes(
+    requestedScopes: string[],
+    supportedScopes: string[]
+  ): void {
+    const unsupportedScopes = requestedScopes.filter(
+      scope => !supportedScopes.includes(scope)
+    );
+
+    if (unsupportedScopes.length > 0) {
+      printWarning(
+        'Some requested scopes are not supported by the OAuth server:'
+      );
+      printInfo(`Unsupported: ${unsupportedScopes.join(', ')}`, 2);
+      printInfo(`Supported: ${supportedScopes.join(', ')}`, 2);
+      printInfo('These scopes will be ignored during authentication.', 2);
+    }
   }
 
   /**
@@ -708,13 +663,7 @@ export class DrupalMCPHttpServer {
    */
   async start(): Promise<void> {
     try {
-      // Initialize OAuth if enabled
-      await this.initializeOAuth();
-
-      // ========== NEW: Tool Discovery ==========
-      printSection('Discovering Tools', '🔍');
-
-      // Discover dynamic tools from Drupal.
+      // Step 1: Validate DRUPAL_BASE_URL early
       const DRUPAL_BASE_URL = process.env.DRUPAL_BASE_URL;
       if (!DRUPAL_BASE_URL) {
         printWarning('DRUPAL_BASE_URL environment variable is required');
@@ -723,9 +672,19 @@ export class DrupalMCPHttpServer {
         process.exit(1);
       }
 
+      // Step 2: Create initial OAuth config
+      printInfo('Initializing OAuth configuration...', 1);
+      const oauthConfig = createOAuthConfigFromEnv();
+      const configManager = new OAuthConfigManager(oauthConfig);
+
+      // Step 3: Discover tools BEFORE OAuth initialization
+      printSection('Discovering Tools', '🔍');
       let tools: ToolDefinition[];
       try {
-        tools = await getDiscoveredTools(DRUPAL_BASE_URL);
+        tools = await discoverTools(
+          DRUPAL_BASE_URL,
+          undefined // No token for initial discovery
+        );
       } catch (error) {
         printWarning('FATAL: Tool discovery failed');
         printInfo(
@@ -759,13 +718,104 @@ export class DrupalMCPHttpServer {
         );
       });
 
-      // Store tools for ListToolsRequest handler
-      setDiscoveredTools(tools);
+      // Step 4: Extract scopes from discovered tools + additional scopes
+      const discoveredScopes = extractRequiredScopes(
+        tools,
+        oauthConfig.additionalScopes
+      );
 
-      // Note: Dynamic handlers are registered per-session in createSessionInstance()
+      printInfo(
+        `Extracted ${discoveredScopes.length} scopes from tool definitions`,
+        2
+      );
+
+      if (oauthConfig.additionalScopes.length > 0) {
+        printInfo(
+          `Additional scopes: ${oauthConfig.additionalScopes.join(', ')}`,
+          2
+        );
+      }
+
+      printInfo(`Total scopes: ${discoveredScopes.join(', ')}`, 2);
+
+      // Step 5: Update config with discovered + additional scopes
+      configManager.updateScopes(discoveredScopes);
+
+      // Step 6: Store tools for ListToolsRequest handler
+      setDiscoveredTools(tools);
       printSuccess('Tool definitions stored for per-session registration');
 
-      // ========== END: Tool Discovery ==========
+      // Step 7: Initialize OAuth with correct scopes (if enabled)
+      if (this.config.enableAuth) {
+        try {
+          printInfo('Initializing OAuth provider...', 1);
+          this.oauthProvider = createDrupalOAuthProvider(configManager);
+          this.oauthConfigManager = configManager;
+          this.drupalConnector = new DrupalConnector();
+
+          // Step 8: Fetch OAuth metadata
+          const metadata = await configManager.fetchMetadata();
+
+          printSuccess('OAuth metadata discovered successfully');
+          printInfo(`Issuer: ${metadata.issuer}`, 2);
+          printInfo(`Authorization: ${metadata.authorization_endpoint}`, 2);
+          printInfo(`Token: ${metadata.token_endpoint}`, 2);
+
+          // Step 9: Validate scopes against server's supported scopes
+          if (metadata.scopes_supported) {
+            this.validateScopes(
+              configManager.getConfig().scopes,
+              metadata.scopes_supported
+            );
+          }
+
+          // Set up OAuth metadata router
+          // Use the MCP server's URL as the resource server URL, not Drupal's URL
+          const resourceServerUrl = new URL(
+            `http://${this.config.host}:${this.config.port}`
+          );
+
+          printInfo('🔧 Setting up OAuth metadata router...');
+          printInfo(`Resource server: ${resourceServerUrl.href}`, 2);
+          printInfo(`Expected well-known endpoints:`, 2);
+          const rsPath = resourceServerUrl.pathname;
+          const wellKnownPath = `/.well-known/oauth-protected-resource${rsPath === '/' ? '' : rsPath}`;
+          printInfo(`- ${resourceServerUrl.origin}${wellKnownPath}`, 4);
+          printInfo(
+            `- ${resourceServerUrl.origin}/.well-known/oauth-authorization-server`,
+            4
+          );
+
+          this.app.use(
+            mcpAuthMetadataRouter({
+              oauthMetadata: metadata,
+              resourceServerUrl,
+              scopesSupported: configManager.getConfig().scopes,
+              resourceName: this.config.name,
+            })
+          );
+
+          printSuccess('OAuth authentication initialized');
+          printInfo(`Resource server: ${resourceServerUrl}`, 2);
+          printInfo(
+            `Scopes: ${configManager.getConfig().scopes.join(', ')}`,
+            2
+          );
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : 'Unknown error';
+          printWarning(`OAuth initialization failed: ${errorMessage}`);
+          printInfo(
+            'Server will start without OAuth. Check DRUPAL_BASE_URL and network.',
+            2
+          );
+          printInfo('To disable this warning, set AUTH_ENABLED=false', 2);
+          // Don't throw - allow server to start without OAuth
+          this.config.enableAuth = false;
+        }
+      } else {
+        console.log('OAuth authentication is disabled');
+      }
 
       // Set up MCP endpoint
       printInfo('🚀 Setting up MCP endpoint...');
