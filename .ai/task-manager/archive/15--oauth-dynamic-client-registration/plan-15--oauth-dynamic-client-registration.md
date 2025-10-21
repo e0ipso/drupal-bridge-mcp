@@ -667,3 +667,7 @@ tests due to missing Drupal instance, which is documented in tests/integration/S
 2. Test with live Drupal instance
 3. Verify Claude Code authentication flow end-to-end
 4. Create release notes documenting breaking changes
+
+---
+
+**Note**: Manually archived on 2025-10-21

@@ -1,11 +1,12 @@
 ---
 id: 4
-group: 'oauth-config-refactor'
-dependencies: [3]
-status: 'completed'
+group: oauth-config-refactor
+dependencies:
+  - 3
+status: completed
 created: '2025-10-15'
 skills:
-  - 'typescript'
+  - typescript
 ---
 
 # Update OAuth Config Factory Function

@@ -1,12 +1,13 @@
 ---
 id: 12
-group: 'test-updates'
-dependencies: [2]
-status: 'completed'
+group: test-updates
+dependencies:
+  - 2
+status: completed
 created: '2025-10-15'
 skills:
-  - 'jest'
-  - 'typescript'
+  - jest
+  - typescript
 ---
 
 # Create JWT Verification Tests

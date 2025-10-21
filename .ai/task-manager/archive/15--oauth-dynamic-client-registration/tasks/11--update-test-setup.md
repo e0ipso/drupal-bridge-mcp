@@ -1,12 +1,13 @@
 ---
 id: 11
-group: 'test-updates'
-dependencies: [10]
-status: 'completed'
+group: test-updates
+dependencies:
+  - 10
+status: completed
 created: '2025-10-15'
 skills:
-  - 'jest'
-  - 'typescript'
+  - jest
+  - typescript
 ---
 
 # Update Test Setup to Remove Credential Mocking

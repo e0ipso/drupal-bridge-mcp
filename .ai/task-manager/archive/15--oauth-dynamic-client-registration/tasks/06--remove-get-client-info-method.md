@@ -1,11 +1,12 @@
 ---
 id: 6
-group: 'oauth-provider-refactor'
-dependencies: [5]
-status: 'completed'
+group: oauth-provider-refactor
+dependencies:
+  - 5
+status: completed
 created: '2025-10-15'
 skills:
-  - 'typescript'
+  - typescript
 ---
 
 # Remove getClientInfo Method

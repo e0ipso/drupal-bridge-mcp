@@ -1,12 +1,13 @@
 ---
 id: 2
-group: 'jwt-verification-infrastructure'
-dependencies: [1]
-status: 'completed'
+group: jwt-verification-infrastructure
+dependencies:
+  - 1
+status: completed
 created: '2025-10-15'
 skills:
-  - 'typescript'
-  - 'oauth'
+  - typescript
+  - oauth
 ---
 
 # Create JWT Verification Utility

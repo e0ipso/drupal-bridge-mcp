@@ -1,11 +1,11 @@
 ---
 id: 1
-group: 'jwt-verification-infrastructure'
+group: jwt-verification-infrastructure
 dependencies: []
-status: 'completed'
+status: completed
 created: '2025-10-15'
 skills:
-  - 'npm'
+  - npm
 ---
 
 # Install JWT Verification Library

@@ -1,14 +1,17 @@
 ---
 id: 13
-group: 'validation-testing'
-dependencies: [4, 5, 6]
-status: 'completed'
+group: validation-testing
+dependencies:
+  - 4
+  - 5
+  - 6
+status: completed
 created: '2025-10-15'
 completed: '2025-10-15'
 skills:
-  - 'typescript'
-  - 'oauth'
-  - 'integration-testing'
+  - typescript
+  - oauth
+  - integration-testing
 ---
 
 # Integration Test: OAuth Metadata Discovery

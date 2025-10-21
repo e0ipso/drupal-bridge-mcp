@@ -1,11 +1,12 @@
 ---
 id: 14
-group: 'documentation'
-dependencies: [13]
-status: 'completed'
+group: documentation
+dependencies:
+  - 13
+status: completed
 created: '2025-10-15'
 skills:
-  - 'documentation'
+  - documentation
 ---
 
 # Update Documentation for Resource Server Architecture

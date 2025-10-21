@@ -1,12 +1,13 @@
 ---
 id: 10
-group: 'test-updates'
-dependencies: [4]
-status: 'completed'
+group: test-updates
+dependencies:
+  - 4
+status: completed
 created: '2025-10-15'
 skills:
-  - 'jest'
-  - 'typescript'
+  - jest
+  - typescript
 ---
 
 # Update OAuth Config Tests

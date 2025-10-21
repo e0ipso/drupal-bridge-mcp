@@ -1,10 +1,12 @@
 ---
 id: 9
-group: 'oauth-client-removal'
-dependencies: [7, 8]
-status: 'completed'
+group: oauth-client-removal
+dependencies:
+  - 7
+  - 8
+status: completed
 skills:
-  - 'typescript'
+  - typescript
 ---
 
 # Remove Device Flow Methods from OAuth Provider

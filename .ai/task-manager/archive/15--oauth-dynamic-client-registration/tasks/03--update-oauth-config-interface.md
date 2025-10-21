@@ -1,11 +1,11 @@
 ---
 id: 3
-group: 'oauth-config-refactor'
+group: oauth-config-refactor
 dependencies: []
-status: 'completed'
+status: completed
 created: '2025-10-15'
 skills:
-  - 'typescript'
+  - typescript
 ---
 
 # Update OAuthConfig Interface to Remove Client Credentials

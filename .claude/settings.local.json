@@ -38,7 +38,10 @@
       "Bash(xargs -r kill -9)",
       "WebFetch(domain:spec.modelcontextprotocol.io)",
       "Bash(ip route:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(DEBUG=mcp:oauth npm start:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(npm view:*)"
     ],
     "deny": []
   },

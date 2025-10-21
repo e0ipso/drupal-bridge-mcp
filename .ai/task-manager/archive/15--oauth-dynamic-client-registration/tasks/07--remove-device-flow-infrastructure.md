@@ -1,12 +1,12 @@
 ---
 id: 7
-group: 'oauth-client-removal'
+group: oauth-client-removal
 dependencies: []
-status: 'completed'
+status: completed
 created: '2025-10-15'
 skills:
-  - 'typescript'
-  - 'file-management'
+  - typescript
+  - file-management
 ---
 
 # Remove Device Flow Infrastructure

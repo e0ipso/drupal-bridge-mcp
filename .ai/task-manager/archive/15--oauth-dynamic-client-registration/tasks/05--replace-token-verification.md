@@ -1,12 +1,14 @@
 ---
 id: 5
-group: 'oauth-provider-refactor'
-dependencies: [2, 4]
-status: 'completed'
+group: oauth-provider-refactor
+dependencies:
+  - 2
+  - 4
+status: completed
 created: '2025-10-15'
 skills:
-  - 'typescript'
-  - 'oauth'
+  - typescript
+  - oauth
 ---
 
 # Replace Token Introspection with JWT Verification
