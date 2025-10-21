@@ -33,10 +33,7 @@
       "WebFetch(domain:www.github.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:levelup.gitconnected.com)",
-      "WebFetch(domain:stackoverflow.com)",
-      "mcp__drupal-bridge__examples_contentTypes_list",
-      "Bash(xargs -r kill -9)",
-      "WebFetch(domain:spec.modelcontextprotocol.io)"
+      "WebFetch(domain:stackoverflow.com)"
     ],
     "deny": []
   },

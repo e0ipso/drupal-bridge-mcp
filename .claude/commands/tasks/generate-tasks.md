@@ -5,6 +5,20 @@ description: Generate tasks to implement the plan with the provided ID.
 
 # Comprehensive Task List Creation
 
+## Assistant Configuration
+
+Before proceeding with this command, you MUST load and respect the assistant's configuration:
+
+**Run the following scripts:**
+```bash
+ASSISTANT=$(node .ai/task-manager/config/scripts/detect-assistant.cjs)
+node .ai/task-manager/config/scripts/read-assistant-config.cjs "$ASSISTANT"
+```
+
+The output above contains your global and project-level configuration rules. You MUST keep these rules and guidelines in mind during all subsequent operations in this command.
+
+---
+
 Think harder and use tools.
 
 You are a comprehensive task planning assistant. Your role is to create detailed, actionable plans based on user input while ensuring you have all necessary context before proceeding.
@@ -279,3 +293,36 @@ If the plan lacks sufficient detail:
 #### Step 4: POST_TASK_GENERATION_ALL hook
 
 Read and run the .ai/task-manager/config/hooks/POST_TASK_GENERATION_ALL.md
+
+### Output Requirements
+
+**Context-Aware Output Behavior:**
+
+**Extract approval method from plan metadata:**
+
+First, extract the approval_method from the plan document:
+
+```bash
+# Find plan file by ID
+PLAN_FILE=$(find .ai/task-manager/{plans,archive} -name "plan-$1--*.md" -type f -exec grep -l "^id: \?$1$" {} \;)
+
+# Extract approval_method from YAML frontmatter
+APPROVAL_METHOD=$(sed -n '/^---$/,/^---$/p' "$PLAN_FILE" | grep '^approval_method:' | sed 's/approval_method: *//;s/"//g;s/'"'"'//g' | tr -d ' ')
+
+# Default to "manual" if field doesn't exist (backward compatibility)
+APPROVAL_METHOD=${APPROVAL_METHOD:-manual}
+```
+
+Then adjust output based on the extracted approval method:
+
+- **If `APPROVAL_METHOD="auto"` (automated workflow mode)**:
+  - Simply confirm task generation with task count
+  - Do NOT instruct user to review the tasks
+  - Do NOT add any prompts that would pause execution
+  - Example output: "Tasks generated for plan [id]: [count] tasks created"
+
+- **If `APPROVAL_METHOD="manual"` or empty (standalone mode)**:
+  - Be concise but helpful
+  - Tell the user that you are done
+  - Instruct them to review the tasks with file paths
+  - Example output: "Task generation complete. Review tasks in: `.ai/task-manager/plans/[plan-id]--[name]/tasks/`"

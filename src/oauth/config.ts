@@ -11,14 +11,16 @@ import {
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 
 /**
- * OAuth configuration interface
+ * OAuth configuration for the MCP resource server.
+ * Note: This server acts as a resource server only, not an OAuth client.
+ * Token verification is performed via JWT signature validation using Drupal's JWKS.
  */
 export interface OAuthConfig {
   drupalUrl: string;
-  clientId: string;
-  clientSecret: string;
   scopes: string[];
   resourceServerUrl?: string;
+  additionalScopes: string[];
+  // clientId and clientSecret removed - not needed for resource server
 }
 
 /**
@@ -56,14 +58,6 @@ export class OAuthConfigManager {
       new URL(this.config.drupalUrl);
     } catch {
       throw new Error('DRUPAL_URL must be a valid URL');
-    }
-
-    if (!this.config.clientId) {
-      throw new Error('OAUTH_CLIENT_ID is required');
-    }
-
-    if (!this.config.clientSecret) {
-      throw new Error('OAUTH_CLIENT_SECRET is required');
     }
 
     if (!Array.isArray(this.config.scopes) || this.config.scopes.length === 0) {
@@ -137,32 +131,42 @@ export class OAuthConfigManager {
   clearCache(): void {
     this.metadataCache = null;
   }
+
+  /**
+   * Updates the scopes in the configuration.
+   * Used after tool discovery to set required scopes.
+   *
+   * @param scopes - Array of scope strings from tool discovery
+   */
+  updateScopes(scopes: string[]): void {
+    if (!Array.isArray(scopes) || scopes.length === 0) {
+      throw new Error('Scopes must be a non-empty array');
+    }
+
+    this.config.scopes = scopes;
+
+    // Clear metadata cache to force re-fetch with new scopes
+    this.clearCache();
+  }
 }
 
 /**
- * Creates an OAuth configuration from environment variables
+ * Creates an OAuth configuration from environment variables.
+ * Scopes are always discovered from tools, with optional additional scopes.
+ *
  * @returns {OAuthConfig} OAuth configuration
  * @throws {Error} If required environment variables are missing
  */
 export function createOAuthConfigFromEnv(): OAuthConfig {
   const drupalUrl = process.env.DRUPAL_URL || process.env.DRUPAL_BASE_URL;
-  const clientId = process.env.OAUTH_CLIENT_ID;
-  const clientSecret = process.env.OAUTH_CLIENT_SECRET;
   const scopesString = process.env.OAUTH_SCOPES;
+  const additionalScopesString = process.env.OAUTH_ADDITIONAL_SCOPES;
   const resourceServerUrl = process.env.OAUTH_RESOURCE_SERVER_URL;
 
   if (!drupalUrl) {
     throw new Error(
       'DRUPAL_URL or DRUPAL_BASE_URL environment variable is required'
     );
-  }
-
-  if (!clientId) {
-    throw new Error('OAUTH_CLIENT_ID environment variable is required');
-  }
-
-  if (!clientSecret) {
-    throw new Error('OAUTH_CLIENT_SECRET environment variable is required');
   }
 
   // Parse scopes from space or comma-separated string
@@ -173,11 +177,18 @@ export function createOAuthConfigFromEnv(): OAuthConfig {
         .filter(s => s.length > 0)
     : ['profile'];
 
+  // Parse additional scopes from environment (optional)
+  const additionalScopes = additionalScopesString
+    ? additionalScopesString
+        .split(/[\s,]+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0)
+    : [];
+
   return {
     drupalUrl,
-    clientId,
-    clientSecret,
     scopes,
     resourceServerUrl,
+    additionalScopes,
   };
 }

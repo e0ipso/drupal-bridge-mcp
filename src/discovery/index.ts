@@ -1,5 +1,6 @@
 export {
   discoverTools,
+  extractRequiredScopes,
   type ToolDefinition,
   type ToolDiscoveryResponse,
   type JSONSchema,

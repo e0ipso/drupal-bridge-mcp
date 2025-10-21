@@ -24,23 +24,17 @@ describe('OAuth Configuration Integration', () => {
   describe('Configuration from Environment', () => {
     test('should create valid config from environment variables', () => {
       process.env.DRUPAL_URL = 'https://drupal.example.com';
-      process.env.OAUTH_CLIENT_ID = 'test-client';
-      process.env.OAUTH_CLIENT_SECRET = 'test-secret';
       process.env.OAUTH_SCOPES = 'profile read:content';
 
       const config = createOAuthConfigFromEnv();
 
       expect(config.drupalUrl).toBe('https://drupal.example.com');
-      expect(config.clientId).toBe('test-client');
-      expect(config.clientSecret).toBe('test-secret');
       expect(config.scopes).toEqual(['profile', 'read:content']);
     });
 
     test('should accept DRUPAL_BASE_URL as alternative', () => {
       delete process.env.DRUPAL_URL;
       process.env.DRUPAL_BASE_URL = 'https://drupal-alt.example.com';
-      process.env.OAUTH_CLIENT_ID = 'test-client';
-      process.env.OAUTH_CLIENT_SECRET = 'test-secret';
 
       const config = createOAuthConfigFromEnv();
 
@@ -49,8 +43,6 @@ describe('OAuth Configuration Integration', () => {
 
     test('should parse comma-separated scopes', () => {
       process.env.DRUPAL_URL = 'https://drupal.example.com';
-      process.env.OAUTH_CLIENT_ID = 'test-client';
-      process.env.OAUTH_CLIENT_SECRET = 'test-secret';
       process.env.OAUTH_SCOPES = 'profile, read:content, write:content';
 
       const config = createOAuthConfigFromEnv();
@@ -64,8 +56,6 @@ describe('OAuth Configuration Integration', () => {
 
     test('should use default profile scope if not specified', () => {
       process.env.DRUPAL_URL = 'https://drupal.example.com';
-      process.env.OAUTH_CLIENT_ID = 'test-client';
-      process.env.OAUTH_CLIENT_SECRET = 'test-secret';
       delete process.env.OAUTH_SCOPES;
 
       const config = createOAuthConfigFromEnv();
@@ -76,31 +66,9 @@ describe('OAuth Configuration Integration', () => {
     test('should throw error if DRUPAL_URL is missing', () => {
       delete process.env.DRUPAL_URL;
       delete process.env.DRUPAL_BASE_URL;
-      process.env.OAUTH_CLIENT_ID = 'test-client';
-      process.env.OAUTH_CLIENT_SECRET = 'test-secret';
 
       expect(() => createOAuthConfigFromEnv()).toThrow(
         /DRUPAL_URL or DRUPAL_BASE_URL environment variable is required/
-      );
-    });
-
-    test('should throw error if OAUTH_CLIENT_ID is missing', () => {
-      process.env.DRUPAL_URL = 'https://drupal.example.com';
-      delete process.env.OAUTH_CLIENT_ID;
-      process.env.OAUTH_CLIENT_SECRET = 'test-secret';
-
-      expect(() => createOAuthConfigFromEnv()).toThrow(
-        /OAUTH_CLIENT_ID environment variable is required/
-      );
-    });
-
-    test('should throw error if OAUTH_CLIENT_SECRET is missing', () => {
-      process.env.DRUPAL_URL = 'https://drupal.example.com';
-      process.env.OAUTH_CLIENT_ID = 'test-client';
-      delete process.env.OAUTH_CLIENT_SECRET;
-
-      expect(() => createOAuthConfigFromEnv()).toThrow(
-        /OAUTH_CLIENT_SECRET environment variable is required/
       );
     });
   });
@@ -109,8 +77,6 @@ describe('OAuth Configuration Integration', () => {
     test('should validate required configuration fields', () => {
       const validConfig: OAuthConfig = {
         drupalUrl: 'https://drupal.example.com',
-        clientId: 'test-client',
-        clientSecret: 'test-secret',
         scopes: ['profile'],
       };
 
@@ -120,8 +86,6 @@ describe('OAuth Configuration Integration', () => {
     test('should reject invalid URL format', () => {
       const invalidConfig: OAuthConfig = {
         drupalUrl: 'not-a-valid-url',
-        clientId: 'test-client',
-        clientSecret: 'test-secret',
         scopes: ['profile'],
       };
 
@@ -130,24 +94,9 @@ describe('OAuth Configuration Integration', () => {
       );
     });
 
-    test('should reject empty client ID', () => {
-      const invalidConfig: OAuthConfig = {
-        drupalUrl: 'https://drupal.example.com',
-        clientId: '',
-        clientSecret: 'test-secret',
-        scopes: ['profile'],
-      };
-
-      expect(() => new OAuthConfigManager(invalidConfig)).toThrow(
-        /OAUTH_CLIENT_ID is required/
-      );
-    });
-
     test('should reject empty scopes array', () => {
       const invalidConfig: OAuthConfig = {
         drupalUrl: 'https://drupal.example.com',
-        clientId: 'test-client',
-        clientSecret: 'test-secret',
         scopes: [],
       };
 
@@ -161,8 +110,6 @@ describe('OAuth Configuration Integration', () => {
     test('should build correct discovery URL', () => {
       const config: OAuthConfig = {
         drupalUrl: 'https://drupal.example.com',
-        clientId: 'test-client',
-        clientSecret: 'test-secret',
         scopes: ['profile'],
       };
 
@@ -194,8 +141,6 @@ describe('OAuth Configuration Integration', () => {
 
       const config: OAuthConfig = {
         drupalUrl: 'https://drupal.example.com',
-        clientId: 'test-client',
-        clientSecret: 'test-secret',
         scopes: ['profile'],
       };
 
@@ -229,8 +174,6 @@ describe('OAuth Configuration Integration', () => {
 
       const config: OAuthConfig = {
         drupalUrl: 'https://drupal.example.com',
-        clientId: 'test-client',
-        clientSecret: 'test-secret',
         scopes: ['profile'],
       };
 
@@ -262,8 +205,6 @@ describe('OAuth Configuration Integration', () => {
 
       const config: OAuthConfig = {
         drupalUrl: 'https://drupal.example.com',
-        clientId: 'test-client',
-        clientSecret: 'test-secret',
         scopes: ['profile'],
       };
 
@@ -290,8 +231,6 @@ describe('OAuth Configuration Integration', () => {
 
       const config: OAuthConfig = {
         drupalUrl: 'https://drupal.example.com',
-        clientId: 'test-client',
-        clientSecret: 'test-secret',
         scopes: ['profile'],
       };
 
@@ -309,8 +248,6 @@ describe('OAuth Configuration Integration', () => {
 
       const config: OAuthConfig = {
         drupalUrl: 'https://drupal.example.com',
-        clientId: 'test-client',
-        clientSecret: 'test-secret',
         scopes: ['profile'],
       };
 
@@ -340,8 +277,6 @@ describe('OAuth Configuration Integration', () => {
 
       const config: OAuthConfig = {
         drupalUrl: 'https://drupal.example.com',
-        clientId: 'test-client',
-        clientSecret: 'test-secret',
         scopes: ['profile'],
       };
 

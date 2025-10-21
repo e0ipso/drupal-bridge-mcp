@@ -19,13 +19,33 @@ export interface JSONSchema {
   [key: string]: any;
 }
 
+export interface ToolAuthMetadata {
+  /**
+   * Authentication requirement level (optional - inferred from scopes)
+   * - If scopes present but level undefined: defaults to 'required'
+   * - If no scopes and no level: defaults to 'none'
+   * - Explicit value overrides inference
+   */
+  level?: 'none' | 'optional' | 'required';
+  /** OAuth 2.1 scopes required to invoke this tool */
+  scopes?: string[];
+  /** Human-readable description of auth requirements */
+  description?: string;
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: JSONSchema;
   outputSchema?: JSONSchema;
   title?: string;
-  annotations?: Record<string, unknown>;
+  annotations?: {
+    category?: string;
+    returns?: string;
+    supports_pagination?: boolean;
+    auth?: ToolAuthMetadata;
+    [key: string]: unknown;
+  };
 }
 
 export interface ToolDiscoveryResponse {
@@ -187,5 +207,121 @@ export async function discoverTools(
 
     // Re-throw other errors with context
     throw error;
+  }
+}
+
+/**
+ * Gets the authentication level for a tool, with inference from scopes.
+ *
+ * @param authMetadata - The tool's auth metadata (optional)
+ * @returns Authentication level: 'none', 'optional', or 'required'
+ */
+export function getAuthLevel(
+  authMetadata?: ToolAuthMetadata
+): 'none' | 'optional' | 'required' {
+  // No auth metadata at all
+  if (!authMetadata) {
+    return 'none';
+  }
+
+  // Explicit level overrides inference
+  if (authMetadata.level !== undefined) {
+    return authMetadata.level;
+  }
+
+  // Infer from scopes: if scopes present, default to 'required'
+  if (authMetadata.scopes && authMetadata.scopes.length > 0) {
+    return 'required';
+  }
+
+  // No scopes, no explicit level
+  return 'none';
+}
+
+/**
+ * Extracts all required OAuth scopes from discovered tools.
+ *
+ * @param tools - Array of tool definitions
+ * @param additionalScopes - Optional additional scopes to include
+ * @returns Array of unique scope strings, always includes 'profile'
+ */
+export function extractRequiredScopes(
+  tools: ToolDefinition[],
+  additionalScopes: string[] = []
+): string[] {
+  const scopes = new Set<string>(['profile']); // Always include profile
+
+  // Add scopes from tool definitions
+  for (const tool of tools) {
+    const authMetadata = tool.annotations?.auth;
+    const authLevel = getAuthLevel(authMetadata);
+
+    // Skip tools that don't use authentication
+    if (authLevel === 'none') {
+      continue;
+    }
+
+    // Add tool's required scopes (for both 'optional' and 'required' auth)
+    if (authMetadata?.scopes) {
+      authMetadata.scopes.forEach(scope => scopes.add(scope));
+    }
+  }
+
+  // Add additional scopes from environment
+  additionalScopes.forEach(scope => scopes.add(scope));
+
+  return Array.from(scopes).sort();
+}
+
+/**
+ * Validates if a session has required scopes to invoke a tool.
+ *
+ * @param tool - The tool definition
+ * @param sessionScopes - OAuth scopes granted to the session
+ * @throws Error if access is denied
+ */
+export function validateToolAccess(
+  tool: ToolDefinition,
+  sessionScopes: string[]
+): void {
+  const authMetadata = tool.annotations?.auth;
+  const authLevel = getAuthLevel(authMetadata);
+
+  // Allow access if auth level is 'none'
+  if (authLevel === 'none') {
+    return;
+  }
+
+  // For 'optional' auth, allow access even without authentication
+  // but scopes will be used if available
+  if (authLevel === 'optional') {
+    return;
+  }
+
+  // For 'required' auth, enforce authentication and scopes
+  if (authLevel === 'required') {
+    // Require authentication
+    if (!sessionScopes || sessionScopes.length === 0) {
+      throw new Error(
+        `Tool "${tool.name}" requires authentication. Please authenticate first.`
+      );
+    }
+
+    // Check required scopes
+    const requiredScopes = authMetadata?.scopes || [];
+    const missingScopes = requiredScopes.filter(
+      scope => !sessionScopes.includes(scope)
+    );
+
+    if (missingScopes.length > 0) {
+      const message = [
+        `Insufficient OAuth scopes for tool "${tool.name}".`,
+        `Required: ${requiredScopes.join(', ')}`,
+        `Missing: ${missingScopes.join(', ')}`,
+        `Current: ${sessionScopes.join(', ')}`,
+      ].join('\n');
+
+      throw new Error(message);
+    }
   }
 }

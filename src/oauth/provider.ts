@@ -11,29 +11,21 @@ import {
   type ProxyEndpoints,
   type ProxyOptions,
 } from '@modelcontextprotocol/sdk/server/auth/providers/proxyProvider.js';
-import {
-  OAuthClientInformationFull,
-  OAuthClientInformationFullSchema,
-  type OAuthMetadata,
-} from '@modelcontextprotocol/sdk/shared/auth.js';
+import { type OAuthMetadata } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import debug from 'debug';
 import { extractUserId } from './jwt-decoder.js';
+import { verifyJWT } from './jwt-verifier.js';
 import type { OAuthConfigManager, OAuthConfig } from './config.js';
-import type { TokenResponse } from './device-flow-types.js';
-import { DeviceFlow } from './device-flow.js';
 
 const debugOAuth = debug('mcp:oauth');
 
-/**
- * Token introspection response from Drupal
- */
-interface DrupalTokenIntrospection {
-  active: boolean;
-  client_id?: string;
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in?: number;
+  refresh_token?: string;
   scope?: string;
-  exp?: number;
-  aud?: string | string[];
 }
 
 interface StoredToken extends TokenResponse {
@@ -54,7 +46,6 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
 
   private readonly configManager: OAuthConfigManager;
   private readonly drupalUrl: string;
-  private clientCache: Map<string, OAuthClientInformationFull> = new Map();
 
   private sessionTokens: Map<string, StoredToken> = new Map();
   private userTokens: Map<string, StoredToken> = new Map();
@@ -73,7 +64,7 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     const options: ProxyOptions = {
       endpoints,
       verifyAccessToken: async (token: string) => this.verifyToken(token),
-      getClient: async (clientId: string) => this.getClientInfo(clientId),
+      getClient: async () => undefined,
     };
 
     super(options);
@@ -119,55 +110,29 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
   }
 
   /**
-   * Verifies an access token with Drupal's introspection endpoint
+   * Verifies an access token using JWT signature verification
    */
   private async verifyToken(token: string): Promise<AuthInfo> {
-    const config = this.configManager.getConfig();
-    const metadata = await this.configManager.fetchMetadata();
-    const introspectionUrl =
-      metadata.introspection_endpoint || `${this.drupalUrl}/oauth/introspect`;
-
     try {
-      const response = await fetch(introspectionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Authorization: `Basic ${Buffer.from(
-            `${config.clientId}:${config.clientSecret}`
-          ).toString('base64')}`,
-        },
-        body: new URLSearchParams({
-          token,
-          token_type_hint: 'access_token',
-        }),
-      });
+      const metadata = await this.configManager.fetchMetadata();
+      const payload = await verifyJWT(token, metadata);
 
-      if (!response.ok) {
-        throw new Error(`Token introspection failed: ${response.status}`);
-      }
-
-      const introspection: DrupalTokenIntrospection = await response.json();
-
-      if (!introspection.active) {
-        throw new Error('Token is not active');
-      }
-
-      const scopes = introspection.scope
-        ? introspection.scope.split(/[\s,]+/).filter(s => s.length > 0)
+      const scopes = payload.scope
+        ? (payload.scope as string).split(/[\s,]+/).filter(s => s.length > 0)
         : [];
 
       const authInfo: AuthInfo = {
         token,
-        clientId: introspection.client_id || config.clientId,
+        clientId: (payload.client_id as string) || 'unknown',
         scopes,
-        expiresAt: introspection.exp,
+        expiresAt: payload.exp,
       };
 
-      if (introspection.aud) {
-        const audience = Array.isArray(introspection.aud)
-          ? introspection.aud[0]
-          : introspection.aud;
-        if (audience) {
+      if (payload.aud) {
+        const audience = Array.isArray(payload.aud)
+          ? payload.aud[0]
+          : payload.aud;
+        if (audience && typeof audience === 'string') {
           try {
             authInfo.resource = new URL(audience);
           } catch {
@@ -186,59 +151,6 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
   }
 
   /**
-   * Gets OAuth client information
-   */
-  private async getClientInfo(
-    clientId: string
-  ): Promise<OAuthClientInformationFull | undefined> {
-    if (this.clientCache.has(clientId)) {
-      return this.clientCache.get(clientId);
-    }
-
-    const config = this.configManager.getConfig();
-
-    if (clientId === config.clientId) {
-      const metadata = await this.configManager.fetchMetadata();
-      const clientInfo: OAuthClientInformationFull = {
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        redirect_uris: [],
-        grant_types: metadata.grant_types_supported || [
-          'authorization_code',
-          'refresh_token',
-        ],
-        response_types: metadata.response_types_supported || ['code'],
-        token_endpoint_auth_method:
-          metadata.token_endpoint_auth_methods_supported?.[0] ||
-          'client_secret_basic',
-        scope: config.scopes.join(' '),
-      };
-
-      const validated = OAuthClientInformationFullSchema.parse(clientInfo);
-      this.clientCache.set(clientId, validated);
-      return validated;
-    }
-
-    return undefined;
-  }
-
-  clearClientCache(): void {
-    this.clientCache.clear();
-  }
-
-  /**
-   * Authenticates using device authorization grant flow
-   */
-  async authenticateDeviceFlow(sessionId: string): Promise<TokenResponse> {
-    const config = this.configManager.getConfig();
-    const metadata = await this.configManager.fetchMetadata();
-    const deviceFlow = new DeviceFlow(config, metadata);
-    const tokens = await deviceFlow.authenticate();
-    this.storeSessionTokens(sessionId, tokens);
-    return tokens;
-  }
-
-  /**
    * Stores OAuth tokens for a session and user
    */
   storeSessionTokens(
@@ -246,7 +158,10 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     tokens: TokenResponse,
     fallbackUserId?: string
   ): StoredToken {
-    const userId = this.resolveUserId(tokens.access_token, fallbackUserId || sessionId);
+    const userId = this.resolveUserId(
+      tokens.access_token,
+      fallbackUserId || sessionId
+    );
     const previousTokens = this.userTokens.get(userId);
 
     const storedToken: StoredToken = {
@@ -260,7 +175,10 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     this.userTokens.set(userId, storedToken);
     this.sessionToUser.set(sessionId, userId);
 
-    for (const [existingSessionId, mappedUser] of this.sessionToUser.entries()) {
+    for (const [
+      existingSessionId,
+      mappedUser,
+    ] of this.sessionToUser.entries()) {
       if (mappedUser === userId) {
         this.sessionTokens.set(existingSessionId, storedToken);
       }
@@ -351,6 +269,43 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     this.clearUserTokens(userId);
   }
 
+  /**
+   * Refreshes tokens for a session reactively (triggered by 401 error)
+   *
+   * This method is called when a request receives a 401 Unauthorized response,
+   * indicating the access token has expired. It attempts to use the refresh_token
+   * to obtain a new access_token without requiring user re-authentication.
+   *
+   * @param sessionId - Session that received 401 response
+   * @returns New access token for retrying the failed request
+   * @throws Error if session not authenticated or no refresh_token available
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   const newToken = await oauthProvider.refreshSessionToken(sessionId);
+   *   // Retry failed request with newToken
+   * } catch (error) {
+   *   // Refresh failed - user must re-authenticate
+   * }
+   * ```
+   */
+  async refreshSessionToken(sessionId: string): Promise<string> {
+    const userId = this.sessionToUser.get(sessionId);
+    if (!userId) {
+      throw new Error('Session not authenticated');
+    }
+
+    const tokens = this.userTokens.get(userId);
+    if (!tokens?.refresh_token) {
+      throw new Error('No refresh token available');
+    }
+
+    // Use existing refresh logic (handles deduplication, storage, cross-session updates)
+    const refreshed = await this.refreshTokens(userId, sessionId, tokens);
+    return refreshed.access_token;
+  }
+
   async getToken(sessionId: string): Promise<string | null> {
     const tokens = await this.ensureSessionToken(sessionId);
     return tokens?.access_token || null;
@@ -369,7 +324,9 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       expiresAt:
-        expiresAt ?? Date.now() + (tokens.expires_in ? tokens.expires_in * 1000 : 3600 * 1000),
+        expiresAt ??
+        Date.now() +
+          (tokens.expires_in ? tokens.expires_in * 1000 : 3600 * 1000),
     };
   }
 
@@ -383,38 +340,69 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     return expiresAt ? new Date(expiresAt).toISOString() : null;
   }
 
-  async getTokenScopes(sessionId: string): Promise<string[] | null> {
-    const tokens = await this.ensureSessionToken(sessionId);
-    if (!tokens) {
-      return null;
+  /**
+   * Extracts OAuth scopes from a session's access token.
+   *
+   * Decodes the JWT access token and extracts the scope claim from the payload.
+   * Handles both space-separated string format (e.g., "profile content:read")
+   * and array format (e.g., ["profile", "content:read"]).
+   *
+   * @param sessionId - Session identifier
+   * @returns Array of scope strings granted to the session, or empty array if session not found
+   */
+  async getTokenScopes(sessionId: string): Promise<string[]> {
+    try {
+      const tokens = await this.ensureSessionToken(sessionId);
+      if (!tokens) {
+        return [];
+      }
+
+      // Decode JWT to extract scope claim from payload
+      const payload = this.decodeJwtPayload(tokens.access_token);
+      const scopeClaim = payload.scope;
+
+      if (!scopeClaim) {
+        return [];
+      }
+
+      // Handle both string (space-separated) and array formats
+      if (typeof scopeClaim === 'string') {
+        return scopeClaim.split(/\s+/).filter(s => s.length > 0);
+      } else if (Array.isArray(scopeClaim)) {
+        return scopeClaim.filter(s => typeof s === 'string' && s.length > 0);
+      }
+
+      return [];
+    } catch (error) {
+      debugOAuth(
+        `Failed to extract scopes for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Decodes JWT payload without verification
+   * @private
+   */
+  private decodeJwtPayload(token: string): Record<string, unknown> {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error('Invalid JWT format: expected 3 parts');
     }
 
-    const scopeSource = tokens.scope || this.configManager.getConfig().scopes.join(' ');
-    return scopeSource.split(/[\s,]+/).filter(scope => scope.length > 0);
+    const payload = parts[1];
+    if (!payload) {
+      throw new Error('Invalid JWT format: missing payload');
+    }
+
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'));
   }
 
   /**
    * Clears the session and removes stored tokens for that session
    */
   async clearSession(sessionId: string): Promise<void> {
-    const tokenResponse = this.sessionTokens.get(sessionId);
-
-    if (tokenResponse && this.revokeToken) {
-      try {
-        const clientInfo = await this.getClientInfo(
-          this.configManager.getConfig().clientId
-        );
-        if (clientInfo) {
-          await this.revokeToken(clientInfo, {
-            token: tokenResponse.access_token,
-            token_type_hint: 'access_token',
-          });
-        }
-      } catch (error) {
-        console.error('Token revocation failed:', error);
-      }
-    }
-
     this.sessionTokens.delete(sessionId);
     this.sessionToUser.delete(sessionId);
   }
@@ -467,10 +455,14 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
       expiresAt !== null &&
       Date.now() >= expiresAt - DrupalOAuthProvider.TOKEN_EXPIRY_SKEW_MS
     ) {
-      debugOAuth(`Token for user ${userId} is expired or near expiry. Attempting refresh.`);
+      debugOAuth(
+        `Token for user ${userId} is expired or near expiry. Attempting refresh.`
+      );
 
       if (!tokens.refresh_token) {
-        debugOAuth(`No refresh token available for user ${userId}. Clearing tokens.`);
+        debugOAuth(
+          `No refresh token available for user ${userId}. Clearing tokens.`
+        );
         this.clearUserTokens(userId);
         return null;
       }
@@ -480,10 +472,28 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
         expiresAt = this.calculateExpiresAt(tokens);
       } catch (error) {
         debugOAuth(
-          `Token refresh failed for user ${userId}: ${error instanceof Error ? error.message : String(error)}`
+          `Proactive refresh failed for user ${userId}: ${error instanceof Error ? error.message : String(error)}`
         );
-        this.clearUserTokens(userId);
-        throw new Error('Authentication expired. Please log in again.');
+
+        // Check if error is permanent (invalid_grant, invalid_token, unauthorized_client)
+        if (error instanceof Error && this.isPermanentAuthFailure(error)) {
+          debugOAuth(
+            `Permanent auth failure detected - clearing tokens for user ${userId}`
+          );
+          this.clearUserTokens(userId);
+          throw new Error('Authentication expired. Please log in again.');
+        }
+
+        // Temporary failure (network error, Drupal unavailable, etc.)
+        debugOAuth(
+          `Temporary proactive refresh failure - returning expired token. ` +
+            `Reactive refresh will handle 401. ` +
+            `Token expires: ${expiresAt ? new Date(expiresAt).toISOString() : 'unknown'}, ` +
+            `Refresh token available: ${!!tokens.refresh_token}`
+        );
+
+        // Continue with expired tokens - reactive refresh will catch it on actual 401
+        // Don't throw - let the request proceed and trigger reactive refresh
       }
     }
 
@@ -514,6 +524,23 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     return refreshPromise;
   }
 
+  /**
+   * Determines if an error represents a permanent authentication failure
+   * that requires user re-authentication (vs temporary network/server issues)
+   *
+   * @param error - Error from token refresh attempt
+   * @returns true if error is permanent (clear tokens), false if temporary (retry later)
+   */
+  private isPermanentAuthFailure(error: Error): boolean {
+    const permanentErrors = [
+      'invalid_grant', // Refresh token expired/revoked
+      'invalid_token', // Token malformed
+      'unauthorized_client', // Client not authorized
+    ];
+
+    return permanentErrors.some(code => error.message.includes(code));
+  }
+
   private async performTokenRefresh(
     sessionId: string,
     tokens: StoredToken
@@ -522,7 +549,6 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
       throw new Error('Refresh token is not available');
     }
 
-    const config = this.configManager.getConfig();
     const metadata = await this.configManager.fetchMetadata();
     const tokenEndpoint = metadata.token_endpoint;
 
@@ -530,15 +556,11 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
       throw new Error('Token endpoint not available in OAuth metadata');
     }
 
+    // OAuth 2.1 supports refresh without client credentials for public clients
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: tokens.refresh_token,
-      client_id: config.clientId,
     });
-
-    if (config.clientSecret) {
-      params.append('client_secret', config.clientSecret);
-    }
 
     const response = await fetch(tokenEndpoint, {
       method: 'POST',
@@ -552,24 +574,39 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     const responseText = await response.text();
 
     if (!response.ok) {
-      let errorMessage = `Token refresh failed: ${response.status} ${response.statusText}`;
       try {
         const errorJson = JSON.parse(responseText);
-        if (errorJson.error) {
-          errorMessage = `Token refresh failed: ${errorJson.error}`;
-          if (errorJson.error_description) {
-            errorMessage += ` - ${errorJson.error_description}`;
-          }
-        }
+        const errorCode = errorJson.error || 'unknown';
+        const errorDesc = errorJson.error_description || response.statusText;
+
+        // Log the specific OAuth error for debugging
+        debugOAuth(
+          `Token refresh failed with OAuth error: ${errorCode} - ${errorDesc}. ` +
+            `HTTP ${response.status}`
+        );
+
+        // Structured error format enables error classification
+        throw new Error(`${errorCode}: ${errorDesc}`);
       } catch {
-        if (responseText) {
-          errorMessage += ` - ${responseText}`;
-        }
+        debugOAuth(
+          `Token refresh failed with non-JSON response: ${response.status} ${response.statusText}`
+        );
+        // Fallback for non-JSON responses
+        throw new Error(
+          `unknown: Token refresh failed - ${response.status} ${response.statusText}`
+        );
       }
-      throw new Error(errorMessage);
     }
 
     const refreshed = JSON.parse(responseText) as TokenResponse;
+
+    // Log successful refresh with new token expiry
+    debugOAuth(
+      `Token refresh successful for session ${sessionId}. ` +
+        `New token expires in ${refreshed.expires_in || 3600}s ` +
+        `(${new Date(Date.now() + (refreshed.expires_in || 3600) * 1000).toISOString()})`
+    );
+
     const normalizedTokens: TokenResponse = {
       access_token: refreshed.access_token,
       token_type: refreshed.token_type || tokens.token_type,

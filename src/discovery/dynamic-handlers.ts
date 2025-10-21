@@ -10,10 +10,14 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
   type CallToolResult,
+  McpError,
+  ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
 import { convertJsonSchemaToZod } from 'zod-from-json-schema';
 import type { z } from 'zod';
 import type { ToolDefinition } from './tool-discovery.js';
+import { getAuthLevel, validateToolAccess } from './tool-discovery.js';
+import type { DrupalOAuthProvider } from '../oauth/provider.js';
 
 interface DynamicToolContext {
   tool: ToolDefinition;
@@ -32,6 +36,64 @@ export interface Session {
   accessToken: string;
   refreshToken?: string;
   expiresAt: number;
+}
+
+/**
+ * Validates tool access for a session.
+ *
+ * @param tool - Tool definition
+ * @param oauthProvider - OAuth provider instance (optional)
+ * @param sessionId - Session identifier (optional)
+ * @throws McpError if access is denied
+ */
+async function validateToolAccessForSession(
+  tool: ToolDefinition,
+  oauthProvider?: DrupalOAuthProvider,
+  sessionId?: string
+): Promise<void> {
+  const authMetadata = tool.annotations?.auth;
+  const authLevel = getAuthLevel(authMetadata);
+
+  // Allow access if auth level is 'none'
+  if (authLevel === 'none') {
+    return;
+  }
+
+  // For 'optional' auth, allow access without provider/session
+  if (authLevel === 'optional') {
+    return;
+  }
+
+  // For 'required' auth, enforce authentication
+  if (authLevel === 'required') {
+    // Require OAuth provider and session
+    if (!oauthProvider || !sessionId) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Tool "${tool.name}" requires authentication. Please authenticate first.`
+      );
+    }
+
+    // Get session scopes
+    const sessionScopes = await oauthProvider.getTokenScopes(sessionId);
+
+    if (!sessionScopes || sessionScopes.length === 0) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Tool "${tool.name}" requires authentication. No valid session found.`
+      );
+    }
+
+    // Validate scopes
+    try {
+      validateToolAccess(tool, sessionScopes);
+    } catch (error) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        error instanceof Error ? error.message : 'Access denied'
+      );
+    }
+  }
 }
 
 /**
@@ -87,6 +149,8 @@ function convertToolSchemas(
  * @param tools - Array of discovered tool definitions
  * @param makeRequest - Function to invoke tools via A2A /mcp/tools/invoke endpoint
  * @param getSession - Function to retrieve session tokens
+ * @param localHandlers - Map of local tool handlers (optional)
+ * @param oauthProvider - OAuth provider instance for scope validation (optional)
  */
 export function registerDynamicTools(
   server: Server,
@@ -94,10 +158,12 @@ export function registerDynamicTools(
   makeRequest: (
     toolName: string,
     params: unknown,
-    token?: string
+    token?: string,
+    sessionId?: string
   ) => Promise<unknown>,
   getSession: (sessionId: string) => Promise<Session | null>,
-  localHandlers: Map<string, LocalToolHandler> = new Map()
+  localHandlers: Map<string, LocalToolHandler> = new Map(),
+  oauthProvider?: DrupalOAuthProvider
 ): void {
   // Convert schemas and create tool contexts
   const toolContexts = convertToolSchemas(tools);
@@ -119,6 +185,15 @@ export function registerDynamicTools(
       const availableTools = Array.from(toolContexts.keys()).join(', ');
       throw new Error(
         `Unknown tool: "${toolName}". Available tools: ${availableTools}`
+      );
+    }
+
+    // Validate tool access based on session scopes BEFORE parameter validation
+    if (context) {
+      await validateToolAccessForSession(
+        context.tool,
+        oauthProvider,
+        extra?.sessionId
       );
     }
 
@@ -161,7 +236,8 @@ export function registerDynamicTools(
       const result = await makeRequest(
         context.tool.name,
         validatedParams,
-        accessToken
+        accessToken,
+        sessionId // Pass sessionId for reactive refresh
       );
 
       // Format response for MCP

@@ -28,7 +28,7 @@
     "<rootDir>/tests/unit/**/*.spec.ts"
   ],
   "testPathIgnorePatterns": ["/node_modules/", "/dist/", "/coverage/", "tests/integration/", "tests/mcp/"],
-  "transformIgnorePatterns": ["node_modules/(?!(@modelcontextprotocol/sdk)/)"],
+  "transformIgnorePatterns": ["node_modules/(?!(@modelcontextprotocol/sdk|jose)/)"],
   "setupFilesAfterEnv": ["<rootDir>/tests/unit/setup.ts"],
   "collectCoverage": false,
   "coverageDirectory": "coverage",

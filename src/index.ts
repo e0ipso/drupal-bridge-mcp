@@ -9,6 +9,7 @@ import express, { type Application } from 'express';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { mcpAuthMetadataRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
+import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -17,6 +18,30 @@ import { dirname, join } from 'node:path';
 import debug from 'debug';
 import pinoHttp from 'pino-http';
 import { logger, requestSerializer } from './utils/logger.js';
+import {
+  createDrupalOAuthProvider,
+  createOAuthConfigFromEnv,
+  DrupalOAuthProvider,
+  OAuthConfigManager,
+} from '@/oauth/index.js';
+
+// Discovery imports
+import {
+  discoverTools,
+  extractRequiredScopes,
+  type LocalToolHandler,
+  registerDynamicTools,
+  type ToolDefinition,
+} from '@/discovery/index.js';
+
+// Console utilities
+import {
+  printInfo,
+  printSection,
+  printStartupBanner,
+  printSuccess,
+  printWarning,
+} from './utils/console.js';
 
 // Debug loggers
 const debugRequestIn = debug('mcp:request:in');
@@ -29,37 +54,6 @@ const packageJson = JSON.parse(
   readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')
 );
 const PKG_VERSION = packageJson.version;
-import {
-  OAuthConfigManager,
-  createOAuthConfigFromEnv,
-} from './oauth/config.js';
-import {
-  DrupalOAuthProvider,
-  createDrupalOAuthProvider,
-} from './oauth/provider.js';
-import { DrupalConnector } from './drupal/connector.js';
-import { DeviceFlow } from './oauth/device-flow.js';
-import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
-
-// Discovery imports
-import {
-  getDiscoveredTools,
-  registerDynamicTools,
-  type ToolDefinition,
-  type LocalToolHandler,
-} from './discovery/index.js';
-
-// Local tools
-import { authLogin } from './tools/auth/login.js';
-
-// Console utilities
-import {
-  printSection,
-  printSuccess,
-  printInfo,
-  printWarning,
-  printStartupBanner,
-} from './utils/console.js';
 
 /**
  * Discovered tool definitions from /mcp/tools/list endpoint
@@ -115,7 +109,6 @@ export class DrupalMCPHttpServer {
   private config: HttpServerConfig;
   private oauthConfigManager?: OAuthConfigManager;
   private oauthProvider?: DrupalOAuthProvider;
-  private drupalConnector?: DrupalConnector;
 
   // Session capabilities (ephemeral)
   private sessionCapabilities: Map<string, ClientCapabilities> = new Map();
@@ -209,81 +202,13 @@ export class DrupalMCPHttpServer {
         },
         serializers: {
           req: req =>
-            requestSerializer(req as any, {
+            requestSerializer(req, {
               includeHeaders: true,
               includeBody: false,
             }),
         },
       })
     );
-  }
-
-  /**
-   * Initializes OAuth if enabled
-   */
-  private async initializeOAuth(): Promise<void> {
-    if (!this.config.enableAuth) {
-      console.log('OAuth authentication is disabled');
-      return;
-    }
-
-    try {
-      // Create OAuth configuration from environment
-      const oauthConfig = createOAuthConfigFromEnv();
-      this.oauthConfigManager = new OAuthConfigManager(oauthConfig);
-
-      // Fetch metadata to validate configuration
-      const metadata = await this.oauthConfigManager.fetchMetadata();
-      printSuccess('OAuth metadata discovered successfully');
-      printInfo(`Issuer: ${metadata.issuer}`, 2);
-      printInfo(`Authorization: ${metadata.authorization_endpoint}`, 2);
-      printInfo(`Token: ${metadata.token_endpoint}`, 2);
-
-      // Create OAuth provider and Drupal connector as shared instances
-      this.oauthProvider = createDrupalOAuthProvider(this.oauthConfigManager);
-      this.drupalConnector = new DrupalConnector();
-
-      // Set up OAuth metadata router
-      // Use the MCP server's URL as the resource server URL, not Drupal's URL
-      const resourceServerUrl = new URL(
-        `http://${this.config.host}:${this.config.port}`
-      );
-
-      printInfo('🔧 Setting up OAuth metadata router...');
-      printInfo(`Resource server: ${resourceServerUrl.href}`, 2);
-      printInfo(`Expected well-known endpoints:`, 2);
-      const rsPath = resourceServerUrl.pathname;
-      const wellKnownPath = `/.well-known/oauth-protected-resource${rsPath === '/' ? '' : rsPath}`;
-      printInfo(`- ${resourceServerUrl.origin}${wellKnownPath}`, 4);
-      printInfo(
-        `- ${resourceServerUrl.origin}/.well-known/oauth-authorization-server`,
-        4
-      );
-
-      this.app.use(
-        mcpAuthMetadataRouter({
-          oauthMetadata: metadata,
-          resourceServerUrl,
-          scopesSupported: oauthConfig.scopes,
-          resourceName: this.config.name,
-        })
-      );
-
-      printSuccess('OAuth authentication initialized');
-      printInfo(`Resource server: ${resourceServerUrl}`, 2);
-      printInfo(`Scopes: ${oauthConfig.scopes.join(', ')}`, 2);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      printWarning(`OAuth initialization failed: ${errorMessage}`);
-      printInfo(
-        'Server will start without OAuth. Check DRUPAL_BASE_URL and network.',
-        2
-      );
-      printInfo('To disable this warning, set AUTH_ENABLED=false', 2);
-      // Don't throw - allow server to start without OAuth
-      this.config.enableAuth = false;
-    }
   }
 
   /**
@@ -323,7 +248,8 @@ export class DrupalMCPHttpServer {
       discoveredToolDefinitions,
       this.makeRequest.bind(this),
       this.getSession.bind(this),
-      this.localToolHandlers
+      this.localToolHandlers,
+      this.oauthProvider
     );
 
     // Create transport
@@ -337,9 +263,7 @@ export class DrupalMCPHttpServer {
         `${this.config.host}:${this.config.port}`,
       ],
       onsessionclosed: async (closedSessionId: string) => {
-        const userId = this.oauthProvider?.getUserIdForSession(
-          closedSessionId
-        );
+        const userId = this.oauthProvider?.getUserIdForSession(closedSessionId);
         console.log(
           `Session closed: ${closedSessionId} (user: ${userId || 'unauthenticated'})`
         );
@@ -399,18 +323,84 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Invoke a tool via A2A /mcp/tools/invoke endpoint
+   * Invoke a tool via A2A /mcp/tools/invoke endpoint with automatic token refresh on 401
    * Used by dynamic tool handlers
+   *
+   * @param toolName - Name of the tool to invoke
+   * @param params - Tool parameters
+   * @param token - OAuth access token (optional)
+   * @param sessionId - Session ID for token refresh (optional)
+   * @returns Tool invocation result
    */
   private async makeRequest(
     toolName: string,
     params: unknown,
-    token?: string
+    token?: string,
+    sessionId?: string
   ): Promise<unknown> {
-    if (!this.drupalConnector) {
-      throw new Error('Drupal connector not initialized');
+    const response = await this.performRequest(toolName, params, token);
+
+    // Detect 401 and attempt reactive refresh
+    if (response.status === 401 && sessionId && this.oauthProvider) {
+      debugOAuth(
+        `401 response for session ${sessionId} - attempting reactive refresh`
+      );
+
+      try {
+        // Attempt to refresh token for this session
+        const newToken =
+          await this.oauthProvider.refreshSessionToken(sessionId);
+
+        debugOAuth(
+          `Reactive refresh successful for session ${sessionId} - retrying request`
+        );
+
+        // Retry request with new token (max 1 retry)
+        const retryResponse = await this.performRequest(
+          toolName,
+          params,
+          newToken
+        );
+
+        if (!retryResponse.ok) {
+          throw new Error(
+            `Retry failed: HTTP ${retryResponse.status} ${retryResponse.statusText}`
+          );
+        }
+
+        return retryResponse.json();
+      } catch (refreshError) {
+        // Refresh failed - throw original 401 error with context
+        const errorMsg =
+          refreshError instanceof Error
+            ? refreshError.message
+            : String(refreshError);
+        throw new Error(`Authentication failed: ${errorMsg}`);
+      }
     }
 
+    if (!response.ok) {
+      throw new Error(
+        `Tool invocation failed: HTTP ${response.status} ${response.statusText}`
+      );
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Perform HTTP request to Drupal (extracted for retry logic)
+   *
+   * @param toolName - Name of the tool to invoke
+   * @param params - Tool parameters
+   * @param token - OAuth access token (optional)
+   * @returns Raw fetch Response object
+   */
+  private async performRequest(
+    toolName: string,
+    params: unknown,
+    token?: string
+  ): Promise<Response> {
     // Build headers - include auth if available
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -422,7 +412,7 @@ export class DrupalMCPHttpServer {
 
     // Use A2A standard /mcp/tools/invoke endpoint
     const endpoint = process.env.DRUPAL_JSONRPC_ENDPOINT || '/mcp/tools/invoke';
-    const response = await fetch(`${process.env.DRUPAL_BASE_URL}${endpoint}`, {
+    return fetch(`${process.env.DRUPAL_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -430,17 +420,6 @@ export class DrupalMCPHttpServer {
         arguments: params,
       }),
     });
-
-    if (!response.ok) {
-      throw new Error(
-        `Tool invocation failed: HTTP ${response.status} ${response.statusText}`
-      );
-    }
-
-    const result = await response.json();
-
-    // A2A response is direct result (no JSON-RPC envelope)
-    return result;
   }
 
   /**
@@ -457,9 +436,8 @@ export class DrupalMCPHttpServer {
     }
 
     try {
-      const authorization = await this.oauthProvider.getSessionAuthorization(
-        sessionId
-      );
+      const authorization =
+        await this.oauthProvider.getSessionAuthorization(sessionId);
 
       if (!authorization) {
         debugOAuth(
@@ -480,47 +458,6 @@ export class DrupalMCPHttpServer {
       );
       throw error;
     }
-  }
-
-  /**
-   * Handles device flow authentication for a session
-   * @param {string} sessionId Session identifier
-   * @returns {Promise<void>} Resolves when authentication succeeds
-   * @throws {Error} If device flow is not appropriate or authentication fails
-   */
-  async handleDeviceFlow(sessionId: string): Promise<void> {
-    if (!DeviceFlow.shouldUseDeviceFlow()) {
-      throw new Error(
-        'Device flow not appropriate for this environment. ' +
-          'Set OAUTH_FORCE_DEVICE_FLOW=true to force device flow usage.'
-      );
-    }
-
-    if (!this.oauthProvider) {
-      throw new Error('OAuth provider not initialized');
-    }
-
-    try {
-      await this.oauthProvider.authenticateDeviceFlow(sessionId);
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Device flow authentication failed: ${error.message}`);
-      }
-      throw new Error('Device flow authentication failed: Unknown error');
-    }
-  }
-
-  /**
-   * Handles browser-based OAuth flow for a session
-   * @param {string} sessionId Session identifier
-   * @returns {Promise<void>}
-   * @throws {Error} If browser flow is not implemented
-   */
-  async handleBrowserFlow(_sessionId: string): Promise<void> {
-    throw new Error(
-      'Browser-based OAuth flow not yet implemented. ' +
-        'Use device flow for headless environments by setting OAUTH_FORCE_DEVICE_FLOW=true.'
-    );
   }
 
   /**
@@ -559,22 +496,23 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Initializes authentication for a session
-   * @param {string} sessionId Session identifier
-   * @returns {Promise<void>}
+   * Validates that requested scopes are supported by the OAuth server.
    */
-  async initializeAuthentication(sessionId: string): Promise<void> {
-    if (!this.config.enableAuth) {
-      console.log('OAuth authentication is disabled');
-      return;
-    }
+  private validateScopes(
+    requestedScopes: string[],
+    supportedScopes: string[]
+  ): void {
+    const unsupportedScopes = requestedScopes.filter(
+      scope => !supportedScopes.includes(scope)
+    );
 
-    if (DeviceFlow.shouldUseDeviceFlow()) {
-      console.log('Using device flow for authentication');
-      await this.handleDeviceFlow(sessionId);
-    } else {
-      console.log('Using browser-based flow for authentication');
-      await this.handleBrowserFlow(sessionId);
+    if (unsupportedScopes.length > 0) {
+      printWarning(
+        'Some requested scopes are not supported by the OAuth server:'
+      );
+      printInfo(`Unsupported: ${unsupportedScopes.join(', ')}`, 2);
+      printInfo(`Supported: ${supportedScopes.join(', ')}`, 2);
+      printInfo('These scopes will be ignored during authentication.', 2);
     }
   }
 
@@ -776,13 +714,7 @@ export class DrupalMCPHttpServer {
    */
   async start(): Promise<void> {
     try {
-      // Initialize OAuth if enabled
-      await this.initializeOAuth();
-
-      // ========== NEW: Tool Discovery ==========
-      printSection('Discovering Tools', '🔍');
-
-      // Discover dynamic tools from Drupal.
+      // Step 1: Validate DRUPAL_BASE_URL early
       const DRUPAL_BASE_URL = process.env.DRUPAL_BASE_URL;
       if (!DRUPAL_BASE_URL) {
         printWarning('DRUPAL_BASE_URL environment variable is required');
@@ -791,9 +723,19 @@ export class DrupalMCPHttpServer {
         process.exit(1);
       }
 
+      // Step 2: Create initial OAuth config
+      printInfo('Initializing OAuth configuration...', 1);
+      const oauthConfig = createOAuthConfigFromEnv();
+      const configManager = new OAuthConfigManager(oauthConfig);
+
+      // Step 3: Discover tools BEFORE OAuth initialization
+      printSection('Discovering Tools', '🔍');
       let tools: ToolDefinition[];
       try {
-        tools = await getDiscoveredTools(DRUPAL_BASE_URL);
+        tools = await discoverTools(
+          DRUPAL_BASE_URL,
+          undefined // No token for initial discovery
+        );
       } catch (error) {
         printWarning('FATAL: Tool discovery failed');
         printInfo(
@@ -827,48 +769,103 @@ export class DrupalMCPHttpServer {
         );
       });
 
-      // Discover local tools.
-      this.localToolHandlers.clear();
-      if (this.config.enableAuth && this.oauthProvider) {
-        const authLoginTool: ToolDefinition = {
-          name: 'auth_login',
-          description:
-            'Authenticate the current session using the device authorization flow.',
-          inputSchema: {
-            type: 'object',
-            description: 'No parameters required.',
-            properties: {},
-            additionalProperties: false,
-          },
-        };
+      // Step 4: Extract scopes from discovered tools + additional scopes
+      const discoveredScopes = extractRequiredScopes(
+        tools,
+        oauthConfig.additionalScopes
+      );
 
-        if (!tools.some(tool => tool.name === authLoginTool.name)) {
-          tools.push(authLoginTool);
-        }
+      printInfo(
+        `Extracted ${discoveredScopes.length} scopes from tool definitions`,
+        2
+      );
 
-        this.localToolHandlers.set('auth_login', async (_params, extra) => {
-          const sessionId = extra.sessionId;
-          if (!sessionId) {
-            throw new Error('Session ID is required to execute auth_login');
-          }
-
-          return authLogin(
-            {},
-            {
-              sessionId,
-              oauthProvider: this.oauthProvider!,
-            }
-          );
-        });
+      if (oauthConfig.additionalScopes.length > 0) {
+        printInfo(
+          `Additional scopes: ${oauthConfig.additionalScopes.join(', ')}`,
+          2
+        );
       }
 
-      // Store tools for ListToolsRequest handler
-      setDiscoveredTools(tools);
+      printInfo(`Total scopes: ${discoveredScopes.join(', ')}`, 2);
 
-      // Note: Dynamic handlers are registered per-session in createSessionInstance()
+      // Step 5: Update config with discovered + additional scopes
+      configManager.updateScopes(discoveredScopes);
+
+      // Step 6: Store tools for ListToolsRequest handler
+      setDiscoveredTools(tools);
       printSuccess('Tool definitions stored for per-session registration');
 
-      // ========== END: Tool Discovery ==========
+      // Step 7: Initialize OAuth with correct scopes (if enabled)
+      if (this.config.enableAuth) {
+        try {
+          printInfo('Initializing OAuth provider...', 1);
+          this.oauthProvider = createDrupalOAuthProvider(configManager);
+          this.oauthConfigManager = configManager;
+
+          // Step 8: Fetch OAuth metadata
+          const metadata = await configManager.fetchMetadata();
+
+          printSuccess('OAuth metadata discovered successfully');
+          printInfo(`Issuer: ${metadata.issuer}`, 2);
+          printInfo(`Authorization: ${metadata.authorization_endpoint}`, 2);
+          printInfo(`Token: ${metadata.token_endpoint}`, 2);
+
+          // Step 9: Validate scopes against server's supported scopes
+          if (metadata.scopes_supported) {
+            this.validateScopes(
+              configManager.getConfig().scopes,
+              metadata.scopes_supported
+            );
+          }
+
+          // Set up OAuth metadata router
+          // Use the MCP server's URL as the resource server URL, not Drupal's URL
+          const resourceServerUrl = new URL(
+            `http://${this.config.host}:${this.config.port}`
+          );
+
+          printInfo('🔧 Setting up OAuth metadata router...');
+          printInfo(`Resource server: ${resourceServerUrl.href}`, 2);
+          printInfo(`Expected well-known endpoints:`, 2);
+          const rsPath = resourceServerUrl.pathname;
+          const wellKnownPath = `/.well-known/oauth-protected-resource${rsPath === '/' ? '' : rsPath}`;
+          printInfo(`- ${resourceServerUrl.origin}${wellKnownPath}`, 4);
+          printInfo(
+            `- ${resourceServerUrl.origin}/.well-known/oauth-authorization-server`,
+            4
+          );
+
+          this.app.use(
+            mcpAuthMetadataRouter({
+              oauthMetadata: metadata,
+              resourceServerUrl,
+              scopesSupported: configManager.getConfig().scopes,
+              resourceName: this.config.name,
+            })
+          );
+
+          printSuccess('OAuth authentication initialized');
+          printInfo(`Resource server: ${resourceServerUrl}`, 2);
+          printInfo(
+            `Scopes: ${configManager.getConfig().scopes.join(', ')}`,
+            2
+          );
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : 'Unknown error';
+          printWarning(`OAuth initialization failed: ${errorMessage}`);
+          printInfo(
+            'Server will start without OAuth. Check DRUPAL_BASE_URL and network.',
+            2
+          );
+          printInfo('To disable this warning, set AUTH_ENABLED=false', 2);
+          // Don't throw - allow server to start without OAuth
+          this.config.enableAuth = false;
+        }
+      } else {
+        console.log('OAuth authentication is disabled');
+      }
 
       // Set up MCP endpoint
       printInfo('🚀 Setting up MCP endpoint...');
@@ -937,7 +934,7 @@ export class DrupalMCPHttpServer {
               port: this.config.port,
               authEnabled: this.config.enableAuth,
               oauthServer: this.oauthConfigManager?.getConfig().drupalUrl,
-              oauthClient: this.oauthConfigManager?.getConfig().clientId,
+              oauthClient: undefined,
               toolsCount: discoveredToolDefinitions.length,
             });
             resolve();

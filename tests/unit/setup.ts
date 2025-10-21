@@ -7,8 +7,6 @@
 // Set test environment variables
 process.env.NODE_ENV = 'test';
 process.env.DRUPAL_URL = 'https://test-drupal.example.com';
-process.env.OAUTH_CLIENT_ID = 'test-client-id';
-process.env.OAUTH_CLIENT_SECRET = 'test-client-secret';
 process.env.OAUTH_SCOPES = 'profile read:content';
 
 // Mock console methods to reduce noise in tests

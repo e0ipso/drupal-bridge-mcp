@@ -82,8 +82,6 @@ Environment variables are set in `setup.ts`:
 
 ```typescript
 process.env.DRUPAL_URL = 'https://test-drupal.example.com';
-process.env.OAUTH_CLIENT_ID = 'test-client-id';
-process.env.OAUTH_CLIENT_SECRET = 'test-client-secret';
 process.env.OAUTH_SCOPES = 'profile read:content';
 ```
 

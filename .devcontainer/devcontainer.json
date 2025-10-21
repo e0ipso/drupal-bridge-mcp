@@ -37,14 +37,14 @@
         "com.anthropic.code.plugin",
         "IdeaVIM",
         "org.jetbrains.IdeaVim-EasyMotion",
-        "org.jetbrains.plugins.github",
-        "zielu.gitworktree"
+        "org.jetbrains.plugins.github"
       ]
     }
   },
   "remoteUser": "node",
   "mounts": [
     "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
+    "source=${localWorkspaceFolder}/../worktrees,target=/worktrees,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.claude/CLAUDE.md,target=/home/node/.claude/CLAUDE.md,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.gemini/GEMINI.md,target=/home/node/.gemini/GEMINI.md,type=bind,consistency=cached",
     "source=${localEnv:HOME}/.claude.json,target=/home/node/.claude.json,type=bind,consistency=cached",
@@ -61,7 +61,7 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
-  "postCreateCommand": "mkdir -p /home/node/.claude/debug /home/node/.gemini && sudo chown -R node:node /home/node/.claude /home/node/.gemini",
+  "postCreateCommand": "sudo chown -R node:node /home/node/.claude /home/node/.gemini || true",
   "postStartCommand": "npm update -g @anthropic-ai/claude-code && npm update -g @google/gemini-cli",
   "waitFor": "postStartCommand"
 }

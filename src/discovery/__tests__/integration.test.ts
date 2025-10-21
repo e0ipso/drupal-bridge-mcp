@@ -488,6 +488,7 @@ describe('Tool Invocation and OAuth', () => {
     expect(mockMakeRequest).toHaveBeenCalledWith(
       'test_tool_simple',
       { message: 'Hello' },
+      undefined,
       undefined
     );
     expect(result.content[0]?.text).toContain('success');
@@ -532,7 +533,8 @@ describe('Tool Invocation and OAuth', () => {
     expect(mockMakeRequest).toHaveBeenCalledWith(
       'test_tool_auth',
       { data: 'secure-data' },
-      'test-oauth-token'
+      'test-oauth-token',
+      'test-session-123'
     );
     expect(result.content[0]?.text).toContain('authenticated success');
   });
@@ -567,6 +569,7 @@ describe('Tool Invocation and OAuth', () => {
     expect(mockMakeRequest).toHaveBeenCalledWith(
       'test_tool_auth',
       { data: 'secure-data' },
+      undefined,
       undefined
     );
   });
@@ -605,7 +608,8 @@ describe('Tool Invocation and OAuth', () => {
     expect(mockMakeRequest).toHaveBeenCalledWith(
       'test_tool_auth',
       { data: 'secure-data' },
-      undefined
+      undefined,
+      'expired-session'
     );
   });
 
