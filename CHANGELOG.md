@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.9.0...v1.10.0) (2025-10-21)
+
+
+### Features
+
+* update MCP to use HTTP ([43b1e49](https://github.com/e0ipso/drupal-bridge-mcp/commit/43b1e49dca17cafc93fa44fe430e08f69f512d38))
+
 # [1.9.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.8.0...v1.9.0) (2025-10-21)
 
 
