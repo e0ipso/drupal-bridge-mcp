@@ -579,9 +579,18 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
         const errorCode = errorJson.error || 'unknown';
         const errorDesc = errorJson.error_description || response.statusText;
 
+        // Log the specific OAuth error for debugging
+        debugOAuth(
+          `Token refresh failed with OAuth error: ${errorCode} - ${errorDesc}. ` +
+            `HTTP ${response.status}`
+        );
+
         // Structured error format enables error classification
         throw new Error(`${errorCode}: ${errorDesc}`);
       } catch {
+        debugOAuth(
+          `Token refresh failed with non-JSON response: ${response.status} ${response.statusText}`
+        );
         // Fallback for non-JSON responses
         throw new Error(
           `unknown: Token refresh failed - ${response.status} ${response.statusText}`
@@ -590,6 +599,14 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     }
 
     const refreshed = JSON.parse(responseText) as TokenResponse;
+
+    // Log successful refresh with new token expiry
+    debugOAuth(
+      `Token refresh successful for session ${sessionId}. ` +
+        `New token expires in ${refreshed.expires_in || 3600}s ` +
+        `(${new Date(Date.now() + (refreshed.expires_in || 3600) * 1000).toISOString()})`
+    );
+
     const normalizedTokens: TokenResponse = {
       access_token: refreshed.access_token,
       token_type: refreshed.token_type || tokens.token_type,
