@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.8.0...v1.9.0) (2025-10-21)
+
+
+### Features
+
+* OAuth resource server architecture and scope-aware tool discovery ([#3](https://github.com/e0ipso/drupal-bridge-mcp/issues/3)) ([e26f4bb](https://github.com/e0ipso/drupal-bridge-mcp/commit/e26f4bb17f9b2c39676a98ef02b8ffe9af5e63aa))
+
 # [1.8.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.7.0...v1.8.0) (2025-10-14)
 
 
