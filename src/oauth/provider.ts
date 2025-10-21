@@ -269,6 +269,43 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     this.clearUserTokens(userId);
   }
 
+  /**
+   * Refreshes tokens for a session reactively (triggered by 401 error)
+   *
+   * This method is called when a request receives a 401 Unauthorized response,
+   * indicating the access token has expired. It attempts to use the refresh_token
+   * to obtain a new access_token without requiring user re-authentication.
+   *
+   * @param sessionId - Session that received 401 response
+   * @returns New access token for retrying the failed request
+   * @throws Error if session not authenticated or no refresh_token available
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   const newToken = await oauthProvider.refreshSessionToken(sessionId);
+   *   // Retry failed request with newToken
+   * } catch (error) {
+   *   // Refresh failed - user must re-authenticate
+   * }
+   * ```
+   */
+  async refreshSessionToken(sessionId: string): Promise<string> {
+    const userId = this.sessionToUser.get(sessionId);
+    if (!userId) {
+      throw new Error('Session not authenticated');
+    }
+
+    const tokens = this.userTokens.get(userId);
+    if (!tokens?.refresh_token) {
+      throw new Error('No refresh token available');
+    }
+
+    // Use existing refresh logic (handles deduplication, storage, cross-session updates)
+    const refreshed = await this.refreshTokens(userId, sessionId, tokens);
+    return refreshed.access_token;
+  }
+
   async getToken(sessionId: string): Promise<string | null> {
     const tokens = await this.ensureSessionToken(sessionId);
     return tokens?.access_token || null;
@@ -435,10 +472,28 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
         expiresAt = this.calculateExpiresAt(tokens);
       } catch (error) {
         debugOAuth(
-          `Token refresh failed for user ${userId}: ${error instanceof Error ? error.message : String(error)}`
+          `Proactive refresh failed for user ${userId}: ${error instanceof Error ? error.message : String(error)}`
         );
-        this.clearUserTokens(userId);
-        throw new Error('Authentication expired. Please log in again.');
+
+        // Check if error is permanent (invalid_grant, invalid_token, unauthorized_client)
+        if (error instanceof Error && this.isPermanentAuthFailure(error)) {
+          debugOAuth(
+            `Permanent auth failure detected - clearing tokens for user ${userId}`
+          );
+          this.clearUserTokens(userId);
+          throw new Error('Authentication expired. Please log in again.');
+        }
+
+        // Temporary failure (network error, Drupal unavailable, etc.)
+        debugOAuth(
+          `Temporary proactive refresh failure - returning expired token. ` +
+            `Reactive refresh will handle 401. ` +
+            `Token expires: ${expiresAt ? new Date(expiresAt).toISOString() : 'unknown'}, ` +
+            `Refresh token available: ${!!tokens.refresh_token}`
+        );
+
+        // Continue with expired tokens - reactive refresh will catch it on actual 401
+        // Don't throw - let the request proceed and trigger reactive refresh
       }
     }
 
