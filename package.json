@@ -11,7 +11,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "dev": "DEBUG=mcp:* tsx --env-file=.env src/server.ts",
     "start": "node --env-file=.env dist/server.js",
     "start:debug": "DEBUG=mcp:* node --env-file=.env dist/server.js",
@@ -56,6 +56,7 @@
     "prettier": "^3.6.2",
     "semantic-release": "^24.2.9",
     "ts-jest": "^29.2.5",
+    "tsc-alias": "^1.8.16",
     "tslib": "^2.8.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",

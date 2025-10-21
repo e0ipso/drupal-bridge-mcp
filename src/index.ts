@@ -9,6 +9,7 @@ import express, { type Application } from 'express';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { mcpAuthMetadataRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
+import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -17,6 +18,30 @@ import { dirname, join } from 'node:path';
 import debug from 'debug';
 import pinoHttp from 'pino-http';
 import { logger, requestSerializer } from './utils/logger.js';
+import {
+  createDrupalOAuthProvider,
+  createOAuthConfigFromEnv,
+  DrupalOAuthProvider,
+  OAuthConfigManager,
+} from '@/oauth';
+
+// Discovery imports
+import {
+  discoverTools,
+  extractRequiredScopes,
+  type LocalToolHandler,
+  registerDynamicTools,
+  type ToolDefinition,
+} from '@/discovery';
+
+// Console utilities
+import {
+  printInfo,
+  printSection,
+  printStartupBanner,
+  printSuccess,
+  printWarning,
+} from './utils/console.js';
 
 // Debug loggers
 const debugRequestIn = debug('mcp:request:in');
@@ -29,34 +54,6 @@ const packageJson = JSON.parse(
   readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')
 );
 const PKG_VERSION = packageJson.version;
-import {
-  OAuthConfigManager,
-  createOAuthConfigFromEnv,
-} from './oauth/config.js';
-import {
-  DrupalOAuthProvider,
-  createDrupalOAuthProvider,
-} from './oauth/provider.js';
-import { DrupalConnector } from './drupal/connector.js';
-import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
-
-// Discovery imports
-import {
-  discoverTools,
-  extractRequiredScopes,
-  registerDynamicTools,
-  type ToolDefinition,
-  type LocalToolHandler,
-} from './discovery/index.js';
-
-// Console utilities
-import {
-  printSection,
-  printSuccess,
-  printInfo,
-  printWarning,
-  printStartupBanner,
-} from './utils/console.js';
 
 /**
  * Discovered tool definitions from /mcp/tools/list endpoint
@@ -112,7 +109,6 @@ export class DrupalMCPHttpServer {
   private config: HttpServerConfig;
   private oauthConfigManager?: OAuthConfigManager;
   private oauthProvider?: DrupalOAuthProvider;
-  private drupalConnector?: DrupalConnector;
 
   // Session capabilities (ephemeral)
   private sessionCapabilities: Map<string, ClientCapabilities> = new Map();
@@ -335,10 +331,6 @@ export class DrupalMCPHttpServer {
     params: unknown,
     token?: string
   ): Promise<unknown> {
-    if (!this.drupalConnector) {
-      throw new Error('Drupal connector not initialized');
-    }
-
     // Build headers - include auth if available
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -751,7 +743,6 @@ export class DrupalMCPHttpServer {
           printInfo('Initializing OAuth provider...', 1);
           this.oauthProvider = createDrupalOAuthProvider(configManager);
           this.oauthConfigManager = configManager;
-          this.drupalConnector = new DrupalConnector();
 
           // Step 8: Fetch OAuth metadata
           const metadata = await configManager.fetchMetadata();
