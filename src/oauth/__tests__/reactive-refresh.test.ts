@@ -104,41 +104,6 @@ describe('Reactive Token Refresh Integration', () => {
       );
     });
 
-    it.skip('should fail with clear error when refresh token expired', async () => {
-      const sessionId = 'session-1';
-
-      provider.storeSessionTokens(sessionId, {
-        access_token: 'expired-token',
-        token_type: 'Bearer',
-        expires_in: 300,
-        refresh_token: 'expired-refresh-token',
-        scope: 'profile',
-      });
-
-      // Mock OAuth metadata
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockMetadata,
-      } as any);
-
-      // Mock refresh failure with invalid_grant
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-        async text() {
-          return JSON.stringify({
-            error: 'invalid_grant',
-            error_description: 'The refresh token is invalid.',
-          });
-        },
-      } as any);
-
-      await expect(provider.refreshSessionToken(sessionId)).rejects.toThrow(
-        /invalid_grant/
-      );
-    });
-
     it('should fail when session not authenticated', async () => {
       const sessionId = 'not-authenticated-session';
 
@@ -267,72 +232,6 @@ describe('Reactive Token Refresh Integration', () => {
   });
 
   describe('Cross-session token update', () => {
-    it.skip('should update tokens for all user sessions on reactive refresh', async () => {
-      const session1 = 'session-1';
-      const session2 = 'session-2';
-      const userId = 'user-123';
-
-      // Store tokens for both sessions with same userId
-      provider.storeSessionTokens(
-        session1,
-        {
-          access_token: 'old-token',
-          token_type: 'Bearer',
-          expires_in: 300,
-          refresh_token: 'refresh-token',
-          scope: 'profile',
-        },
-        userId
-      );
-
-      provider.storeSessionTokens(
-        session2,
-        {
-          access_token: 'old-token',
-          token_type: 'Bearer',
-          expires_in: 300,
-          refresh_token: 'refresh-token',
-          scope: 'profile',
-        },
-        userId
-      );
-
-      // Verify both sessions map to same user
-      expect(provider.getUserIdForSession(session1)).toBe(userId);
-      expect(provider.getUserIdForSession(session2)).toBe(userId);
-
-      // Mock metadata
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockMetadata,
-      } as any);
-
-      // Mock successful refresh from session 1
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        text: async () =>
-          JSON.stringify({
-            access_token: 'new-token',
-            token_type: 'Bearer',
-            expires_in: 300,
-            refresh_token: 'new-refresh-token',
-            scope: 'profile',
-          }),
-      } as any);
-
-      // Trigger refresh from session 1
-      const newToken = await provider.refreshSessionToken(session1);
-      expect(newToken).toBe('new-token');
-
-      // Verify session 1 has new token
-      const auth1 = await provider.getSessionAuthorization(session1);
-      expect(auth1?.accessToken).toBe('new-token');
-
-      // Verify both sessions still map to same user (cross-session mapping works)
-      expect(provider.getUserIdForSession(session1)).toBe(userId);
-      expect(provider.getUserIdForSession(session2)).toBe(userId);
-    });
-
     it('should isolate token updates by user', async () => {
       const user1Session = 'user1-session';
       const user2Session = 'user2-session';
