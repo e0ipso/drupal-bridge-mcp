@@ -348,7 +348,7 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
    * Decodes JWT payload without verification
    * @private
    */
-  private decodeJwtPayload(token: string): Record<string, any> {
+  private decodeJwtPayload(token: string): Record<string, unknown> {
     const parts = token.split('.');
     if (parts.length !== 3) {
       throw new Error('Invalid JWT format: expected 3 parts');
@@ -469,6 +469,23 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     return refreshPromise;
   }
 
+  /**
+   * Determines if an error represents a permanent authentication failure
+   * that requires user re-authentication (vs temporary network/server issues)
+   *
+   * @param error - Error from token refresh attempt
+   * @returns true if error is permanent (clear tokens), false if temporary (retry later)
+   */
+  private isPermanentAuthFailure(error: Error): boolean {
+    const permanentErrors = [
+      'invalid_grant', // Refresh token expired/revoked
+      'invalid_token', // Token malformed
+      'unauthorized_client', // Client not authorized
+    ];
+
+    return permanentErrors.some(code => error.message.includes(code));
+  }
+
   private async performTokenRefresh(
     sessionId: string,
     tokens: StoredToken
@@ -502,21 +519,19 @@ export class DrupalOAuthProvider extends ProxyOAuthServerProvider {
     const responseText = await response.text();
 
     if (!response.ok) {
-      let errorMessage = `Token refresh failed: ${response.status} ${response.statusText}`;
       try {
         const errorJson = JSON.parse(responseText);
-        if (errorJson.error) {
-          errorMessage = `Token refresh failed: ${errorJson.error}`;
-          if (errorJson.error_description) {
-            errorMessage += ` - ${errorJson.error_description}`;
-          }
-        }
+        const errorCode = errorJson.error || 'unknown';
+        const errorDesc = errorJson.error_description || response.statusText;
+
+        // Structured error format enables error classification
+        throw new Error(`${errorCode}: ${errorDesc}`);
       } catch {
-        if (responseText) {
-          errorMessage += ` - ${responseText}`;
-        }
+        // Fallback for non-JSON responses
+        throw new Error(
+          `unknown: Token refresh failed - ${response.status} ${response.statusText}`
+        );
       }
-      throw new Error(errorMessage);
     }
 
     const refreshed = JSON.parse(responseText) as TokenResponse;
