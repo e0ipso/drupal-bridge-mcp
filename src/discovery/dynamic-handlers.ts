@@ -158,7 +158,8 @@ export function registerDynamicTools(
   makeRequest: (
     toolName: string,
     params: unknown,
-    token?: string
+    token?: string,
+    sessionId?: string
   ) => Promise<unknown>,
   getSession: (sessionId: string) => Promise<Session | null>,
   localHandlers: Map<string, LocalToolHandler> = new Map(),
@@ -235,7 +236,8 @@ export function registerDynamicTools(
       const result = await makeRequest(
         context.tool.name,
         validatedParams,
-        accessToken
+        accessToken,
+        sessionId // Pass sessionId for reactive refresh
       );
 
       // Format response for MCP

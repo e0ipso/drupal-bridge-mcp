@@ -23,7 +23,7 @@ import {
   createOAuthConfigFromEnv,
   DrupalOAuthProvider,
   OAuthConfigManager,
-} from '@/oauth';
+} from '@/oauth/index.js';
 
 // Discovery imports
 import {
@@ -32,7 +32,7 @@ import {
   type LocalToolHandler,
   registerDynamicTools,
   type ToolDefinition,
-} from '@/discovery';
+} from '@/discovery/index.js';
 
 // Console utilities
 import {
@@ -323,14 +323,84 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Invoke a tool via A2A /mcp/tools/invoke endpoint
+   * Invoke a tool via A2A /mcp/tools/invoke endpoint with automatic token refresh on 401
    * Used by dynamic tool handlers
+   *
+   * @param toolName - Name of the tool to invoke
+   * @param params - Tool parameters
+   * @param token - OAuth access token (optional)
+   * @param sessionId - Session ID for token refresh (optional)
+   * @returns Tool invocation result
    */
   private async makeRequest(
     toolName: string,
     params: unknown,
-    token?: string
+    token?: string,
+    sessionId?: string
   ): Promise<unknown> {
+    const response = await this.performRequest(toolName, params, token);
+
+    // Detect 401 and attempt reactive refresh
+    if (response.status === 401 && sessionId && this.oauthProvider) {
+      debugOAuth(
+        `401 response for session ${sessionId} - attempting reactive refresh`
+      );
+
+      try {
+        // Attempt to refresh token for this session
+        const newToken =
+          await this.oauthProvider.refreshSessionToken(sessionId);
+
+        debugOAuth(
+          `Reactive refresh successful for session ${sessionId} - retrying request`
+        );
+
+        // Retry request with new token (max 1 retry)
+        const retryResponse = await this.performRequest(
+          toolName,
+          params,
+          newToken
+        );
+
+        if (!retryResponse.ok) {
+          throw new Error(
+            `Retry failed: HTTP ${retryResponse.status} ${retryResponse.statusText}`
+          );
+        }
+
+        return retryResponse.json();
+      } catch (refreshError) {
+        // Refresh failed - throw original 401 error with context
+        const errorMsg =
+          refreshError instanceof Error
+            ? refreshError.message
+            : String(refreshError);
+        throw new Error(`Authentication failed: ${errorMsg}`);
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        `Tool invocation failed: HTTP ${response.status} ${response.statusText}`
+      );
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Perform HTTP request to Drupal (extracted for retry logic)
+   *
+   * @param toolName - Name of the tool to invoke
+   * @param params - Tool parameters
+   * @param token - OAuth access token (optional)
+   * @returns Raw fetch Response object
+   */
+  private async performRequest(
+    toolName: string,
+    params: unknown,
+    token?: string
+  ): Promise<Response> {
     // Build headers - include auth if available
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -342,7 +412,7 @@ export class DrupalMCPHttpServer {
 
     // Use A2A standard /mcp/tools/invoke endpoint
     const endpoint = process.env.DRUPAL_JSONRPC_ENDPOINT || '/mcp/tools/invoke';
-    const response = await fetch(`${process.env.DRUPAL_BASE_URL}${endpoint}`, {
+    return fetch(`${process.env.DRUPAL_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -350,17 +420,6 @@ export class DrupalMCPHttpServer {
         arguments: params,
       }),
     });
-
-    if (!response.ok) {
-      throw new Error(
-        `Tool invocation failed: HTTP ${response.status} ${response.statusText}`
-      );
-    }
-
-    const result = await response.json();
-
-    // A2A response is direct result (no JSON-RPC envelope)
-    return result;
   }
 
   /**
