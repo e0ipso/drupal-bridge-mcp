@@ -1,0 +1,40 @@
+{
+  "testEnvironment": "node",
+  "preset": "ts-jest/presets/default-esm",
+  "extensionsToTreatAsEsm": [".ts"],
+  "transform": {
+    "^.+\\.ts$": [
+      "ts-jest",
+      {
+        "useESM": true,
+        "tsconfig": {
+          "module": "ES2022",
+          "target": "ES2022",
+          "moduleResolution": "node"
+        }
+      }
+    ]
+  },
+  "moduleNameMapper": {
+    "^@/(.*)\\.(js|ts)$": "<rootDir>/src/$1",
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "^(.*)\\.js$": "$1"
+  },
+  "testMatch": ["<rootDir>/tests/integration/**/*.test.ts", "<rootDir>/tests/integration/**/*.spec.ts"],
+  "testPathIgnorePatterns": ["/node_modules/", "/dist/", "/coverage/"],
+  "transformIgnorePatterns": ["node_modules/(?!(@modelcontextprotocol/sdk|jose)/)"],
+  "setupFilesAfterEnv": ["<rootDir>/tests/integration/setup.ts"],
+  "collectCoverage": false,
+  "maxWorkers": 1,
+  "cache": true,
+  "cacheDirectory": "<rootDir>/.jest-cache-integration",
+  "verbose": true,
+  "silent": false,
+  "bail": false,
+  "testTimeout": 15000,
+  "clearMocks": true,
+  "resetMocks": true,
+  "restoreMocks": true,
+  "errorOnDeprecated": true,
+  "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json"]
+}
