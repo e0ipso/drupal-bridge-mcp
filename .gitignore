@@ -191,3 +191,4 @@ auto-generated/
 .idea
 .jest-cache-integration
 core
+.claude/settings.local.json
