@@ -1,3 +1,15 @@
+# [1.11.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.10.0...v1.11.0) (2025-10-22)
+
+
+### Bug Fixes
+
+* ignore settings file ([e768876](https://github.com/e0ipso/drupal-bridge-mcp/commit/e76887642b0fc8138bec850cc0581994815939b4))
+
+
+### Features
+
+* add software identification to OAuth metadata ([cde9eb6](https://github.com/e0ipso/drupal-bridge-mcp/commit/cde9eb67727d78e79267c59ab14f68b20e8047c8))
+
 # [1.10.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.9.0...v1.10.0) (2025-10-21)
 
 
