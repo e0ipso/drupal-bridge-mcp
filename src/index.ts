@@ -806,6 +806,21 @@ export class DrupalMCPHttpServer {
           // Step 8: Fetch OAuth metadata
           const metadata = await configManager.fetchMetadata();
 
+          // Enhance OAuth metadata with MCP server identification (custom extension per RFC 8414)
+          // Per RFC 7591, software_id and software_version normally identify the CLIENT software.
+          // Here, we repurpose them to identify the MCP SERVER (resource server) that clients
+          // connect to. This enables:
+          // - Audit trails: which MCP server is this client connecting to?
+          // - Version tracking: correlate issues with specific MCP server versions
+          // - Server-specific policies: Drupal can apply rules based on MCP server identity
+          const enhancedMetadata = {
+            ...metadata,
+            software_id:
+              process.env.MCP_SERVER_NAME ||
+              'com.mateuaguilo.drupal-bridge-mcp',
+            software_version: PKG_VERSION,
+          };
+
           printSuccess('OAuth metadata discovered successfully');
           printInfo(`Issuer: ${metadata.issuer}`, 2);
           printInfo(`Authorization: ${metadata.authorization_endpoint}`, 2);
@@ -835,10 +850,16 @@ export class DrupalMCPHttpServer {
             `- ${resourceServerUrl.origin}/.well-known/oauth-authorization-server`,
             4
           );
+          printInfo(`Server identification:`, 2);
+          printInfo(`  software_id: ${enhancedMetadata.software_id}`, 4);
+          printInfo(
+            `  software_version: ${enhancedMetadata.software_version}`,
+            4
+          );
 
           this.app.use(
             mcpAuthMetadataRouter({
-              oauthMetadata: metadata,
+              oauthMetadata: enhancedMetadata,
               resourceServerUrl,
               scopesSupported: configManager.getConfig().scopes,
               resourceName: this.config.name,
