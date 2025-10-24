@@ -17,9 +17,11 @@ export async function verifyJWT(token: string, metadata: OAuthMetadata) {
   // Use JWKS endpoint from discovered metadata (not hard-coded)
   const JWKS = createRemoteJWKSet(new URL(jwksUri));
 
-  const { payload } = await jwtVerify(token, JWKS, {
-    issuer: metadata.issuer, // Use issuer from metadata
-  });
+  // Note: Drupal Simple OAuth doesn't include 'iss' claim by default
+  // RFC 7519 specifies that 'iss' is OPTIONAL
+  // We skip issuer validation to maintain compatibility with Drupal
+  // Signature verification via JWKS provides sufficient security
+  const { payload } = await jwtVerify(token, JWKS);
 
   return payload;
 }

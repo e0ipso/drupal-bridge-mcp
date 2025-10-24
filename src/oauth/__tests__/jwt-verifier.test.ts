@@ -52,9 +52,8 @@ describe('JWT Verifier', () => {
       expect(mockCreateRemoteJWKSet).toHaveBeenCalledWith(
         new URL('https://drupal.test/oauth/jwks')
       );
-      expect(mockJwtVerify).toHaveBeenCalledWith('valid.jwt.token', mockJWKS, {
-        issuer: 'https://drupal.test',
-      });
+      // Note: issuer validation is skipped for Drupal compatibility (iss claim is optional)
+      expect(mockJwtVerify).toHaveBeenCalledWith('valid.jwt.token', mockJWKS);
     });
 
     it('should verify JWT with complex payload including scopes and client metadata', async () => {
@@ -157,7 +156,7 @@ describe('JWT Verifier', () => {
       ).rejects.toThrow('JWT issuer invalid. Expected https://drupal.test');
     });
 
-    it('should use issuer from metadata for verification', async () => {
+    it('should verify JWT without requiring issuer claim (Drupal compatibility)', async () => {
       const customMetadata: OAuthMetadata = {
         ...mockMetadata,
         issuer: 'https://custom-drupal.example.com',
@@ -173,13 +172,9 @@ describe('JWT Verifier', () => {
 
       await verifyJWT('token', customMetadata);
 
-      expect(mockJwtVerify).toHaveBeenCalledWith(
-        'token',
-        {},
-        {
-          issuer: 'https://custom-drupal.example.com',
-        }
-      );
+      // Issuer validation is skipped - Drupal Simple OAuth doesn't include iss claim
+      // Signature verification via JWKS provides sufficient security
+      expect(mockJwtVerify).toHaveBeenCalledWith('token', {});
     });
 
     it('should create JWKS from metadata jwks_uri', async () => {
