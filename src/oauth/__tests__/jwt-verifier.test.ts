@@ -52,8 +52,10 @@ describe('JWT Verifier', () => {
       expect(mockCreateRemoteJWKSet).toHaveBeenCalledWith(
         new URL('https://drupal.test/oauth/jwks')
       );
-      // Note: issuer validation is skipped for Drupal compatibility (iss claim is optional)
-      expect(mockJwtVerify).toHaveBeenCalledWith('valid.jwt.token', mockJWKS);
+      // Should try with issuer validation first
+      expect(mockJwtVerify).toHaveBeenCalledWith('valid.jwt.token', mockJWKS, {
+        issuer: 'https://drupal.test',
+      });
     });
 
     it('should verify JWT with complex payload including scopes and client metadata', async () => {
@@ -156,7 +158,7 @@ describe('JWT Verifier', () => {
       ).rejects.toThrow('JWT issuer invalid. Expected https://drupal.test');
     });
 
-    it('should verify JWT without requiring issuer claim (Drupal compatibility)', async () => {
+    it('should fall back to signature-only verification when iss claim is missing', async () => {
       const customMetadata: OAuthMetadata = {
         ...mockMetadata,
         issuer: 'https://custom-drupal.example.com',
@@ -164,17 +166,27 @@ describe('JWT Verifier', () => {
       };
 
       const mockPayload = { sub: 'user-789' };
-      mockCreateRemoteJWKSet.mockReturnValueOnce({} as any);
-      mockJwtVerify.mockResolvedValueOnce({
-        payload: mockPayload,
-        protectedHeader: { alg: 'RS256' },
-      } as any);
+      const mockJWKS = {} as any;
+      mockCreateRemoteJWKSet.mockReturnValueOnce(mockJWKS);
 
-      await verifyJWT('token', customMetadata);
+      // First call (with issuer) throws missing iss claim error
+      mockJwtVerify
+        .mockRejectedValueOnce(new Error('missing required "iss" claim'))
+        // Second call (without issuer) succeeds
+        .mockResolvedValueOnce({
+          payload: mockPayload,
+          protectedHeader: { alg: 'RS256' },
+        } as any);
 
-      // Issuer validation is skipped - Drupal Simple OAuth doesn't include iss claim
-      // Signature verification via JWKS provides sufficient security
-      expect(mockJwtVerify).toHaveBeenCalledWith('token', {});
+      const result = await verifyJWT('token', customMetadata);
+
+      expect(result).toEqual(mockPayload);
+      // Should try with issuer first, then fall back to signature-only
+      expect(mockJwtVerify).toHaveBeenCalledTimes(2);
+      expect(mockJwtVerify).toHaveBeenNthCalledWith(1, 'token', mockJWKS, {
+        issuer: 'https://custom-drupal.example.com',
+      });
+      expect(mockJwtVerify).toHaveBeenNthCalledWith(2, 'token', mockJWKS);
     });
 
     it('should create JWKS from metadata jwks_uri', async () => {
