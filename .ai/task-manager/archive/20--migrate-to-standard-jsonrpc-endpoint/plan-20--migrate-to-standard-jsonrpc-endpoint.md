@@ -441,3 +441,102 @@ After each phase completes, validation gates from `POST_PHASE.md` will verify:
 - Total Tasks: 3
 - Maximum Parallelism: 2 tasks (in Phase 1)
 - Critical Path Length: 2 phases
+
+## Execution Summary
+
+**Status**: ✅ Completed Successfully **Completed Date**: 2025-10-29
+
+### Results
+
+Successfully migrated the MCP server from custom `/mcp/tools/invoke` endpoint to standard Drupal
+`/jsonrpc` endpoint with full JSON-RPC 2.0 protocol compliance. All three tasks completed without
+blocking issues.
+
+**Key Deliverables:**
+
+1. **JSON-RPC 2.0 Request Builder** (Task 1)
+   - Implemented standard request format with `jsonrpc`, `method`, `params`, and `id` fields
+   - Added intelligent GET/POST method selection with automatic fallback (GET → POST when URL > 2000
+     chars)
+   - Integrated environment variables: `DRUPAL_JSONRPC_METHOD` (default: GET) and
+     `DRUPAL_JSONRPC_ENDPOINT` (default: /jsonrpc)
+   - UUID-based request IDs for end-to-end traceability
+
+2. **JSON-RPC 2.0 Response Parser** (Task 2)
+   - Created Zod schemas for response validation
+   - Implemented comprehensive error code mapping (JSON-RPC → MCP ErrorCode)
+   - Added HTTP-level error handling (401, 403, 500, etc.)
+   - Enhanced debug logging for troubleshooting
+
+3. **Tests and Documentation** (Task 3)
+   - Fixed pre-existing scope parsing bug in `token-verifier.ts`
+   - All 140 tests passing with >78% coverage on core modules
+   - Added migration guide to AGENTS.md with step-by-step instructions
+   - Updated architecture documentation to reflect endpoint changes
+
+**Git Commits:**
+
+- `584ce9c` - feat: implement JSON-RPC 2.0 request builder with GET/POST support
+- `edb8a69` - feat: implement JSON-RPC 2.0 response parser and error mapper
+- `bf6276b` - docs: update tests and documentation for JSON-RPC migration
+
+### Noteworthy Events
+
+**Pre-existing Test Failures Resolved:**
+
+- Discovered and fixed scope parsing bug in `token-verifier.ts` that affected 8 tests
+- The bug was incorrectly casting JWT scope claims to string arrays without parsing
+- Fix involved proper space/comma-separated string parsing logic
+- Updated JWT verifier test to match current implementation (no issuer fallback)
+
+**Linting Issues Fixed:**
+
+- Encountered unused variable and useless try/catch in `jwt-verifier.ts`
+- Fixed during Phase 1 commit to maintain code quality standards
+- All lint-staged checks now pass
+
+**Documentation Already Up-to-Date:**
+
+- Environment variables were already documented in `.env.example` from previous work
+- No duplication needed, just verified completeness
+
+**Test Strategy:**
+
+- Followed "write a few tests, mostly integration" philosophy
+- Avoided creating exhaustive unit tests for framework functionality
+- Existing integration tests provide comprehensive coverage of JSON-RPC flow
+- 25 integration tests cover tool discovery, invocation, and OAuth handling
+
+### Recommendations
+
+**Short-term (Next Sprint):**
+
+1. **Manual Testing**: Verify migration with live Drupal instance using MCP Inspector
+2. **Performance Monitoring**: Track GET vs POST usage and fallback frequency in production logs
+3. **CDN Configuration**: Document CDN caching strategies for GET requests with Authorization
+   headers
+
+**Long-term (Future Enhancements):**
+
+1. **Token-in-Query Support**: Consider supporting OAuth tokens as query parameters for CDN
+   environments that strip auth headers (currently out of scope)
+2. **Batch Requests**: JSON-RPC 2.0 supports batch requests - could reduce roundtrips for multi-tool
+   operations
+3. **Response Compression**: Enable gzip/brotli compression for large JSON-RPC responses to improve
+   performance
+
+**Code Quality:**
+
+1. **Integration Test Coverage**: Current 78% coverage on tool discovery module is good but could be
+   improved with additional edge case tests
+2. **Error Message Localization**: Consider i18n support for user-facing error messages in future
+   iterations
+3. **Request ID Correlation**: Implement request ID tracking in logs for distributed tracing
+   capabilities
+
+**Deployment Notes:**
+
+- Migration is backward compatible via `DRUPAL_JSONRPC_ENDPOINT` override
+- Recommend gradual rollout: test on staging first, then production
+- Monitor OAuth token validation errors during first 24 hours post-migration
+- No database migrations or Drupal module updates required on MCP server side
