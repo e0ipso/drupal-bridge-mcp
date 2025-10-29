@@ -500,12 +500,17 @@ export class DrupalMCPHttpServer {
     token?: string
   ): Promise<Response> {
     // Build JSON-RPC 2.0 request
-    const jsonRpcRequest = {
-      jsonrpc: '2.0' as const,
+    // Note: params field is omitted when empty per JSON-RPC 2.0 spec (optional field)
+    const jsonRpcRequest: Record<string, unknown> = {
+      jsonrpc: '2.0',
       method: toolName,
-      params: params as Record<string, unknown>,
       id: randomUUID(),
     };
+
+    // Only include params if not empty
+    if (params && Object.keys(params as Record<string, unknown>).length > 0) {
+      jsonRpcRequest.params = params;
+    }
 
     // Determine endpoint and method
     const endpoint = process.env.DRUPAL_JSONRPC_ENDPOINT || '/jsonrpc';
