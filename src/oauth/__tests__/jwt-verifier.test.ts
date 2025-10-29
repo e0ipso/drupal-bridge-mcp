@@ -52,6 +52,7 @@ describe('JWT Verifier', () => {
       expect(mockCreateRemoteJWKSet).toHaveBeenCalledWith(
         new URL('https://drupal.test/oauth/jwks')
       );
+      // Should try with issuer validation first
       expect(mockJwtVerify).toHaveBeenCalledWith('valid.jwt.token', mockJWKS, {
         issuer: 'https://drupal.test',
       });
@@ -157,29 +158,30 @@ describe('JWT Verifier', () => {
       ).rejects.toThrow('JWT issuer invalid. Expected https://drupal.test');
     });
 
-    it('should use issuer from metadata for verification', async () => {
+    it('should throw error when issuer validation fails', async () => {
       const customMetadata: OAuthMetadata = {
         ...mockMetadata,
         issuer: 'https://custom-drupal.example.com',
         jwks_uri: 'https://custom-drupal.example.com/oauth/jwks',
       };
 
-      const mockPayload = { sub: 'user-789' };
-      mockCreateRemoteJWKSet.mockReturnValueOnce({} as any);
-      mockJwtVerify.mockResolvedValueOnce({
-        payload: mockPayload,
-        protectedHeader: { alg: 'RS256' },
-      } as any);
+      const mockJWKS = {} as any;
+      mockCreateRemoteJWKSet.mockReturnValueOnce(mockJWKS);
 
-      await verifyJWT('token', customMetadata);
-
-      expect(mockJwtVerify).toHaveBeenCalledWith(
-        'token',
-        {},
-        {
-          issuer: 'https://custom-drupal.example.com',
-        }
+      // Issuer validation fails
+      mockJwtVerify.mockRejectedValueOnce(
+        new Error('missing required "iss" claim')
       );
+
+      await expect(verifyJWT('token', customMetadata)).rejects.toThrow(
+        'missing required "iss" claim'
+      );
+
+      // Should only try once with issuer validation
+      expect(mockJwtVerify).toHaveBeenCalledTimes(1);
+      expect(mockJwtVerify).toHaveBeenCalledWith('token', mockJWKS, {
+        issuer: 'https://custom-drupal.example.com',
+      });
     });
 
     it('should create JWKS from metadata jwks_uri', async () => {

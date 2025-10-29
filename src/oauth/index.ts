@@ -10,4 +10,4 @@ export {
   type OAuthConfig,
 } from './config.js';
 
-export { DrupalOAuthProvider, createDrupalOAuthProvider } from './provider.js';
+export { DrupalTokenVerifier } from './token-verifier.js';

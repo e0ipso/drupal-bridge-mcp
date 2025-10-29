@@ -17,7 +17,6 @@ import { convertJsonSchemaToZod } from 'zod-from-json-schema';
 import type { z } from 'zod';
 import type { ToolDefinition } from './tool-discovery.js';
 import { getAuthLevel, validateToolAccess } from './tool-discovery.js';
-import type { DrupalOAuthProvider } from '../oauth/provider.js';
 
 interface DynamicToolContext {
   tool: ToolDefinition;
@@ -39,18 +38,63 @@ export interface Session {
 }
 
 /**
+ * Extracts scopes from a JWT access token.
+ *
+ * Decodes the JWT (without verification - verification happens elsewhere)
+ * and extracts the scope claim from the payload. Handles both space-separated
+ * string format and array format.
+ *
+ * @param token - JWT access token
+ * @returns Array of scope strings, or empty array if no scopes or invalid token
+ */
+function extractScopesFromToken(token: string): string[] {
+  try {
+    // Decode JWT payload (base64url decode the middle part)
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return [];
+    }
+
+    const payload = parts[1];
+    if (!payload) {
+      return [];
+    }
+
+    const decoded = JSON.parse(
+      Buffer.from(payload, 'base64url').toString('utf-8')
+    ) as Record<string, unknown>;
+
+    const scopeClaim = decoded.scope;
+
+    if (!scopeClaim) {
+      return [];
+    }
+
+    // Handle both string (space-separated) and array formats
+    if (typeof scopeClaim === 'string') {
+      return scopeClaim.split(/[\s,]+/).filter(s => s.length > 0);
+    } else if (Array.isArray(scopeClaim)) {
+      return scopeClaim.filter(s => typeof s === 'string' && s.length > 0);
+    }
+
+    return [];
+  } catch {
+    // Invalid token format - return empty scopes
+    return [];
+  }
+}
+
+/**
  * Validates tool access for a session.
  *
  * @param tool - Tool definition
- * @param oauthProvider - OAuth provider instance (optional)
- * @param sessionId - Session identifier (optional)
+ * @param accessToken - OAuth access token (optional)
  * @throws McpError if access is denied
  */
-async function validateToolAccessForSession(
+function validateToolAccessForSession(
   tool: ToolDefinition,
-  oauthProvider?: DrupalOAuthProvider,
-  sessionId?: string
-): Promise<void> {
+  accessToken?: string
+): void {
   const authMetadata = tool.annotations?.auth;
   const authLevel = getAuthLevel(authMetadata);
 
@@ -59,28 +103,28 @@ async function validateToolAccessForSession(
     return;
   }
 
-  // For 'optional' auth, allow access without provider/session
+  // For 'optional' auth, allow access without token
   if (authLevel === 'optional') {
     return;
   }
 
   // For 'required' auth, enforce authentication
   if (authLevel === 'required') {
-    // Require OAuth provider and session
-    if (!oauthProvider || !sessionId) {
+    // Require access token
+    if (!accessToken) {
       throw new McpError(
         ErrorCode.InvalidParams,
         `Tool "${tool.name}" requires authentication. Please authenticate first.`
       );
     }
 
-    // Get session scopes
-    const sessionScopes = await oauthProvider.getTokenScopes(sessionId);
+    // Extract scopes from the access token
+    const sessionScopes = extractScopesFromToken(accessToken);
 
     if (!sessionScopes || sessionScopes.length === 0) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        `Tool "${tool.name}" requires authentication. No valid session found.`
+        `Tool "${tool.name}" requires authentication. No valid scopes found in token.`
       );
     }
 
@@ -150,7 +194,6 @@ function convertToolSchemas(
  * @param makeRequest - Function to invoke tools via A2A /mcp/tools/invoke endpoint
  * @param getSession - Function to retrieve session tokens
  * @param localHandlers - Map of local tool handlers (optional)
- * @param oauthProvider - OAuth provider instance for scope validation (optional)
  */
 export function registerDynamicTools(
   server: Server,
@@ -162,8 +205,7 @@ export function registerDynamicTools(
     sessionId?: string
   ) => Promise<unknown>,
   getSession: (sessionId: string) => Promise<Session | null>,
-  localHandlers: Map<string, LocalToolHandler> = new Map(),
-  oauthProvider?: DrupalOAuthProvider
+  localHandlers: Map<string, LocalToolHandler> = new Map()
 ): void {
   // Convert schemas and create tool contexts
   const toolContexts = convertToolSchemas(tools);
@@ -188,15 +230,6 @@ export function registerDynamicTools(
       );
     }
 
-    // Validate tool access based on session scopes BEFORE parameter validation
-    if (context) {
-      await validateToolAccessForSession(
-        context.tool,
-        oauthProvider,
-        extra?.sessionId
-      );
-    }
-
     // Attempt to get OAuth token if available (let Drupal handle auth)
     let accessToken: string | undefined;
     const sessionId = extra?.sessionId;
@@ -206,6 +239,11 @@ export function registerDynamicTools(
       if (session?.accessToken) {
         accessToken = session.accessToken;
       }
+    }
+
+    // Validate tool access based on session scopes BEFORE parameter validation
+    if (context) {
+      validateToolAccessForSession(context.tool, accessToken);
     }
 
     // Validate parameters with Zod schema

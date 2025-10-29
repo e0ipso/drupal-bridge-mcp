@@ -10,7 +10,12 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { mcpAuthMetadataRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
-import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ListToolsRequestSchema,
+  McpError,
+  ErrorCode,
+} from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -19,9 +24,8 @@ import debug from 'debug';
 import pinoHttp from 'pino-http';
 import { logger, requestSerializer } from './utils/logger.js';
 import {
-  createDrupalOAuthProvider,
   createOAuthConfigFromEnv,
-  DrupalOAuthProvider,
+  DrupalTokenVerifier,
   OAuthConfigManager,
 } from '@/oauth/index.js';
 
@@ -45,7 +49,46 @@ import {
 
 // Debug loggers
 const debugRequestIn = debug('mcp:request:in');
+const debugRequestOut = debug('mcp:request:out');
 const debugOAuth = debug('mcp:oauth');
+
+// JSON-RPC 2.0 Response Schemas
+const JsonRpcSuccessResponseSchema = z.object({
+  jsonrpc: z.literal('2.0'),
+  result: z.unknown(),
+  id: z.string(),
+});
+
+const JsonRpcErrorResponseSchema = z.object({
+  jsonrpc: z.literal('2.0'),
+  error: z.object({
+    code: z.number(),
+    message: z.string(),
+    data: z.unknown().optional(),
+  }),
+  id: z.string().nullable(),
+});
+
+// Union type for any valid JSON-RPC response
+const JsonRpcResponseSchema = z.union([
+  JsonRpcSuccessResponseSchema,
+  JsonRpcErrorResponseSchema,
+]);
+
+/**
+ * Maps JSON-RPC error codes to MCP ErrorCode enum
+ */
+function mapJsonRpcErrorToMcpError(code: number): ErrorCode {
+  const errorCodeMap: Record<number, ErrorCode> = {
+    [-32700]: ErrorCode.ParseError, // Parse error - invalid JSON
+    [-32600]: ErrorCode.InvalidRequest, // Invalid Request - malformed JSON-RPC
+    [-32601]: ErrorCode.MethodNotFound, // Method not found - tool doesn't exist
+    [-32602]: ErrorCode.InvalidParams, // Invalid params - parameter validation failed
+    [-32603]: ErrorCode.InternalError, // Internal error - Drupal-side execution error
+  };
+
+  return errorCodeMap[code] ?? ErrorCode.InternalError;
+}
 
 // Read version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -108,7 +151,12 @@ export class DrupalMCPHttpServer {
   private app: Application;
   private config: HttpServerConfig;
   private oauthConfigManager?: OAuthConfigManager;
-  private oauthProvider?: DrupalOAuthProvider;
+  private tokenVerifier?: DrupalTokenVerifier;
+
+  // Session authentication info (ephemeral)
+  private sessionAuth: Map<string, { token: string; scopes: string[] }> =
+    new Map();
+  // sessionId → { token, scopes }
 
   // Session capabilities (ephemeral)
   private sessionCapabilities: Map<string, ClientCapabilities> = new Map();
@@ -248,8 +296,7 @@ export class DrupalMCPHttpServer {
       discoveredToolDefinitions,
       this.makeRequest.bind(this),
       this.getSession.bind(this),
-      this.localToolHandlers,
-      this.oauthProvider
+      this.localToolHandlers
     );
 
     // Create transport
@@ -263,9 +310,9 @@ export class DrupalMCPHttpServer {
         `${this.config.host}:${this.config.port}`,
       ],
       onsessionclosed: async (closedSessionId: string) => {
-        const userId = this.oauthProvider?.getUserIdForSession(closedSessionId);
+        const hasAuth = this.sessionAuth.has(closedSessionId);
         console.log(
-          `Session closed: ${closedSessionId} (user: ${userId || 'unauthenticated'})`
+          `Session closed: ${closedSessionId} (authenticated: ${hasAuth})`
         );
 
         // Step 1: Retrieve Server+Transport for cleanup
@@ -302,15 +349,14 @@ export class DrupalMCPHttpServer {
           this.transports.delete(closedSessionId);
         }
 
-        // Step 5: Clean session mappings (existing Plan 8 logic)
+        // Step 5: Clean session mappings
         this.sessionCapabilities.delete(closedSessionId);
-        this.oauthProvider?.detachSession(closedSessionId);
+        this.sessionAuth.delete(closedSessionId);
 
-        const activeUsers = this.oauthProvider?.getActiveUserCount() ?? 0;
-        const activeSessions = this.oauthProvider?.getActiveSessionCount() ?? 0;
+        const activeSessions = this.sessionAuth.size;
 
         console.log(
-          `Active transports: ${this.transports.size}, Active sessions: ${activeSessions}, Active users: ${activeUsers}`
+          `Active transports: ${this.transports.size}, Active sessions: ${activeSessions}`
         );
       },
     });
@@ -323,69 +369,121 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Invoke a tool via A2A /mcp/tools/invoke endpoint with automatic token refresh on 401
+   * Invoke a tool via A2A /mcp/tools/invoke endpoint
    * Used by dynamic tool handlers
    *
    * @param toolName - Name of the tool to invoke
    * @param params - Tool parameters
    * @param token - OAuth access token (optional)
-   * @param sessionId - Session ID for token refresh (optional)
+   * @param sessionId - Session ID (unused in resource server pattern)
    * @returns Tool invocation result
    */
   private async makeRequest(
     toolName: string,
     params: unknown,
     token?: string,
-    sessionId?: string
+    _sessionId?: string
   ): Promise<unknown> {
     const response = await this.performRequest(toolName, params, token);
 
-    // Detect 401 and attempt reactive refresh
-    if (response.status === 401 && sessionId && this.oauthProvider) {
-      debugOAuth(
-        `401 response for session ${sessionId} - attempting reactive refresh`
-      );
-
+    // Handle HTTP-level errors (non-200 status codes)
+    if (!response.ok) {
+      // Try to get error details from response body
+      let errorBody = '';
       try {
-        // Attempt to refresh token for this session
-        const newToken =
-          await this.oauthProvider.refreshSessionToken(sessionId);
-
-        debugOAuth(
-          `Reactive refresh successful for session ${sessionId} - retrying request`
-        );
-
-        // Retry request with new token (max 1 retry)
-        const retryResponse = await this.performRequest(
-          toolName,
-          params,
-          newToken
-        );
-
-        if (!retryResponse.ok) {
-          throw new Error(
-            `Retry failed: HTTP ${retryResponse.status} ${retryResponse.statusText}`
-          );
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          const errorJson = await response.json();
+          errorBody = JSON.stringify(errorJson, null, 2);
+        } else {
+          errorBody = await response.text();
         }
+      } catch {
+        // Ignore errors reading body
+      }
 
-        return retryResponse.json();
-      } catch (refreshError) {
-        // Refresh failed - throw original 401 error with context
-        const errorMsg =
-          refreshError instanceof Error
-            ? refreshError.message
-            : String(refreshError);
-        throw new Error(`Authentication failed: ${errorMsg}`);
+      // Log detailed error information
+      debugRequestOut('HTTP error response body: %s', errorBody || '(empty)');
+
+      // Map HTTP status codes to MCP errors
+      if (response.status === 401) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `Authentication failed: The OAuth token is invalid or expired. ` +
+            `Please re-authenticate. (HTTP 401)${errorBody ? `\n\nDetails: ${errorBody}` : ''}`
+        );
+      } else if (response.status === 403) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `Authorization failed: The OAuth token does not have permission to access this tool. ` +
+            `Required scopes may be missing or token may be expired. (HTTP 403)${errorBody ? `\n\nDetails: ${errorBody}` : ''}`
+        );
+      } else {
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Tool invocation failed: HTTP ${response.status} ${response.statusText}${errorBody ? `\n\nResponse body:\n${errorBody}` : ''}`
+        );
       }
     }
 
-    if (!response.ok) {
-      throw new Error(
-        `Tool invocation failed: HTTP ${response.status} ${response.statusText}`
+    // Parse JSON response body
+    let responseBody: unknown;
+    try {
+      responseBody = await response.json();
+    } catch (parseError) {
+      debugRequestOut('Failed to parse JSON response: %O', parseError);
+      throw new McpError(
+        ErrorCode.ParseError,
+        `Invalid JSON response from Drupal: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`
       );
     }
 
-    return response.json();
+    // Validate JSON-RPC 2.0 response structure
+    let jsonRpcResponse: z.infer<typeof JsonRpcResponseSchema>;
+    try {
+      jsonRpcResponse = JsonRpcResponseSchema.parse(responseBody);
+    } catch (validationError) {
+      debugRequestOut(
+        'Response validation failed: %O',
+        validationError instanceof Error
+          ? validationError.message
+          : validationError
+      );
+      debugRequestOut('Response body: %O', responseBody);
+
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Malformed JSON-RPC response from Drupal: ${
+          validationError instanceof Error
+            ? validationError.message
+            : 'Invalid response structure'
+        }`
+      );
+    }
+
+    // Check for JSON-RPC error response
+    if ('error' in jsonRpcResponse) {
+      const { error } = jsonRpcResponse;
+      const mcpErrorCode = mapJsonRpcErrorToMcpError(error.code);
+
+      // Build error message with additional context
+      let errorMessage = `JSON-RPC Error (${error.code}): ${error.message}`;
+      if (error.data !== undefined) {
+        try {
+          errorMessage += `\n\nAdditional data: ${JSON.stringify(error.data, null, 2)}`;
+        } catch {
+          errorMessage += `\n\nAdditional data: [non-serializable]`;
+        }
+      }
+
+      debugRequestOut('JSON-RPC error response: %O', error);
+
+      throw new McpError(mcpErrorCode, errorMessage);
+    }
+
+    // Success response - extract and return result
+    debugRequestOut('JSON-RPC success response, returning result');
+    return jsonRpcResponse.result;
   }
 
   /**
@@ -401,6 +499,26 @@ export class DrupalMCPHttpServer {
     params: unknown,
     token?: string
   ): Promise<Response> {
+    // Build JSON-RPC 2.0 request
+    // Note: params field is omitted when empty per JSON-RPC 2.0 spec (optional field)
+    const jsonRpcRequest: Record<string, unknown> = {
+      jsonrpc: '2.0',
+      method: toolName,
+      id: randomUUID(),
+    };
+
+    // Only include params if not empty
+    if (params && Object.keys(params as Record<string, unknown>).length > 0) {
+      jsonRpcRequest.params = params;
+    }
+
+    // Determine endpoint and method
+    const endpoint = process.env.DRUPAL_JSONRPC_ENDPOINT || '/jsonrpc';
+    const baseUrl = `${process.env.DRUPAL_BASE_URL}${endpoint}`;
+    let requestMethod = (
+      process.env.DRUPAL_JSONRPC_METHOD || 'GET'
+    ).toUpperCase();
+
     // Build headers - include auth if available
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -410,16 +528,68 @@ export class DrupalMCPHttpServer {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    // Use A2A standard /mcp/tools/invoke endpoint
-    const endpoint = process.env.DRUPAL_JSONRPC_ENDPOINT || '/mcp/tools/invoke';
-    return fetch(`${process.env.DRUPAL_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: toolName,
-        arguments: params,
-      }),
+    let url = baseUrl;
+    let body: string | undefined;
+
+    // Construct request based on method
+    if (requestMethod === 'GET') {
+      // Serialize JSON-RPC request to URL-encoded query parameter
+      const queryParam = encodeURIComponent(JSON.stringify(jsonRpcRequest));
+      url = `${baseUrl}?query=${queryParam}`;
+
+      // Check URL length and fallback to POST if needed
+      if (url.length > 2000) {
+        debugRequestOut(
+          'GET URL exceeds 2000 characters (%d), falling back to POST',
+          url.length
+        );
+        requestMethod = 'POST';
+        url = baseUrl;
+        body = JSON.stringify(jsonRpcRequest);
+      }
+    } else {
+      // POST method - JSON body
+      body = JSON.stringify(jsonRpcRequest);
+    }
+
+    // Log outbound request
+    debugRequestOut(`${requestMethod} ${url}`);
+    debugRequestOut('Tool: %s (JSON-RPC method)', toolName);
+    debugRequestOut('Request ID: %s', jsonRpcRequest.id);
+    debugRequestOut('Headers: %O', {
+      ...headers,
+      Authorization: token ? `Bearer ***${token.slice(-6)}` : '(none)',
     });
+    if (body) {
+      debugRequestOut('Body: %s', body);
+    } else {
+      debugRequestOut(
+        'Query params: query=%s...',
+        JSON.stringify(jsonRpcRequest).substring(0, 100)
+      );
+    }
+
+    const response = await fetch(url, {
+      method: requestMethod,
+      headers,
+      body,
+    });
+
+    // Log response
+    debugRequestOut(
+      'Response status: %d %s',
+      response.status,
+      response.statusText
+    );
+
+    // Convert headers to object for logging
+    const responseHeaders: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+    debugRequestOut('Response headers: %O', responseHeaders);
+
+    return response;
   }
 
   /**
@@ -431,68 +601,47 @@ export class DrupalMCPHttpServer {
     refreshToken?: string;
     expiresAt: number;
   } | null> {
-    if (!this.oauthProvider) {
+    const auth = this.sessionAuth.get(sessionId);
+
+    if (!auth) {
+      debugOAuth(`Token lookup FAILED: session ${sessionId} not authenticated`);
       return null;
     }
 
-    try {
-      const authorization =
-        await this.oauthProvider.getSessionAuthorization(sessionId);
+    const redactedToken = this.redactToken(auth.token);
+    debugOAuth(
+      `Token lookup SUCCESS: session ${sessionId} (token: ${redactedToken})`
+    );
 
-      if (!authorization) {
-        debugOAuth(
-          `Token lookup FAILED: session ${sessionId} not mapped to an authenticated user`
-        );
-        return null;
-      }
-
-      const redactedToken = this.redactToken(authorization.accessToken);
-      debugOAuth(
-        `Token lookup SUCCESS: session ${sessionId} (token: ${redactedToken})`
-      );
-
-      return authorization;
-    } catch (error) {
-      debugOAuth(
-        `Token lookup error for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
-      );
-      throw error;
-    }
+    // Return in expected format - no refresh token or expiry in resource server pattern
+    return {
+      accessToken: auth.token,
+      refreshToken: undefined,
+      expiresAt: 0, // Unknown expiry - token is validated per-request
+    };
   }
 
   /**
    * Handle explicit user logout
-   * Removes user tokens and session mapping
+   * Removes session authentication info
    * @param {string} sessionId Session requesting logout
    * @returns {Promise<void>}
    */
   async handleLogout(sessionId: string): Promise<void> {
-    if (!this.oauthProvider) {
-      console.log(
-        `Logout requested for session ${sessionId}, but OAuth provider is not initialized`
-      );
-      this.sessionCapabilities.delete(sessionId);
-      return;
-    }
+    const hasAuth = this.sessionAuth.has(sessionId);
 
-    const userId = this.oauthProvider.getUserIdForSession(sessionId);
-
-    if (!userId) {
+    if (!hasAuth) {
       console.log(`Logout requested for unauthenticated session: ${sessionId}`);
-      this.oauthProvider.detachSession(sessionId);
       this.sessionCapabilities.delete(sessionId);
       return;
     }
 
-    await this.oauthProvider.logoutSession(sessionId);
-
-    // Remove session capabilities
+    // Remove session auth and capabilities
+    this.sessionAuth.delete(sessionId);
     this.sessionCapabilities.delete(sessionId);
 
-    console.log(`User ${userId} logged out - tokens removed`);
-    console.log(
-      `Active users: ${this.oauthProvider.getActiveUserCount()}, Active sessions: ${this.oauthProvider.getActiveSessionCount()}`
-    );
+    console.log(`Session ${sessionId} logged out - auth info removed`);
+    console.log(`Active sessions: ${this.sessionAuth.size}`);
   }
 
   /**
@@ -529,15 +678,15 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Extracts OAuth token from Authorization header and stores session/user mappings
+   * Extracts OAuth token from Authorization header and validates it
    * @param sessionId - MCP session identifier
    * @param req - Express Request object
    */
-  private extractAndStoreTokenFromRequest(
+  private async extractAndValidateTokenFromRequest(
     sessionId: string,
     req: express.Request
-  ): void {
-    debugOAuth(`Token extraction attempt for session ${sessionId}`);
+  ): Promise<void> {
+    debugOAuth(`Token validation attempt for session ${sessionId}`);
 
     // Step 1: Extract Authorization Header
     const authHeader = req.headers['authorization'] as string | undefined;
@@ -545,7 +694,9 @@ export class DrupalMCPHttpServer {
     debugOAuth(`Authorization header present: ${!!authHeader}`);
 
     if (!authHeader) {
-      debugOAuth(`No Authorization header - skipping token extraction`);
+      debugOAuth(
+        `No Authorization header - session ${sessionId} unauthenticated`
+      );
       return; // No token present - not an error, exit gracefully
     }
 
@@ -568,31 +719,31 @@ export class DrupalMCPHttpServer {
     debugOAuth(`Token extracted (redacted): ${redactedToken}`);
     debugOAuth(`Token length: ${token.length} characters`);
 
-    if (!this.oauthProvider) {
-      debugOAuth('OAuth provider not initialized. Skipping token capture.');
+    if (!this.tokenVerifier) {
+      debugOAuth('Token verifier not initialized. Skipping token validation.');
       return;
     }
 
     try {
-      const stored = this.oauthProvider.captureSessionToken(sessionId, token);
-      const userId = this.oauthProvider.getUserIdForSession(sessionId);
+      // Step 4: Verify token and extract auth info
+      const authInfo = await this.tokenVerifier.verifyAccessToken(token);
+
+      // Step 5: Store validated auth info for this session
+      this.sessionAuth.set(sessionId, {
+        token: authInfo.token,
+        scopes: authInfo.scopes,
+      });
 
       debugOAuth(
-        `Token stored for session ${sessionId} → user ${userId || 'unknown'}`
+        `Token validated for session ${sessionId} (scopes: ${authInfo.scopes.join(', ')})`
       );
-      debugOAuth(
-        `Active users: ${this.oauthProvider.getActiveUserCount()}, Active sessions: ${this.oauthProvider.getActiveSessionCount()}`
-      );
-
-      if (!stored.refresh_token) {
-        debugOAuth(
-          'Captured token does not include a refresh token. Automatic refresh will not be available.'
-        );
-      }
+      debugOAuth(`Active sessions: ${this.sessionAuth.size}`);
     } catch (error) {
       debugOAuth(
-        `Failed to capture token for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+        `Token validation failed for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
       );
+      // Don't throw - allow session to continue unauthenticated
+      // Tool handlers will handle missing auth appropriately
     }
   }
 
@@ -664,12 +815,12 @@ export class DrupalMCPHttpServer {
             `Session ${newSessionId} created. Active sessions: ${this.transports.size}`
           );
 
-          // Extract OAuth token if auth is enabled
+          // Validate OAuth token if auth is enabled
           if (this.config.enableAuth) {
-            debugOAuth(`Auth enabled - extracting token for new session`);
-            this.extractAndStoreTokenFromRequest(newSessionId, req);
+            debugOAuth(`Auth enabled - validating token for new session`);
+            await this.extractAndValidateTokenFromRequest(newSessionId, req);
           } else {
-            debugOAuth(`Auth disabled - skipping token extraction`);
+            debugOAuth(`Auth disabled - skipping token validation`);
           }
 
           await transport.handleRequest(req, res);
@@ -678,12 +829,12 @@ export class DrupalMCPHttpServer {
           debugRequestIn(`Using existing session: ${sessionId}`);
           const { transport } = this.transports.get(sessionId)!;
 
-          // Extract OAuth token if auth is enabled
+          // Validate OAuth token if auth is enabled
           if (this.config.enableAuth) {
-            debugOAuth(`Auth enabled - extracting token for existing session`);
-            this.extractAndStoreTokenFromRequest(sessionId, req);
+            debugOAuth(`Auth enabled - validating token for existing session`);
+            await this.extractAndValidateTokenFromRequest(sessionId, req);
           } else {
-            debugOAuth(`Auth disabled - skipping token extraction`);
+            debugOAuth(`Auth disabled - skipping token validation`);
           }
 
           await transport.handleRequest(req, res);
@@ -796,11 +947,11 @@ export class DrupalMCPHttpServer {
       setDiscoveredTools(tools);
       printSuccess('Tool definitions stored for per-session registration');
 
-      // Step 7: Initialize OAuth with correct scopes (if enabled)
+      // Step 7: Initialize token verifier (if auth enabled)
       if (this.config.enableAuth) {
         try {
-          printInfo('Initializing OAuth provider...', 1);
-          this.oauthProvider = createDrupalOAuthProvider(configManager);
+          printInfo('Initializing token verifier...', 1);
+          this.tokenVerifier = new DrupalTokenVerifier(configManager);
           this.oauthConfigManager = configManager;
 
           // Step 8: Fetch OAuth metadata
@@ -866,7 +1017,7 @@ export class DrupalMCPHttpServer {
             })
           );
 
-          printSuccess('OAuth authentication initialized');
+          printSuccess('Token verifier initialized');
           printInfo(`Resource server: ${resourceServerUrl}`, 2);
           printInfo(
             `Scopes: ${configManager.getConfig().scopes.join(', ')}`,
@@ -894,11 +1045,8 @@ export class DrupalMCPHttpServer {
 
       // Health check endpoint
       this.app.get('/health', (_req, res) => {
-        const activeUsers = this.oauthProvider?.getActiveUserCount() ?? 0;
-        const activeSessions = this.oauthProvider?.getActiveSessionCount() ?? 0;
-        const sessionMappings = this.oauthProvider
-          ? Object.fromEntries(this.oauthProvider.getSessionMappings())
-          : {};
+        const activeSessions = this.sessionAuth.size;
+        const authenticatedSessions = Array.from(this.sessionAuth.keys());
 
         res.json({
           status: 'healthy',
@@ -908,38 +1056,30 @@ export class DrupalMCPHttpServer {
           timestamp: new Date().toISOString(),
 
           // Session and authentication state
-          activeUsers,
           activeSessions,
           activeTransports: this.transports.size,
-          sessionMappings,
+          authenticatedSessions,
         });
       });
 
       // Debug sessions endpoint
       this.app.get('/debug/sessions', (_req, res) => {
-        const sessionMappings = this.oauthProvider
-          ? this.oauthProvider.getSessionMappings()
-          : [];
-        const activeUsers = this.oauthProvider?.getActiveUserIds() ?? [];
-        const authenticatedSessions = this.oauthProvider
-          ? this.oauthProvider.getAuthenticatedSessionCount()
-          : 0;
-
-        res.json({
-          sessions: sessionMappings.map(([sessionId, userId]) => ({
+        const sessions = Array.from(this.sessionAuth.entries()).map(
+          ([sessionId, auth]) => ({
             sessionId,
-            userId,
-            hasTokens: this.oauthProvider?.hasUserTokens(userId) ?? false,
+            scopes: auth.scopes,
             hasCapabilities: this.sessionCapabilities.has(sessionId),
             hasTransport: this.transports.has(sessionId),
-          })),
+          })
+        );
+
+        res.json({
+          sessions,
           transports: Array.from(this.transports.keys()),
-          users: activeUsers,
           summary: {
-            totalSessions: this.oauthProvider?.getActiveSessionCount() ?? 0,
-            totalUsers: this.oauthProvider?.getActiveUserCount() ?? 0,
+            totalSessions: this.sessionAuth.size,
             totalTransports: this.transports.size,
-            authenticatedSessions,
+            authenticatedSessions: this.sessionAuth.size,
           },
         });
       });
@@ -1007,9 +1147,9 @@ export class DrupalMCPHttpServer {
     this.transports.clear();
     console.log('All transports closed');
 
-    // Clear all session and user data
+    // Clear all session data
     this.sessionCapabilities.clear();
-    this.oauthProvider?.clearAllSessions();
+    this.sessionAuth.clear();
   }
 }
 

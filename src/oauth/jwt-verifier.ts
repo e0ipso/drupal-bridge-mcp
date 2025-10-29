@@ -1,5 +1,8 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { OAuthMetadata } from '@modelcontextprotocol/sdk/shared/auth.js';
+import debugFactory from 'debug';
+
+const _debug = debugFactory('mcp:oauth:jwt');
 
 /**
  * Verifies a JWT access token using Drupal's JWKS endpoint
@@ -17,9 +20,9 @@ export async function verifyJWT(token: string, metadata: OAuthMetadata) {
   // Use JWKS endpoint from discovered metadata (not hard-coded)
   const JWKS = createRemoteJWKSet(new URL(jwksUri));
 
+  // Verify with issuer validation (most secure)
   const { payload } = await jwtVerify(token, JWKS, {
-    issuer: metadata.issuer, // Use issuer from metadata
+    issuer: metadata.issuer,
   });
-
   return payload;
 }
