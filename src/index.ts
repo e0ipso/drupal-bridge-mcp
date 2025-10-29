@@ -44,6 +44,7 @@ import {
 
 // Debug loggers
 const debugRequestIn = debug('mcp:request:in');
+const debugRequestOut = debug('mcp:request:out');
 const debugOAuth = debug('mcp:oauth');
 
 // Read version from package.json
@@ -344,9 +345,40 @@ export class DrupalMCPHttpServer {
 
     // In resource server pattern, no token refresh - client must provide valid token
     if (!response.ok) {
-      throw new Error(
-        `Tool invocation failed: HTTP ${response.status} ${response.statusText}`
-      );
+      // Try to get error details from response body
+      let errorBody = '';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          const errorJson = await response.json();
+          errorBody = JSON.stringify(errorJson, null, 2);
+        } else {
+          errorBody = await response.text();
+        }
+      } catch {
+        // Ignore errors reading body
+      }
+
+      // Log detailed error information
+      debugRequestOut('Error response body: %s', errorBody || '(empty)');
+
+      // Provide specific error messages based on status code
+      if (response.status === 401) {
+        throw new Error(
+          `Authentication failed: The OAuth token is invalid or expired. ` +
+            `Please re-authenticate. (HTTP 401)\n${errorBody ? `\nDetails: ${errorBody}` : ''}`
+        );
+      } else if (response.status === 403) {
+        throw new Error(
+          `Authorization failed: The OAuth token does not have permission to access this tool. ` +
+            `Required scopes may be missing or token may be expired. (HTTP 403)\n${errorBody ? `\nDetails: ${errorBody}` : ''}`
+        );
+      } else {
+        throw new Error(
+          `Tool invocation failed: HTTP ${response.status} ${response.statusText}` +
+            `${errorBody ? `\n\nResponse body:\n${errorBody}` : ''}`
+        );
+      }
     }
 
     return response.json();
@@ -365,6 +397,21 @@ export class DrupalMCPHttpServer {
     params: unknown,
     token?: string
   ): Promise<Response> {
+    // Build JSON-RPC 2.0 request
+    const jsonRpcRequest = {
+      jsonrpc: '2.0' as const,
+      method: toolName,
+      params: params as Record<string, unknown>,
+      id: randomUUID(),
+    };
+
+    // Determine endpoint and method
+    const endpoint = process.env.DRUPAL_JSONRPC_ENDPOINT || '/jsonrpc';
+    const baseUrl = `${process.env.DRUPAL_BASE_URL}${endpoint}`;
+    let requestMethod = (
+      process.env.DRUPAL_JSONRPC_METHOD || 'GET'
+    ).toUpperCase();
+
     // Build headers - include auth if available
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -374,16 +421,68 @@ export class DrupalMCPHttpServer {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    // Use A2A standard /mcp/tools/invoke endpoint
-    const endpoint = process.env.DRUPAL_JSONRPC_ENDPOINT || '/mcp/tools/invoke';
-    return fetch(`${process.env.DRUPAL_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: toolName,
-        arguments: params,
-      }),
+    let url = baseUrl;
+    let body: string | undefined;
+
+    // Construct request based on method
+    if (requestMethod === 'GET') {
+      // Serialize JSON-RPC request to URL-encoded query parameter
+      const queryParam = encodeURIComponent(JSON.stringify(jsonRpcRequest));
+      url = `${baseUrl}?query=${queryParam}`;
+
+      // Check URL length and fallback to POST if needed
+      if (url.length > 2000) {
+        debugRequestOut(
+          'GET URL exceeds 2000 characters (%d), falling back to POST',
+          url.length
+        );
+        requestMethod = 'POST';
+        url = baseUrl;
+        body = JSON.stringify(jsonRpcRequest);
+      }
+    } else {
+      // POST method - JSON body
+      body = JSON.stringify(jsonRpcRequest);
+    }
+
+    // Log outbound request
+    debugRequestOut(`${requestMethod} ${url}`);
+    debugRequestOut('Tool: %s (JSON-RPC method)', toolName);
+    debugRequestOut('Request ID: %s', jsonRpcRequest.id);
+    debugRequestOut('Headers: %O', {
+      ...headers,
+      Authorization: token ? `Bearer ***${token.slice(-6)}` : '(none)',
     });
+    if (body) {
+      debugRequestOut('Body: %s', body);
+    } else {
+      debugRequestOut(
+        'Query params: query=%s...',
+        JSON.stringify(jsonRpcRequest).substring(0, 100)
+      );
+    }
+
+    const response = await fetch(url, {
+      method: requestMethod,
+      headers,
+      body,
+    });
+
+    // Log response
+    debugRequestOut(
+      'Response status: %d %s',
+      response.status,
+      response.statusText
+    );
+
+    // Convert headers to object for logging
+    const responseHeaders: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+    debugRequestOut('Response headers: %O', responseHeaders);
+
+    return response;
   }
 
   /**
