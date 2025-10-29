@@ -67,7 +67,7 @@ device flow authentication, and dynamic tool registration from Drupal's `/mcp/to
    - `tool-discovery.ts`: Fetches tools from `/mcp/tools/list` at startup
    - `dynamic-handlers.ts`: Registers CallToolRequest handlers for discovered tools
    - `tool-cache.ts`: In-memory tool definition storage
-   - Follows A2A standard: Tools invoke via `/mcp/tools/invoke` endpoint
+   - Tool invocation: Uses standard `/jsonrpc` endpoint (configurable via `DRUPAL_JSONRPC_ENDPOINT`)
 
 4. **Drupal Connector** (`src/drupal/connector.ts`)
    - JSON-RPC 2.0 client for Drupal communication
@@ -96,12 +96,13 @@ all maps → **User tokens persist** for reconnection
 
 ### Tool Discovery Flow
 
-1. Server startup calls `getDiscoveredTools(DRUPAL_BASE_URL)`
+1. **Discovery**: Server startup calls `getDiscoveredTools(DRUPAL_BASE_URL)`
 2. Fetches `/mcp/tools/list` (5-second timeout)
 3. Validates tool definitions (name, description, inputSchema required)
 4. Normalizes Drupal quirks (empty array → empty object for properties)
 5. Stores in `discoveredToolDefinitions` array
 6. Each new session registers dynamic handlers via `registerDynamicTools()`
+7. **Invocation**: Tools execute via standard `/jsonrpc` endpoint using JSON-RPC 2.0 protocol
 
 ### OAuth Device Flow
 
@@ -166,6 +167,29 @@ all maps → **User tokens persist** for reconnection
 ```bash
 npx jest src/path/to/file.test.ts
 ```
+
+### Migrating to Standard JSON-RPC Endpoint
+
+**Why**: The standard `/jsonrpc` endpoint (Drupal's JSON-RPC module) has built-in OAuth2 support and
+doesn't require custom routing modifications.
+
+**Migration steps**:
+
+1. Ensure Drupal site has `jsonrpc` module 3.0.0+ installed
+2. Update MCP server environment variables:
+   - Remove `DRUPAL_JSONRPC_ENDPOINT=/mcp/tools/invoke` (if set)
+   - Set `DRUPAL_JSONRPC_METHOD=GET` (default, recommended for CDN caching)
+3. Restart MCP server
+4. Verify tools work via MCP Inspector or client application
+
+**Backward compatibility**: To use the legacy A2A endpoint, set:
+
+```bash
+DRUPAL_JSONRPC_ENDPOINT=/mcp/tools/invoke
+```
+
+**GET vs POST**: GET is the default for CDN-friendly caching. The server automatically falls back to
+POST when the URL exceeds 2000 characters to avoid URL length limitations.
 
 ### Type Checking
 

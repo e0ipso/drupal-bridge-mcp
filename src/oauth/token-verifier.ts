@@ -39,7 +39,15 @@ export class DrupalTokenVerifier implements OAuthTokenVerifier {
 
       // Extract scopes from JWT payload
       // Handle both space-separated string and array formats
-      const scopes = payload.scope as string[];
+      let scopes: string[] = [];
+      if (typeof payload.scope === 'string') {
+        // Split by space or comma and filter empty strings
+        scopes = payload.scope.split(/[\s,]+/).filter(s => s.length > 0);
+      } else if (Array.isArray(payload.scope)) {
+        scopes = payload.scope.filter(
+          s => typeof s === 'string' && s.length > 0
+        );
+      }
 
       // Build AuthInfo from JWT claims
       const authInfo: AuthInfo = {

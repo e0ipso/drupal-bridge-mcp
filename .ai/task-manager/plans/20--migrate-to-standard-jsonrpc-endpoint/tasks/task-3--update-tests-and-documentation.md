@@ -2,8 +2,9 @@
 id: 3
 group: 'jsonrpc-migration'
 dependencies: [1, 2]
-status: 'pending'
+status: 'completed'
 created: 2025-10-28
+completed: 2025-10-29
 skills:
   - jest
   - technical-writing

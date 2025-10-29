@@ -158,35 +158,30 @@ describe('JWT Verifier', () => {
       ).rejects.toThrow('JWT issuer invalid. Expected https://drupal.test');
     });
 
-    it('should fall back to signature-only verification when iss claim is missing', async () => {
+    it('should throw error when issuer validation fails', async () => {
       const customMetadata: OAuthMetadata = {
         ...mockMetadata,
         issuer: 'https://custom-drupal.example.com',
         jwks_uri: 'https://custom-drupal.example.com/oauth/jwks',
       };
 
-      const mockPayload = { sub: 'user-789' };
       const mockJWKS = {} as any;
       mockCreateRemoteJWKSet.mockReturnValueOnce(mockJWKS);
 
-      // First call (with issuer) throws missing iss claim error
-      mockJwtVerify
-        .mockRejectedValueOnce(new Error('missing required "iss" claim'))
-        // Second call (without issuer) succeeds
-        .mockResolvedValueOnce({
-          payload: mockPayload,
-          protectedHeader: { alg: 'RS256' },
-        } as any);
+      // Issuer validation fails
+      mockJwtVerify.mockRejectedValueOnce(
+        new Error('missing required "iss" claim')
+      );
 
-      const result = await verifyJWT('token', customMetadata);
+      await expect(verifyJWT('token', customMetadata)).rejects.toThrow(
+        'missing required "iss" claim'
+      );
 
-      expect(result).toEqual(mockPayload);
-      // Should try with issuer first, then fall back to signature-only
-      expect(mockJwtVerify).toHaveBeenCalledTimes(2);
-      expect(mockJwtVerify).toHaveBeenNthCalledWith(1, 'token', mockJWKS, {
+      // Should only try once with issuer validation
+      expect(mockJwtVerify).toHaveBeenCalledTimes(1);
+      expect(mockJwtVerify).toHaveBeenCalledWith('token', mockJWKS, {
         issuer: 'https://custom-drupal.example.com',
       });
-      expect(mockJwtVerify).toHaveBeenNthCalledWith(2, 'token', mockJWKS);
     });
 
     it('should create JWKS from metadata jwks_uri', async () => {
