@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.11.0...v1.11.1) (2025-10-29)
+
+
+### Bug Fixes
+
+* migrate to resource server OAuth pattern and standard JSON-RPC endpoint ([#5](https://github.com/e0ipso/drupal-bridge-mcp/issues/5)) ([879d7a1](https://github.com/e0ipso/drupal-bridge-mcp/commit/879d7a1627b30da5a9bea0c11b41d30eb545b477))
+
 # [1.11.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.10.0...v1.11.0) (2025-10-22)
 
 
