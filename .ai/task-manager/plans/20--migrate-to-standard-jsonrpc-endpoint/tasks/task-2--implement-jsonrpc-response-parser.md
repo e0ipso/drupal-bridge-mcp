@@ -2,7 +2,7 @@
 id: 2
 group: 'jsonrpc-migration'
 dependencies: [1]
-status: 'pending'
+status: 'completed'
 created: 2025-10-28
 skills:
   - typescript

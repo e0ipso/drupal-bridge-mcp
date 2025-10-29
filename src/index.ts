@@ -10,7 +10,12 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { mcpAuthMetadataRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
-import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ListToolsRequestSchema,
+  McpError,
+  ErrorCode,
+} from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +51,44 @@ import {
 const debugRequestIn = debug('mcp:request:in');
 const debugRequestOut = debug('mcp:request:out');
 const debugOAuth = debug('mcp:oauth');
+
+// JSON-RPC 2.0 Response Schemas
+const JsonRpcSuccessResponseSchema = z.object({
+  jsonrpc: z.literal('2.0'),
+  result: z.unknown(),
+  id: z.string(),
+});
+
+const JsonRpcErrorResponseSchema = z.object({
+  jsonrpc: z.literal('2.0'),
+  error: z.object({
+    code: z.number(),
+    message: z.string(),
+    data: z.unknown().optional(),
+  }),
+  id: z.string().nullable(),
+});
+
+// Union type for any valid JSON-RPC response
+const JsonRpcResponseSchema = z.union([
+  JsonRpcSuccessResponseSchema,
+  JsonRpcErrorResponseSchema,
+]);
+
+/**
+ * Maps JSON-RPC error codes to MCP ErrorCode enum
+ */
+function mapJsonRpcErrorToMcpError(code: number): ErrorCode {
+  const errorCodeMap: Record<number, ErrorCode> = {
+    [-32700]: ErrorCode.ParseError, // Parse error - invalid JSON
+    [-32600]: ErrorCode.InvalidRequest, // Invalid Request - malformed JSON-RPC
+    [-32601]: ErrorCode.MethodNotFound, // Method not found - tool doesn't exist
+    [-32602]: ErrorCode.InvalidParams, // Invalid params - parameter validation failed
+    [-32603]: ErrorCode.InternalError, // Internal error - Drupal-side execution error
+  };
+
+  return errorCodeMap[code] ?? ErrorCode.InternalError;
+}
 
 // Read version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -343,7 +386,7 @@ export class DrupalMCPHttpServer {
   ): Promise<unknown> {
     const response = await this.performRequest(toolName, params, token);
 
-    // In resource server pattern, no token refresh - client must provide valid token
+    // Handle HTTP-level errors (non-200 status codes)
     if (!response.ok) {
       // Try to get error details from response body
       let errorBody = '';
@@ -360,28 +403,87 @@ export class DrupalMCPHttpServer {
       }
 
       // Log detailed error information
-      debugRequestOut('Error response body: %s', errorBody || '(empty)');
+      debugRequestOut('HTTP error response body: %s', errorBody || '(empty)');
 
-      // Provide specific error messages based on status code
+      // Map HTTP status codes to MCP errors
       if (response.status === 401) {
-        throw new Error(
+        throw new McpError(
+          ErrorCode.InvalidParams,
           `Authentication failed: The OAuth token is invalid or expired. ` +
-            `Please re-authenticate. (HTTP 401)\n${errorBody ? `\nDetails: ${errorBody}` : ''}`
+            `Please re-authenticate. (HTTP 401)${errorBody ? `\n\nDetails: ${errorBody}` : ''}`
         );
       } else if (response.status === 403) {
-        throw new Error(
+        throw new McpError(
+          ErrorCode.InvalidParams,
           `Authorization failed: The OAuth token does not have permission to access this tool. ` +
-            `Required scopes may be missing or token may be expired. (HTTP 403)\n${errorBody ? `\nDetails: ${errorBody}` : ''}`
+            `Required scopes may be missing or token may be expired. (HTTP 403)${errorBody ? `\n\nDetails: ${errorBody}` : ''}`
         );
       } else {
-        throw new Error(
-          `Tool invocation failed: HTTP ${response.status} ${response.statusText}` +
-            `${errorBody ? `\n\nResponse body:\n${errorBody}` : ''}`
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Tool invocation failed: HTTP ${response.status} ${response.statusText}${errorBody ? `\n\nResponse body:\n${errorBody}` : ''}`
         );
       }
     }
 
-    return response.json();
+    // Parse JSON response body
+    let responseBody: unknown;
+    try {
+      responseBody = await response.json();
+    } catch (parseError) {
+      debugRequestOut('Failed to parse JSON response: %O', parseError);
+      throw new McpError(
+        ErrorCode.ParseError,
+        `Invalid JSON response from Drupal: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`
+      );
+    }
+
+    // Validate JSON-RPC 2.0 response structure
+    let jsonRpcResponse: z.infer<typeof JsonRpcResponseSchema>;
+    try {
+      jsonRpcResponse = JsonRpcResponseSchema.parse(responseBody);
+    } catch (validationError) {
+      debugRequestOut(
+        'Response validation failed: %O',
+        validationError instanceof Error
+          ? validationError.message
+          : validationError
+      );
+      debugRequestOut('Response body: %O', responseBody);
+
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Malformed JSON-RPC response from Drupal: ${
+          validationError instanceof Error
+            ? validationError.message
+            : 'Invalid response structure'
+        }`
+      );
+    }
+
+    // Check for JSON-RPC error response
+    if ('error' in jsonRpcResponse) {
+      const { error } = jsonRpcResponse;
+      const mcpErrorCode = mapJsonRpcErrorToMcpError(error.code);
+
+      // Build error message with additional context
+      let errorMessage = `JSON-RPC Error (${error.code}): ${error.message}`;
+      if (error.data !== undefined) {
+        try {
+          errorMessage += `\n\nAdditional data: ${JSON.stringify(error.data, null, 2)}`;
+        } catch {
+          errorMessage += `\n\nAdditional data: [non-serializable]`;
+        }
+      }
+
+      debugRequestOut('JSON-RPC error response: %O', error);
+
+      throw new McpError(mcpErrorCode, errorMessage);
+    }
+
+    // Success response - extract and return result
+    debugRequestOut('JSON-RPC success response, returning result');
+    return jsonRpcResponse.result;
   }
 
   /**
