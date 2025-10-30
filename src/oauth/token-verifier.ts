@@ -7,6 +7,7 @@
  */
 
 import { OAuthTokenVerifier } from '@modelcontextprotocol/sdk/server/auth/provider.js';
+import { InvalidTokenError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
 import { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import { verifyJWT } from './jwt-verifier.js';
 import type { OAuthConfigManager } from './config.js';
@@ -73,11 +74,11 @@ export class DrupalTokenVerifier implements OAuthTokenVerifier {
 
       return authInfo;
     } catch (error) {
-      // Provide descriptive error messages for verification failures
-      if (error instanceof Error) {
-        throw new Error(`Token verification failed: ${error.message}`);
-      }
-      throw new Error('Token verification failed: Unknown error');
+      const message =
+        error instanceof Error
+          ? `Token verification failed: ${error.message}`
+          : 'Token verification failed: Unknown error';
+      throw new InvalidTokenError(message);
     }
   }
 }
