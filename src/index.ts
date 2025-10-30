@@ -6,9 +6,14 @@
  */
 
 import express, { type Application } from 'express';
+import getRawBody from 'raw-body';
+import contentType from 'content-type';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { mcpAuthMetadataRouter } from '@modelcontextprotocol/sdk/server/auth/router.js';
+import {
+  getOAuthProtectedResourceMetadataUrl,
+  mcpAuthMetadataRouter,
+} from '@modelcontextprotocol/sdk/server/auth/router.js';
 import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import {
   ListToolsRequestSchema,
@@ -37,6 +42,7 @@ import {
   registerDynamicTools,
   type ToolDefinition,
 } from '@/discovery/index.js';
+import { getAuthLevel } from '@/discovery/tool-discovery.js';
 
 // Console utilities
 import {
@@ -163,6 +169,10 @@ export class DrupalMCPHttpServer {
   // sessionId → capabilities
 
   private localToolHandlers: Map<string, LocalToolHandler> = new Map();
+  private toolsRequiringAuth: Set<string> = new Set();
+  private resourceMetadataUrl?: string;
+  private resourceServerUrl?: URL;
+  private advertisedScopes: string[] = [];
 
   constructor(config: HttpServerConfig = DEFAULT_HTTP_CONFIG) {
     this.config = config;
@@ -176,6 +186,52 @@ export class DrupalMCPHttpServer {
     printInfo(
       '🔄 Transport map initialized for per-session Server+Transport instances'
     );
+  }
+
+  /**
+   * Updates the internal cache of tools that require authentication.
+   */
+  private updateToolAuthRequirements(tools: ToolDefinition[]): void {
+    this.toolsRequiringAuth.clear();
+
+    for (const tool of tools) {
+      const authLevel = getAuthLevel(tool.annotations?.auth);
+      if (authLevel === 'required') {
+        this.toolsRequiringAuth.add(tool.name);
+      }
+    }
+
+    debugOAuth(
+      `Tools requiring auth: ${Array.from(this.toolsRequiringAuth).join(', ') || '(none)'}`
+    );
+  }
+
+  /**
+   * Sends an HTTP 401 challenge response with OAuth metadata.
+   */
+  private respondWithAuthChallenge(res: express.Response): void {
+    const challengeParts = [
+      'Bearer error="invalid_token"',
+      'error_description="Authentication required to invoke this tool"',
+    ];
+
+    if (this.resourceServerUrl) {
+      challengeParts.push(`resource="${this.resourceServerUrl.href}"`);
+    }
+
+    if (this.resourceMetadataUrl) {
+      challengeParts.push(`resource_metadata="${this.resourceMetadataUrl}"`);
+    }
+
+    if (this.advertisedScopes.length > 0) {
+      challengeParts.push(`scope="${this.advertisedScopes.join(' ')}"`);
+    }
+
+    res.set('WWW-Authenticate', challengeParts.join(', '));
+    res.status(401).json({
+      error: 'invalid_token',
+      error_description: 'Authentication required to invoke this tool.',
+    });
   }
 
   /**
@@ -688,6 +744,33 @@ export class DrupalMCPHttpServer {
   ): Promise<void> {
     debugOAuth(`Token validation attempt for session ${sessionId}`);
 
+    const middlewareAuth = req.auth;
+    if (middlewareAuth) {
+      const token = middlewareAuth.token;
+      if (!token) {
+        debugOAuth(
+          `Middleware provided auth info without token for session ${sessionId}`
+        );
+        return;
+      }
+
+      const scopes = Array.isArray(middlewareAuth.scopes)
+        ? middlewareAuth.scopes
+        : [];
+
+      this.sessionAuth.set(sessionId, {
+        token,
+        scopes,
+      });
+
+      const scopeSummary = scopes.length > 0 ? scopes.join(', ') : '(none)';
+      debugOAuth(
+        `Token validated via middleware for session ${sessionId} (scopes: ${scopeSummary})`
+      );
+      debugOAuth(`Active sessions: ${this.sessionAuth.size}`);
+      return;
+    }
+
     // Step 1: Extract Authorization Header
     const authHeader = req.headers['authorization'] as string | undefined;
 
@@ -742,6 +825,7 @@ export class DrupalMCPHttpServer {
       debugOAuth(
         `Token validation failed for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
       );
+      this.sessionAuth.delete(sessionId);
       // Don't throw - allow session to continue unauthenticated
       // Tool handlers will handle missing auth appropriately
     }
@@ -793,13 +877,94 @@ export class DrupalMCPHttpServer {
           )}`
         );
 
-        // Log request body if present (for debugging)
-        if (req.body) {
-          debugRequestIn(`Body: ${JSON.stringify(req.body)}`);
+        let parsedBodyForTransport: unknown;
+        let requiresAuthForRequest = false;
+
+        if (
+          req.method === 'POST' &&
+          this.config.enableAuth &&
+          this.toolsRequiringAuth.size > 0
+        ) {
+          const contentTypeHeader = req.headers['content-type'];
+
+          if (contentTypeHeader?.includes('application/json')) {
+            try {
+              const parsedContentType = contentType.parse(contentTypeHeader);
+              const bodyBuffer = await getRawBody(req, {
+                limit: '4mb',
+                encoding: parsedContentType.parameters.charset ?? 'utf-8',
+              });
+
+              const bodyText = bodyBuffer.toString();
+              parsedBodyForTransport = bodyText;
+
+              try {
+                const bodyJson = JSON.parse(bodyText) as unknown;
+                parsedBodyForTransport = bodyJson;
+
+                const messages = Array.isArray(bodyJson)
+                  ? bodyJson
+                  : [bodyJson];
+
+                for (const message of messages) {
+                  if (
+                    message &&
+                    typeof message === 'object' &&
+                    'method' in message &&
+                    (message as Record<string, unknown>).method === 'tools/call'
+                  ) {
+                    const messageRecord = message as Record<string, unknown>;
+                    const params = messageRecord.params as
+                      | Record<string, unknown>
+                      | undefined;
+                    const toolName = params?.name;
+
+                    if (
+                      typeof toolName === 'string' &&
+                      this.toolsRequiringAuth.has(toolName)
+                    ) {
+                      requiresAuthForRequest = true;
+                      break;
+                    }
+                  }
+                }
+              } catch (parseError) {
+                debugRequestIn(
+                  `Failed to parse request body for auth inspection: ${
+                    parseError instanceof Error
+                      ? parseError.message
+                      : String(parseError)
+                  }`
+                );
+              }
+            } catch (readError) {
+              debugRequestIn(
+                `Failed to read request body for auth inspection: ${
+                  readError instanceof Error
+                    ? readError.message
+                    : String(readError)
+                }`
+              );
+            }
+          }
         }
 
         // Step 1: Extract session ID from header
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+        if (
+          requiresAuthForRequest &&
+          this.config.enableAuth &&
+          !req.headers['authorization']
+        ) {
+          const hasSessionToken =
+            sessionId !== undefined && this.sessionAuth.has(sessionId);
+
+          if (!hasSessionToken) {
+            this.respondWithAuthChallenge(res);
+            return;
+          }
+        }
 
         // Step 2: Session routing logic
         if (!sessionId) {
@@ -823,7 +988,28 @@ export class DrupalMCPHttpServer {
             debugOAuth(`Auth disabled - skipping token validation`);
           }
 
-          await transport.handleRequest(req, res);
+          if (
+            requiresAuthForRequest &&
+            this.config.enableAuth &&
+            !this.sessionAuth.has(newSessionId)
+          ) {
+            this.respondWithAuthChallenge(res);
+            try {
+              await transport.close();
+            } catch (closeError) {
+              debugOAuth(
+                `Failed to close transport for unauthenticated session ${newSessionId}: ${
+                  closeError instanceof Error
+                    ? closeError.message
+                    : String(closeError)
+                }`
+              );
+            }
+            this.transports.delete(newSessionId);
+            return;
+          }
+
+          await transport.handleRequest(req, res, parsedBodyForTransport);
         } else if (sessionId && this.transports.has(sessionId)) {
           // Scenario 2: Existing session
           debugRequestIn(`Using existing session: ${sessionId}`);
@@ -837,7 +1023,16 @@ export class DrupalMCPHttpServer {
             debugOAuth(`Auth disabled - skipping token validation`);
           }
 
-          await transport.handleRequest(req, res);
+          if (
+            requiresAuthForRequest &&
+            this.config.enableAuth &&
+            !this.sessionAuth.has(sessionId)
+          ) {
+            this.respondWithAuthChallenge(res);
+            return;
+          }
+
+          await transport.handleRequest(req, res, parsedBodyForTransport);
         } else {
           // Scenario 3: Invalid session ID
           debugRequestIn(`Invalid session ID: ${sessionId}`);
@@ -942,10 +1137,12 @@ export class DrupalMCPHttpServer {
 
       // Step 5: Update config with discovered + additional scopes
       configManager.updateScopes(discoveredScopes);
+      this.advertisedScopes = configManager.getConfig().scopes;
 
       // Step 6: Store tools for ListToolsRequest handler
       setDiscoveredTools(tools);
       printSuccess('Tool definitions stored for per-session registration');
+      this.updateToolAuthRequirements(tools);
 
       // Step 7: Initialize token verifier (if auth enabled)
       if (this.config.enableAuth) {
@@ -987,9 +1184,13 @@ export class DrupalMCPHttpServer {
 
           // Set up OAuth metadata router
           // Use the MCP server's URL as the resource server URL, not Drupal's URL
-          const resourceServerUrl = new URL(
-            `http://${this.config.host}:${this.config.port}`
-          );
+          const resourceServerBase =
+            configManager.getConfig().resourceServerUrl ??
+            `http://${this.config.host}:${this.config.port}/mcp`;
+          const resourceServerUrl = new URL(resourceServerBase);
+          this.resourceServerUrl = resourceServerUrl;
+          this.resourceMetadataUrl =
+            getOAuthProtectedResourceMetadataUrl(resourceServerUrl);
 
           printInfo('🔧 Setting up OAuth metadata router...');
           printInfo(`Resource server: ${resourceServerUrl.href}`, 2);
