@@ -417,13 +417,13 @@ graph TD
 
 - ✔️ Task 001: Implement Per-Tool URL Construction
 
-### Phase 2: Configuration and Validation
+### ✅ Phase 2: Configuration and Validation
 
 **Parallel Tasks:**
 
-- Task 002: Update Environment Configuration (depends on: 001)
-- Task 003: Update Documentation Files (depends on: 001)
-- Task 004: Update Existing Tests (depends on: 001)
+- ✔️ Task 002: Update Environment Configuration (depends on: 001)
+- ✔️ Task 003: Update Documentation Files (depends on: 001)
+- ✔️ Task 004: Update Existing Tests (depends on: 001)
 
 ### Execution Summary
 
@@ -431,3 +431,93 @@ graph TD
 - Total Tasks: 4
 - Maximum Parallelism: 3 tasks (in Phase 2)
 - Critical Path Length: 2 phases
+
+## Execution Summary
+
+**Status**: ✅ Completed Successfully **Completed Date**: 2025-11-03
+
+### Results
+
+Successfully migrated the MCP server from centralized JSON-RPC endpoint to per-tool invocation URLs
+following the pattern `/mcp/tools/{tool_name}`. This breaking change aligns with Drupal backend PR
+#3 and enables route-level OAuth2 authentication, tool-specific caching, and improved HTTP
+semantics.
+
+**Key Deliverables:**
+
+1. **Core Implementation (Phase 1)**:
+   - Modified `src/index.ts` to construct per-tool URLs dynamically
+   - Removed all usage of `DRUPAL_JSONRPC_ENDPOINT` environment variable
+   - Preserved JSON-RPC 2.0 request format and GET/POST flexibility
+   - Maintained automatic POST fallback for URL length > 2000 characters
+
+2. **Configuration & Documentation (Phase 2)**:
+   - Updated `.env.example` with breaking change migration notes
+   - Removed deprecated `DRUPAL_JSONRPC_ENDPOINT` configuration
+   - Rewrote `AGENTS.md` to reflect per-tool URL architecture
+   - Added comprehensive migration guide in `.github/DEPLOYMENT.md`
+   - Updated code comments referencing old endpoint patterns
+
+3. **Testing & Validation**:
+   - All 140 existing tests pass without modification (tests mock at higher level)
+   - TypeScript compilation succeeds with zero errors
+   - No breaking test changes required (existing tests already compatible)
+
+**Technical Changes:**
+
+- **Files Modified**: 7 files (src/index.ts, src/discovery/dynamic-handlers.ts, .env.example,
+  AGENTS.md, .github/DEPLOYMENT.md, plus task tracking files)
+- **Lines Changed**: 955 insertions, 11 deletions
+- **Commits**: 2 feature commits on branch `feature/plan-21-per-tool-invocation-urls`
+
+**Quality Metrics:**
+
+- ✅ TypeScript: Zero compilation errors
+- ✅ Tests: 140/140 passing (8 test suites)
+- ✅ Linting: All pre-commit hooks passed
+- ✅ Documentation: No `DRUPAL_JSONRPC_ENDPOINT` references remain (excluding archived plans)
+
+### Noteworthy Events
+
+1. **Minimal Test Changes Required**: The existing test suite was already compatible with the new
+   per-tool URL pattern because tests mock at the `makeRequest` function level rather than at the
+   HTTP/fetch level. Only code comments needed updates, not test logic.
+
+2. **Backward Compatibility Intentionally Removed**: Per the plan clarifications, this is a breaking
+   change with no backward compatibility. The `DRUPAL_JSONRPC_ENDPOINT` environment variable is
+   completely removed from the codebase.
+
+3. **Documentation Was Key Deliverable**: Significant effort went into comprehensive migration
+   documentation to guide users through the breaking change, including:
+   - Clear before/after comparisons
+   - Step-by-step migration instructions
+   - Backward compatibility warnings
+   - Testing procedures
+
+4. **Coordinated Breaking Change**: This migration requires synchronous deployment with Drupal
+   backend PR #3. Documented extensively in migration guides to prevent deployment issues.
+
+### Recommendations
+
+1. **Version Bump**: This is a major breaking change. Recommend bumping to next major version (e.g.,
+   1.x.x → 2.0.0) to clearly signal incompatibility.
+
+2. **Release Notes**: Include prominent breaking change notice in release notes with:
+   - Minimum Drupal backend version required (post-PR #3)
+   - Link to migration guide
+   - Emphasis on testing in staging environment first
+
+3. **Deployment Coordination**: Create deployment runbook that coordinates:
+   - Drupal backend update to PR #3 version
+   - MCP server update to this version
+   - Rollback procedures if issues arise
+
+4. **Future Monitoring**: After deployment, monitor:
+   - Tool invocation success rates
+   - Error rates for 401/403 authentication failures
+   - URL length fallback to POST (should be minimal)
+
+5. **Follow-up Documentation**: Consider adding:
+   - Mermaid diagram showing per-tool URL request flow (already included in plan)
+   - Example curl commands for testing per-tool endpoints
+   - Troubleshooting guide for common migration issues
