@@ -60,14 +60,14 @@ BLUEPRINT_EXISTS=$(echo "$VALIDATION" | grep -o '"blueprintExists": [a-z]*' | aw
 
 If either `$TASK_COUNT` is 0 or `$BLUEPRINT_EXISTS` is "no":
    - Display notification to user: "⚠️ Tasks or execution blueprint not found. Generating tasks automatically..."
+   - Immediately after task generation succeeds, set the approval_method_tasks field to auto:
+  ```bash
+  node .ai/task-manager/config/scripts/set-approval-method.cjs "$PLAN_FILE" auto tasks
+  ```
    - Use the SlashCommand tool to invoke task generation:
    ```
    /tasks:generate-tasks $1
    ```
-   - **NEW STEP**: Immediately after task generation succeeds, set the approval_method_tasks field to auto:
-     ```bash
-     node .ai/task-manager/config/scripts/set-approval-method.cjs "$PLAN_FILE" auto tasks
-     ```
    - This signals that tasks were auto-generated in workflow context and execution should continue without pause.
    - **CRITICAL**: After setting the field, you MUST immediately proceed with blueprint execution without waiting for user input. The workflow should continue seamlessly.
    - If generation fails: Halt execution with clear error message:
