@@ -512,9 +512,9 @@ export class DrupalMCPHttpServer {
       jsonRpcRequest.params = params;
     }
 
-    // Determine endpoint and method
-    const endpoint = process.env.DRUPAL_JSONRPC_ENDPOINT || '/jsonrpc';
-    const baseUrl = `${process.env.DRUPAL_BASE_URL}${endpoint}`;
+    // Construct per-tool endpoint URL
+    const toolEndpoint = `/mcp/tools/${toolName}`;
+    const baseUrl = `${process.env.DRUPAL_BASE_URL}${toolEndpoint}`;
     let requestMethod = (
       process.env.DRUPAL_JSONRPC_METHOD || 'GET'
     ).toUpperCase();
