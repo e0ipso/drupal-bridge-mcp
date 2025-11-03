@@ -191,7 +191,7 @@ function convertToolSchemas(
  *
  * @param server - MCP Server instance
  * @param tools - Array of discovered tool definitions
- * @param makeRequest - Function to invoke tools via A2A /mcp/tools/invoke endpoint
+ * @param makeRequest - Function to invoke tools via per-tool A2A endpoint (/mcp/tools/{toolName})
  * @param getSession - Function to retrieve session tokens
  * @param localHandlers - Map of local tool handlers (optional)
  */
@@ -269,7 +269,7 @@ export function registerDynamicTools(
       throw new Error(`Tool "${toolName}" is not available`);
     }
 
-    // Proxy request to Drupal via A2A /mcp/tools/invoke endpoint
+    // Proxy request to Drupal via per-tool A2A endpoint (/mcp/tools/{toolName})
     try {
       const result = await makeRequest(
         context.tool.name,

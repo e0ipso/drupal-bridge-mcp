@@ -369,7 +369,7 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Invoke a tool via A2A /mcp/tools/invoke endpoint
+   * Invoke a tool via per-tool A2A endpoint (/mcp/tools/{toolName})
    * Used by dynamic tool handlers
    *
    * @param toolName - Name of the tool to invoke
