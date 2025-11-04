@@ -1,3 +1,13 @@
+# [2.1.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v2.0.0...v2.1.0) (2025-11-04)
+
+
+### Features
+
+* add CLI help and version display utilities ([661f73c](https://github.com/e0ipso/drupal-bridge-mcp/commit/661f73cc483a4d7bdfc27416e89aaee8db0b9baa))
+* implement CLI argument parser module ([7ec61af](https://github.com/e0ipso/drupal-bridge-mcp/commit/7ec61af3161dbd86893ce2c72a75663509d8a823))
+* implement configuration manager with CLI argument precedence ([b64b98c](https://github.com/e0ipso/drupal-bridge-mcp/commit/b64b98cfe607a2e8df572d8f4d56f9aa75f391a7))
+* integrate CLI parser into server entry point ([272b55a](https://github.com/e0ipso/drupal-bridge-mcp/commit/272b55abd6b28a6dc22304ab8cbb889aaceb58f6))
+
 # [2.0.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.11.1...v2.0.0) (2025-11-04)
 
 
