@@ -1,3 +1,22 @@
+# [2.0.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.11.1...v2.0.0) (2025-11-04)
+
+
+### Features
+
+* complete per-tool URL migration - config, docs, and tests ([d0041c9](https://github.com/e0ipso/drupal-bridge-mcp/commit/d0041c9a8bcca7e8bfe0ba4e36c4537cb10b927a)), closes [#3](https://github.com/e0ipso/drupal-bridge-mcp/issues/3)
+* implement per-tool URL construction for MCP tool invocation ([09ec04f](https://github.com/e0ipso/drupal-bridge-mcp/commit/09ec04f66b05b9e6b76657f9704977c135aac19e)), closes [#3](https://github.com/e0ipso/drupal-bridge-mcp/issues/3)
+
+
+### BREAKING CHANGES
+
+* This completes the migration from centralized endpoint
+* Tools now invoke at /mcp/tools/{tool_name} instead
+of centralized /jsonrpc or /mcp/tools/invoke endpoints.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
 ## [1.11.1](https://github.com/e0ipso/drupal-bridge-mcp/compare/v1.11.0...v1.11.1) (2025-10-29)
 
 
