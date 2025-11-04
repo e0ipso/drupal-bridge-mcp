@@ -67,7 +67,7 @@ device flow authentication, and dynamic tool registration from Drupal's `/mcp/to
    - `tool-discovery.ts`: Fetches tools from `/mcp/tools/list` at startup
    - `dynamic-handlers.ts`: Registers CallToolRequest handlers for discovered tools
    - `tool-cache.ts`: In-memory tool definition storage
-   - Tool invocation: Uses standard `/jsonrpc` endpoint (configurable via `DRUPAL_JSONRPC_ENDPOINT`)
+   - Tool invocation: Uses per-tool URLs (`/mcp/tools/{tool_name}`)
 
 4. **Drupal Connector** (`src/drupal/connector.ts`)
    - JSON-RPC 2.0 client for Drupal communication
@@ -168,25 +168,19 @@ all maps → **User tokens persist** for reconnection
 npx jest src/path/to/file.test.ts
 ```
 
-### Migrating to Standard JSON-RPC Endpoint
+### Tool Invocation Method
 
-**Why**: The standard `/jsonrpc` endpoint (Drupal's JSON-RPC module) has built-in OAuth2 support and
-doesn't require custom routing modifications.
+**Architecture**: The MCP server uses per-tool URLs for tool invocation, where each tool is accessed
+at its own endpoint: `/mcp/tools/{tool_name}`. This architecture provides better routing control and
+clearer endpoint management.
 
-**Migration steps**:
+**HTTP Method Configuration**:
 
-1. Ensure Drupal site has `jsonrpc` module 3.0.0+ installed
-2. Update MCP server environment variables:
-   - Remove `DRUPAL_JSONRPC_ENDPOINT=/mcp/tools/invoke` (if set)
-   - Set `DRUPAL_JSONRPC_METHOD=GET` (default, recommended for CDN caching)
-3. Restart MCP server
-4. Verify tools work via MCP Inspector or client application
+Set `DRUPAL_JSONRPC_METHOD` to control the HTTP method for tool invocation:
 
-**Backward compatibility**: To use the legacy A2A endpoint, set:
-
-```bash
-DRUPAL_JSONRPC_ENDPOINT=/mcp/tools/invoke
-```
+- `GET` (default): URL-encoded query parameters (CDN-friendly, automatic POST fallback if URL > 2000
+  chars)
+- `POST`: JSON body
 
 **GET vs POST**: GET is the default for CDN-friendly caching. The server automatically falls back to
 POST when the URL exceeds 2000 characters to avoid URL length limitations.

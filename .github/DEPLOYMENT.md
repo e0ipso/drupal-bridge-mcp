@@ -61,7 +61,7 @@ These are configured in Railway directly:
 ### Drupal Integration (for Railway)
 
 - `DRUPAL_BASE_URL`: Base URL of your Drupal instance
-- `DRUPAL_JSONRPC_ENDPOINT`: JSON-RPC endpoint path (default: `/jsonrpc`)
+- `DRUPAL_JSONRPC_METHOD`: HTTP method for tool invocation (GET or POST, default: `GET`)
 - `DRUPAL_TIMEOUT`: Request timeout in milliseconds (default: `10000`)
 
 ### Other Configuration

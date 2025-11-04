@@ -67,7 +67,7 @@ sequenceDiagram
 
 ```bash
 # Drupal Server
-DRUPAL_URL=https://your-drupal-site.com
+DRUPAL_BASE_URL=https://your-drupal-site.com
 
 # OAuth Client Credentials (from Drupal Simple OAuth setup)
 OAUTH_CLIENT_ID=mcp-server-client
@@ -79,7 +79,7 @@ OAUTH_SCOPES="profile tutorial_read user_read tutorial_search"
 # Enable/Disable OAuth Authentication
 AUTH_ENABLED=true
 
-# Optional: Override resource server URL (defaults to DRUPAL_URL)
+# Optional: Override resource server URL (defaults to DRUPAL_BASE_URL)
 OAUTH_RESOURCE_SERVER_URL=https://your-drupal-site.com
 
 # HTTP Server Configuration
@@ -256,7 +256,7 @@ This implementation follows:
 
 ### OAuth Discovery Fails
 
-- Verify `DRUPAL_URL` is correct and accessible
+- Verify `DRUPAL_BASE_URL` is correct and accessible
 - Check that Drupal's `.well-known/oauth-authorization-server` endpoint returns valid metadata
 - Ensure network connectivity to Drupal server
 
