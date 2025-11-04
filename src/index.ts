@@ -134,7 +134,7 @@ const DEFAULT_HTTP_CONFIG: HttpServerConfig = {
   version: process.env.MCP_SERVER_VERSION || PKG_VERSION,
   port: parseInt(process.env.HTTP_PORT || '6200', 10),
   host: process.env.HTTP_HOST || 'localhost',
-  enableAuth: process.env.AUTH_ENABLED?.toLowerCase() === 'true',
+  enableAuth: process.env.AUTH_ENABLED?.toLowerCase() !== 'false',
 };
 
 /**

@@ -29,17 +29,12 @@ describe('CLI Parser', () => {
     });
 
     describe('auth boolean flag', () => {
-      it('should parse --auth as true', () => {
-        const result = parseCliArgs(['--auth']);
-        expect(result.auth).toBe(true);
-      });
-
       it('should parse --no-auth as false', () => {
         const result = parseCliArgs(['--no-auth']);
         expect(result.auth).toBe(false);
       });
 
-      it('should return false as default when auth not provided', () => {
+      it('should return false as default when auth not provided (minimist behavior)', () => {
         const result = parseCliArgs([]);
         // minimist returns false for boolean flags even with default: undefined
         expect(result.auth).toBe(false);
@@ -116,23 +111,21 @@ describe('CLI Parser', () => {
           'https://example.com',
           '--port',
           '4000',
-          '--auth',
         ]);
 
         expect(result.drupalUrl).toBe('https://example.com');
         expect(result.port).toBe(4000);
-        expect(result.auth).toBe(true);
       });
 
       it('should parse all supported arguments together', () => {
         const result = parseCliArgs([
           '--drupal-url=https://example.com',
-          '--auth',
+          '--no-auth',
           '--port=5000',
         ]);
 
         expect(result.drupalUrl).toBe('https://example.com');
-        expect(result.auth).toBe(true);
+        expect(result.auth).toBe(false);
         expect(result.port).toBe(5000);
       });
     });
@@ -176,7 +169,7 @@ describe('CLI Parser', () => {
       it('should return object with correct types', () => {
         const result = parseCliArgs([
           '--drupal-url=https://example.com',
-          '--auth',
+          '--no-auth',
           '--port=3000',
         ]);
 

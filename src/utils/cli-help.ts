@@ -35,7 +35,7 @@ Required:
   --drupal-url <url>              Drupal site URL (e.g., https://example.com)
 
 Optional:
-  --auth / --no-auth              Enable/disable OAuth authentication (default: true)
+  --no-auth                       Disable OAuth authentication (enabled by default)
   --port <number>                 Server port (default: 3000)
   --help, -h                      Show this help message
   --version, -v                   Show version number

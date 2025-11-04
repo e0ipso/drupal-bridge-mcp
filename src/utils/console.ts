@@ -1,9 +1,8 @@
 /**
- * Pretty console output utilities with colors, boxes, and emojis
+ * Pretty console output utilities with colors and emojis
  */
 
 import chalk from 'chalk';
-import boxen from 'boxen';
 
 /**
  * Print a section header with emoji
@@ -79,14 +78,11 @@ export function printStartupBanner(config: {
     `${chalk.cyan('🛠️ Tools Available:')} ${chalk.bold.green(config.toolsCount.toString())}`
   );
 
-  const box = boxen(content.join('\n'), {
-    title: '✨ MCP SERVER STARTED ✨',
-    titleAlignment: 'center',
-    padding: 1,
-    margin: 1,
-    borderStyle: 'round',
-    borderColor: 'green',
-  });
-
-  console.log(box);
+  // Print header
+  console.log('');
+  console.log(chalk.bold.green('✨ MCP SERVER STARTED ✨'));
+  console.log('');
+  // Print content
+  console.log(content.join('\n'));
+  console.log('');
 }

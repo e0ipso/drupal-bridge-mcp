@@ -9,7 +9,7 @@
  * Validation rules:
  * - drupal-url: Must be valid HTTP/HTTPS URL
  * - port: Integer between 1 and 65535
- * - auth: Boolean (true/false)
+ * - auth: Boolean (true/false, undefined = enabled by default)
  */
 
 import type { ParsedCliArgs } from './cli-parser.js';

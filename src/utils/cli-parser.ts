@@ -6,7 +6,7 @@
  *
  * Supported arguments:
  * - --drupal-base-url=<url>: Drupal site URL
- * - --auth / --no-auth: Enable/disable OAuth authentication
+ * - --no-auth: Disable OAuth authentication (enabled by default)
  * - --port=<number>: Server port
  * - --help / -h: Show help message
  * - --version / -v: Show version
@@ -32,7 +32,8 @@ export interface ParsedCliArgs {
   drupalBaseUrl?: string;
 
   /**
-   * Enable/disable OAuth authentication
+   * Enable/disable OAuth authentication (undefined = enabled by default)
+   * Use --no-auth to disable
    */
   auth?: boolean;
 
@@ -81,7 +82,7 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
       h: 'help',
       v: 'version',
     },
-    // Default values (undefined = let env vars take precedence)
+    // Default values (undefined = auth enabled by default)
     default: {
       auth: undefined,
     },

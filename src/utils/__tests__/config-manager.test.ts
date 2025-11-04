@@ -196,15 +196,7 @@ describe('Config Manager', () => {
     });
 
     describe('auth argument', () => {
-      it('should apply auth true to AUTH_ENABLED as string', () => {
-        const args: ParsedCliArgs = {
-          auth: true,
-        };
-        applyArgsToEnv(args);
-        expect(process.env.AUTH_ENABLED).toBe('true');
-      });
-
-      it('should apply auth false to AUTH_ENABLED as string', () => {
+      it('should apply auth false to AUTH_ENABLED as string when --no-auth is used', () => {
         const args: ParsedCliArgs = {
           auth: false,
         };
@@ -212,7 +204,7 @@ describe('Config Manager', () => {
         expect(process.env.AUTH_ENABLED).toBe('false');
       });
 
-      it('should not modify AUTH_ENABLED when auth is undefined', () => {
+      it('should not modify AUTH_ENABLED when auth is undefined (default)', () => {
         process.env.AUTH_ENABLED = 'existing-value';
         const args: ParsedCliArgs = {
           port: 3000,
@@ -277,9 +269,7 @@ describe('Config Manager', () => {
 
       it('should not modify PORT when port is undefined', () => {
         delete process.env.PORT;
-        const args: ParsedCliArgs = {
-          auth: true,
-        };
+        const args: ParsedCliArgs = {};
         applyArgsToEnv(args);
         expect(process.env.PORT).toBeUndefined();
       });
@@ -289,13 +279,13 @@ describe('Config Manager', () => {
       it('should apply multiple valid arguments', () => {
         const args: ParsedCliArgs = {
           drupalUrl: 'https://example.com',
-          auth: true,
+          auth: false,
           port: 4000,
         };
         applyArgsToEnv(args);
 
         expect(process.env.DRUPAL_BASE_URL).toBe('https://example.com');
-        expect(process.env.AUTH_ENABLED).toBe('true');
+        expect(process.env.AUTH_ENABLED).toBe('false');
         expect(process.env.PORT).toBe('4000');
       });
 
