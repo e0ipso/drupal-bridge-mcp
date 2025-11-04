@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import {
-  applyArgsToEnv,
-  isValidUrl,
-  isValidPort,
-  isValidLogLevel,
-  isValidJsonRpcMethod,
-} from '../config-manager.js';
+import { applyArgsToEnv, isValidUrl, isValidPort } from '../config-manager.js';
 import type { ParsedCliArgs } from '../cli-parser.js';
 
 describe('Config Manager', () => {
@@ -125,110 +119,6 @@ describe('Config Manager', () => {
 
       it('should reject Infinity', () => {
         expect(isValidPort(Infinity)).toBe(false);
-      });
-    });
-  });
-
-  describe('isValidLogLevel', () => {
-    describe('valid log levels', () => {
-      it('should accept trace', () => {
-        expect(isValidLogLevel('trace')).toBe(true);
-      });
-
-      it('should accept debug', () => {
-        expect(isValidLogLevel('debug')).toBe(true);
-      });
-
-      it('should accept info', () => {
-        expect(isValidLogLevel('info')).toBe(true);
-      });
-
-      it('should accept warn', () => {
-        expect(isValidLogLevel('warn')).toBe(true);
-      });
-
-      it('should accept error', () => {
-        expect(isValidLogLevel('error')).toBe(true);
-      });
-
-      it('should accept fatal', () => {
-        expect(isValidLogLevel('fatal')).toBe(true);
-      });
-
-      it('should accept uppercase TRACE', () => {
-        expect(isValidLogLevel('TRACE')).toBe(true);
-      });
-
-      it('should accept uppercase DEBUG', () => {
-        expect(isValidLogLevel('DEBUG')).toBe(true);
-      });
-
-      it('should accept mixed case DeBuG', () => {
-        expect(isValidLogLevel('DeBuG')).toBe(true);
-      });
-    });
-
-    describe('invalid log levels', () => {
-      it('should reject invalid level', () => {
-        expect(isValidLogLevel('invalid')).toBe(false);
-      });
-
-      it('should reject empty string', () => {
-        expect(isValidLogLevel('')).toBe(false);
-      });
-
-      it('should reject verbose', () => {
-        expect(isValidLogLevel('verbose')).toBe(false);
-      });
-
-      it('should reject silly', () => {
-        expect(isValidLogLevel('silly')).toBe(false);
-      });
-    });
-  });
-
-  describe('isValidJsonRpcMethod', () => {
-    describe('valid methods', () => {
-      it('should accept GET', () => {
-        expect(isValidJsonRpcMethod('GET')).toBe(true);
-      });
-
-      it('should accept POST', () => {
-        expect(isValidJsonRpcMethod('POST')).toBe(true);
-      });
-
-      it('should accept lowercase get', () => {
-        expect(isValidJsonRpcMethod('get')).toBe(true);
-      });
-
-      it('should accept lowercase post', () => {
-        expect(isValidJsonRpcMethod('post')).toBe(true);
-      });
-
-      it('should accept mixed case GeT', () => {
-        expect(isValidJsonRpcMethod('GeT')).toBe(true);
-      });
-    });
-
-    describe('invalid methods', () => {
-      it('should reject PUT', () => {
-        expect(isValidJsonRpcMethod('PUT')).toBe(false);
-      });
-
-      it('should reject DELETE', () => {
-        expect(isValidJsonRpcMethod('DELETE')).toBe(false);
-      });
-
-      it('should reject PATCH', () => {
-        expect(isValidJsonRpcMethod('PATCH')).toBe(false);
-      });
-
-      it('should reject empty string', () => {
-        expect(isValidJsonRpcMethod('')).toBe(false);
-      });
-
-      it('should reject invalid method', () => {
-        expect(isValidJsonRpcMethod('INVALID')).toBe(false);
       });
     });
   });
@@ -388,186 +278,10 @@ describe('Config Manager', () => {
       it('should not modify PORT when port is undefined', () => {
         delete process.env.PORT;
         const args: ParsedCliArgs = {
-          logLevel: 'debug',
+          auth: true,
         };
         applyArgsToEnv(args);
         expect(process.env.PORT).toBeUndefined();
-      });
-    });
-
-    describe('log-level argument', () => {
-      it('should apply valid log level', () => {
-        const args: ParsedCliArgs = {
-          logLevel: 'debug',
-        };
-        applyArgsToEnv(args);
-        expect(process.env.LOG_LEVEL).toBe('debug');
-      });
-
-      it('should apply trace level', () => {
-        const args: ParsedCliArgs = {
-          logLevel: 'trace',
-        };
-        applyArgsToEnv(args);
-        expect(process.env.LOG_LEVEL).toBe('trace');
-      });
-
-      it('should apply fatal level', () => {
-        const args: ParsedCliArgs = {
-          logLevel: 'fatal',
-        };
-        applyArgsToEnv(args);
-        expect(process.env.LOG_LEVEL).toBe('fatal');
-      });
-
-      it('should throw error for invalid log level', () => {
-        const args: ParsedCliArgs = {
-          logLevel: 'invalid',
-        };
-        expect(() => applyArgsToEnv(args)).toThrow(/Invalid --log-level/);
-      });
-
-      it('should list valid levels in error message', () => {
-        const args: ParsedCliArgs = {
-          logLevel: 'invalid',
-        };
-        expect(() => applyArgsToEnv(args)).toThrow(
-          /Must be one of: trace, debug, info, warn, error, fatal/
-        );
-      });
-
-      it('should not modify LOG_LEVEL when logLevel is undefined', () => {
-        delete process.env.LOG_LEVEL;
-        const args: ParsedCliArgs = {
-          port: 3000,
-        };
-        applyArgsToEnv(args);
-        expect(process.env.LOG_LEVEL).toBeUndefined();
-      });
-    });
-
-    describe('oauth-scopes arguments', () => {
-      it('should apply oauthScopes to OAUTH_SCOPES', () => {
-        const args: ParsedCliArgs = {
-          oauthScopes: 'read:content write:content',
-        };
-        applyArgsToEnv(args);
-        expect(process.env.OAUTH_SCOPES).toBe('read:content write:content');
-      });
-
-      it('should apply oauthAdditionalScopes to OAUTH_ADDITIONAL_SCOPES', () => {
-        const args: ParsedCliArgs = {
-          oauthAdditionalScopes: 'admin:users',
-        };
-        applyArgsToEnv(args);
-        expect(process.env.OAUTH_ADDITIONAL_SCOPES).toBe('admin:users');
-      });
-
-      it('should not modify env when scopes are undefined', () => {
-        delete process.env.OAUTH_SCOPES;
-        const args: ParsedCliArgs = {
-          port: 3000,
-        };
-        applyArgsToEnv(args);
-        expect(process.env.OAUTH_SCOPES).toBeUndefined();
-      });
-    });
-
-    describe('oauth-resource-server-url argument', () => {
-      it('should apply valid resource server URL', () => {
-        const args: ParsedCliArgs = {
-          oauthResourceServerUrl: 'https://resource.example.com',
-        };
-        applyArgsToEnv(args);
-        expect(process.env.OAUTH_RESOURCE_SERVER_URL).toBe(
-          'https://resource.example.com'
-        );
-      });
-
-      it('should throw error for invalid resource server URL', () => {
-        const args: ParsedCliArgs = {
-          oauthResourceServerUrl: 'not-a-url',
-        };
-        expect(() => applyArgsToEnv(args)).toThrow(
-          /Invalid --oauth-resource-server-url/
-        );
-      });
-
-      it('should include helpful example in error message', () => {
-        const args: ParsedCliArgs = {
-          oauthResourceServerUrl: 'invalid',
-        };
-        expect(() => applyArgsToEnv(args)).toThrow(
-          /Example: https:\/\/example\.com/
-        );
-      });
-
-      it('should not modify env when URL is undefined', () => {
-        delete process.env.OAUTH_RESOURCE_SERVER_URL;
-        const args: ParsedCliArgs = {
-          port: 3000,
-        };
-        applyArgsToEnv(args);
-        expect(process.env.OAUTH_RESOURCE_SERVER_URL).toBeUndefined();
-      });
-    });
-
-    describe('drupal-jsonrpc-method argument', () => {
-      it('should apply GET method', () => {
-        const args: ParsedCliArgs = {
-          drupalJsonrpcMethod: 'GET',
-        };
-        applyArgsToEnv(args);
-        expect(process.env.DRUPAL_JSONRPC_METHOD).toBe('GET');
-      });
-
-      it('should apply POST method', () => {
-        const args: ParsedCliArgs = {
-          drupalJsonrpcMethod: 'POST',
-        };
-        applyArgsToEnv(args);
-        expect(process.env.DRUPAL_JSONRPC_METHOD).toBe('POST');
-      });
-
-      it('should normalize lowercase get to uppercase', () => {
-        const args: ParsedCliArgs = {
-          drupalJsonrpcMethod: 'get',
-        };
-        applyArgsToEnv(args);
-        expect(process.env.DRUPAL_JSONRPC_METHOD).toBe('GET');
-      });
-
-      it('should normalize lowercase post to uppercase', () => {
-        const args: ParsedCliArgs = {
-          drupalJsonrpcMethod: 'post',
-        };
-        applyArgsToEnv(args);
-        expect(process.env.DRUPAL_JSONRPC_METHOD).toBe('POST');
-      });
-
-      it('should throw error for PUT method', () => {
-        const args: ParsedCliArgs = {
-          drupalJsonrpcMethod: 'PUT',
-        };
-        expect(() => applyArgsToEnv(args)).toThrow(
-          /Invalid --drupal-jsonrpc-method/
-        );
-      });
-
-      it('should list valid methods in error message', () => {
-        const args: ParsedCliArgs = {
-          drupalJsonrpcMethod: 'PUT',
-        };
-        expect(() => applyArgsToEnv(args)).toThrow(/Must be one of: GET, POST/);
-      });
-
-      it('should not modify env when method is undefined', () => {
-        delete process.env.DRUPAL_JSONRPC_METHOD;
-        const args: ParsedCliArgs = {
-          port: 3000,
-        };
-        applyArgsToEnv(args);
-        expect(process.env.DRUPAL_JSONRPC_METHOD).toBeUndefined();
       });
     });
 
@@ -577,25 +291,18 @@ describe('Config Manager', () => {
           drupalUrl: 'https://example.com',
           auth: true,
           port: 4000,
-          logLevel: 'debug',
-          oauthScopes: 'read write',
-          drupalJsonrpcMethod: 'POST',
         };
         applyArgsToEnv(args);
 
         expect(process.env.DRUPAL_BASE_URL).toBe('https://example.com');
         expect(process.env.AUTH_ENABLED).toBe('true');
         expect(process.env.PORT).toBe('4000');
-        expect(process.env.LOG_LEVEL).toBe('debug');
-        expect(process.env.OAUTH_SCOPES).toBe('read write');
-        expect(process.env.DRUPAL_JSONRPC_METHOD).toBe('POST');
       });
 
       it('should throw on first invalid argument', () => {
         const args: ParsedCliArgs = {
           drupalUrl: 'https://example.com',
           port: 0, // Invalid
-          logLevel: 'debug',
         };
         expect(() => applyArgsToEnv(args)).toThrow(/Invalid --port/);
       });

@@ -64,35 +64,27 @@ describe('Scope Discovery', () => {
 
     expect(scopes).toContain('content:read');
     expect(scopes).toContain('content:write');
-    expect(scopes).toContain('profile');
+    expect(scopes).toHaveLength(2);
   });
 
-  it('should include additional scopes', async () => {
+  it('should return empty array when no tools have auth scopes', async () => {
     nock(MOCK_DRUPAL_URL)
       .get('/mcp/tools/list')
       .reply(200, {
         tools: [
           {
-            name: 'content.list',
-            description: 'List content',
+            name: 'public.tool',
+            description: 'Public tool',
             inputSchema: { type: 'object', properties: {} },
-            annotations: {
-              auth: {
-                scopes: ['content:read'],
-              },
-            },
+            // No auth metadata
           },
         ],
       });
 
     const tools = await discoverTools(MOCK_DRUPAL_URL);
-    const additionalScopes = ['admin:access', 'experimental:features'];
-    const scopes = extractRequiredScopes(tools, additionalScopes);
+    const scopes = extractRequiredScopes(tools);
 
-    expect(scopes).toContain('admin:access');
-    expect(scopes).toContain('content:read');
-    expect(scopes).toContain('experimental:features');
-    expect(scopes).toContain('profile');
+    expect(scopes).toEqual([]);
   });
 
   it('should deduplicate scopes', () => {
@@ -119,18 +111,16 @@ describe('Scope Discovery', () => {
       },
     ];
 
-    const additionalScopes = ['content:write', 'admin:access']; // One duplicate
-    const scopes = extractRequiredScopes(tools, additionalScopes);
+    const scopes = extractRequiredScopes(tools);
 
     // Verify no duplicates
     const uniqueScopes = new Set(scopes);
     expect(scopes.length).toBe(uniqueScopes.size);
 
     // Verify all expected scopes present
-    expect(scopes).toContain('admin:access');
     expect(scopes).toContain('content:read');
     expect(scopes).toContain('content:write');
-    expect(scopes).toContain('profile');
+    expect(scopes).toHaveLength(2);
   });
 
   it('should validate tool access with correct scopes', () => {

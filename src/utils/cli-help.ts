@@ -37,24 +37,17 @@ Required:
 Optional:
   --auth / --no-auth              Enable/disable OAuth authentication (default: true)
   --port <number>                 Server port (default: 3000)
-  --log-level <level>             Logging verbosity (default: info)
-                                  Options: trace, debug, info, warn, error, fatal
-  --oauth-scopes <scopes>         OAuth scopes (comma/space separated)
-  --oauth-additional-scopes <s>   Additional OAuth scopes beyond tool requirements
-  --oauth-resource-server-url     OAuth resource server URL (if different from Drupal URL)
-  --drupal-jsonrpc-method <m>     HTTP method for tool invocation (GET|POST, default: GET)
   --help, -h                      Show this help message
   --version, -v                   Show version number
 
 Examples:
   drupal-bridge-mcp --drupal-url=https://example.com
   drupal-bridge-mcp --drupal-url=https://example.com --no-auth
-  drupal-bridge-mcp --drupal-url=https://example.com --port=4000 --log-level=debug
-  drupal-bridge-mcp --drupal-url=https://example.com --oauth-scopes="profile tutorial_read"
+  drupal-bridge-mcp --drupal-url=https://example.com --port=4000
 
 Environment Variables:
   All options can also be set via environment variables (CLI args take precedence):
-  DRUPAL_BASE_URL, AUTH_ENABLED, PORT, LOG_LEVEL, OAUTH_SCOPES, etc.
+  DRUPAL_BASE_URL, AUTH_ENABLED, PORT, etc.
 
 Documentation: https://github.com/e0ipso/drupal-bridge-mcp#readme
 `;

@@ -1,36 +1,11 @@
 #!/usr/bin/env node
 
-import { parseCliArgs } from './utils/cli-parser.js';
-import { applyArgsToEnv } from './utils/config-manager.js';
-import { displayHelp, displayVersion } from './utils/cli-help.js';
+import { bootstrap } from './utils/cli-bootstrap.js';
 
-// Parse CLI arguments
-const args = parseCliArgs(process.argv.slice(2));
+// Bootstrap CLI configuration (parses args, validates, sets env)
+bootstrap(process.argv.slice(2));
 
-// Handle --help flag
-if (args.help) {
-  displayHelp();
-  process.exit(0);
-}
-
-// Handle --version flag
-if (args.version) {
-  console.log(displayVersion());
-  process.exit(0);
-}
-
-// Apply CLI arguments to environment (validation happens here)
-try {
-  applyArgsToEnv(args);
-} catch (error) {
-  if (error instanceof Error) {
-    console.error(`Configuration error: ${error.message}`);
-    console.error('Run with --help for usage information.');
-  }
-  process.exit(1);
-}
-
-// Now import main (after env vars are set)
+// Import main after environment is configured
 const { default: main, handleError } = await import('./index.js');
 
 // Set up error handlers

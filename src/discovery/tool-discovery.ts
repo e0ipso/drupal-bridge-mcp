@@ -242,14 +242,10 @@ export function getAuthLevel(
  * Extracts all required OAuth scopes from discovered tools.
  *
  * @param tools - Array of tool definitions
- * @param additionalScopes - Optional additional scopes to include
- * @returns Array of unique scope strings, always includes 'profile'
+ * @returns Array of unique scope strings from tool definitions
  */
-export function extractRequiredScopes(
-  tools: ToolDefinition[],
-  additionalScopes: string[] = []
-): string[] {
-  const scopes = new Set<string>(['profile']); // Always include profile
+export function extractRequiredScopes(tools: ToolDefinition[]): string[] {
+  const scopes = new Set<string>();
 
   // Add scopes from tool definitions
   for (const tool of tools) {
@@ -266,9 +262,6 @@ export function extractRequiredScopes(
       authMetadata.scopes.forEach(scope => scopes.add(scope));
     }
   }
-
-  // Add additional scopes from environment
-  additionalScopes.forEach(scope => scopes.add(scope));
 
   return Array.from(scopes).sort();
 }

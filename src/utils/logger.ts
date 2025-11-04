@@ -158,7 +158,7 @@ export function requestSerializer(
  */
 function createLoggerOptions(): LoggerOptions {
   const isDevelopment = process.env.NODE_ENV !== 'production';
-  const logLevel = process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info');
+  const logLevel = isDevelopment ? 'debug' : 'info';
 
   const baseOptions: LoggerOptions = {
     level: logLevel,

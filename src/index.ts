@@ -645,27 +645,6 @@ export class DrupalMCPHttpServer {
   }
 
   /**
-   * Validates that requested scopes are supported by the OAuth server.
-   */
-  private validateScopes(
-    requestedScopes: string[],
-    supportedScopes: string[]
-  ): void {
-    const unsupportedScopes = requestedScopes.filter(
-      scope => !supportedScopes.includes(scope)
-    );
-
-    if (unsupportedScopes.length > 0) {
-      printWarning(
-        'Some requested scopes are not supported by the OAuth server:'
-      );
-      printInfo(`Unsupported: ${unsupportedScopes.join(', ')}`, 2);
-      printInfo(`Supported: ${supportedScopes.join(', ')}`, 2);
-      printInfo('These scopes will be ignored during authentication.', 2);
-    }
-  }
-
-  /**
    * Redacts a token for safe logging, showing only last 6 characters
    * @param token - Full token string
    * @returns Redacted token string
@@ -920,41 +899,32 @@ export class DrupalMCPHttpServer {
         );
       });
 
-      // Step 4: Extract scopes from discovered tools + additional scopes
-      const discoveredScopes = extractRequiredScopes(
-        tools,
-        oauthConfig.additionalScopes
-      );
+      // Step 4: Extract scopes from discovered tools
+      const discoveredScopes = extractRequiredScopes(tools);
 
       printInfo(
         `Extracted ${discoveredScopes.length} scopes from tool definitions`,
         2
       );
 
-      if (oauthConfig.additionalScopes.length > 0) {
-        printInfo(
-          `Additional scopes: ${oauthConfig.additionalScopes.join(', ')}`,
-          2
-        );
+      if (discoveredScopes.length > 0) {
+        printInfo(`Scopes: ${discoveredScopes.join(', ')}`, 2);
+      } else {
+        printInfo('No scopes required by tools', 2);
       }
 
-      printInfo(`Total scopes: ${discoveredScopes.join(', ')}`, 2);
-
-      // Step 5: Update config with discovered + additional scopes
-      configManager.updateScopes(discoveredScopes);
-
-      // Step 6: Store tools for ListToolsRequest handler
+      // Step 5: Store tools for ListToolsRequest handler
       setDiscoveredTools(tools);
       printSuccess('Tool definitions stored for per-session registration');
 
-      // Step 7: Initialize token verifier (if auth enabled)
+      // Step 6: Initialize token verifier (if auth enabled)
       if (this.config.enableAuth) {
         try {
           printInfo('Initializing token verifier...', 1);
           this.tokenVerifier = new DrupalTokenVerifier(configManager);
           this.oauthConfigManager = configManager;
 
-          // Step 8: Fetch OAuth metadata
+          // Step 7: Fetch OAuth metadata
           const metadata = await configManager.fetchMetadata();
 
           // Enhance OAuth metadata with MCP server identification (custom extension per RFC 8414)
@@ -976,14 +946,6 @@ export class DrupalMCPHttpServer {
           printInfo(`Issuer: ${metadata.issuer}`, 2);
           printInfo(`Authorization: ${metadata.authorization_endpoint}`, 2);
           printInfo(`Token: ${metadata.token_endpoint}`, 2);
-
-          // Step 9: Validate scopes against server's supported scopes
-          if (metadata.scopes_supported) {
-            this.validateScopes(
-              configManager.getConfig().scopes,
-              metadata.scopes_supported
-            );
-          }
 
           // Set up OAuth metadata router
           // Use the MCP server's URL as the resource server URL, not Drupal's URL
@@ -1012,17 +974,16 @@ export class DrupalMCPHttpServer {
             mcpAuthMetadataRouter({
               oauthMetadata: enhancedMetadata,
               resourceServerUrl,
-              scopesSupported: configManager.getConfig().scopes,
+              scopesSupported: discoveredScopes,
               resourceName: this.config.name,
             })
           );
 
           printSuccess('Token verifier initialized');
           printInfo(`Resource server: ${resourceServerUrl}`, 2);
-          printInfo(
-            `Scopes: ${configManager.getConfig().scopes.join(', ')}`,
-            2
-          );
+          if (discoveredScopes.length > 0) {
+            printInfo(`Scopes: ${discoveredScopes.join(', ')}`, 2);
+          }
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : 'Unknown error';

@@ -5,14 +5,9 @@
  * Parses CLI arguments and returns a structured configuration object.
  *
  * Supported arguments:
- * - --drupal-url=<url> or --drupal-base-url=<url>: Drupal site URL
+ * - --drupal-base-url=<url>: Drupal site URL
  * - --auth / --no-auth: Enable/disable OAuth authentication
  * - --port=<number>: Server port
- * - --log-level=<level>: Logging verbosity
- * - --oauth-scopes=<scopes>: OAuth scopes (comma or space separated)
- * - --oauth-additional-scopes=<scopes>: Additional OAuth scopes
- * - --oauth-resource-server-url=<url>: OAuth resource server URL
- * - --drupal-jsonrpc-method=<method>: JSON-RPC HTTP method (GET|POST)
  * - --help / -h: Show help message
  * - --version / -v: Show version
  */
@@ -47,31 +42,6 @@ export interface ParsedCliArgs {
   port?: number;
 
   /**
-   * Logging verbosity level (trace|debug|info|warn|error|fatal)
-   */
-  logLevel?: string;
-
-  /**
-   * OAuth scopes (comma or space separated)
-   */
-  oauthScopes?: string;
-
-  /**
-   * Additional OAuth scopes
-   */
-  oauthAdditionalScopes?: string;
-
-  /**
-   * OAuth resource server URL
-   */
-  oauthResourceServerUrl?: string;
-
-  /**
-   * JSON-RPC HTTP method (GET|POST)
-   */
-  drupalJsonrpcMethod?: string;
-
-  /**
    * Show help message
    */
   help?: boolean;
@@ -102,11 +72,6 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
     string: [
       'drupal-url',
       'drupal-base-url',
-      'log-level',
-      'oauth-scopes',
-      'oauth-additional-scopes',
-      'oauth-resource-server-url',
-      'drupal-jsonrpc-method',
       'port', // Parse as string first, then convert to number
     ],
     // Boolean flags (including negation support via --no-auth)
@@ -129,11 +94,6 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
     auth: parsed.auth,
     // Convert port from string to number (if provided)
     port: parsed.port ? parseInt(parsed.port, 10) : undefined,
-    logLevel: parsed['log-level'],
-    oauthScopes: parsed['oauth-scopes'],
-    oauthAdditionalScopes: parsed['oauth-additional-scopes'],
-    oauthResourceServerUrl: parsed['oauth-resource-server-url'],
-    drupalJsonrpcMethod: parsed['drupal-jsonrpc-method'],
     help: parsed.help,
     version: parsed.version,
   };

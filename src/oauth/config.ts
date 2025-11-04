@@ -17,9 +17,6 @@ import {
  */
 export interface OAuthConfig {
   drupalUrl: string;
-  scopes: string[];
-  resourceServerUrl?: string;
-  additionalScopes: string[];
   // clientId and clientSecret removed - not needed for resource server
 }
 
@@ -58,10 +55,6 @@ export class OAuthConfigManager {
       new URL(this.config.drupalUrl);
     } catch {
       throw new Error('DRUPAL_URL must be a valid URL');
-    }
-
-    if (!Array.isArray(this.config.scopes) || this.config.scopes.length === 0) {
-      throw new Error('OAUTH_SCOPES must be a non-empty array');
     }
   }
 
@@ -131,37 +124,16 @@ export class OAuthConfigManager {
   clearCache(): void {
     this.metadataCache = null;
   }
-
-  /**
-   * Updates the scopes in the configuration.
-   * Used after tool discovery to set required scopes.
-   *
-   * @param scopes - Array of scope strings from tool discovery
-   */
-  updateScopes(scopes: string[]): void {
-    if (!Array.isArray(scopes) || scopes.length === 0) {
-      throw new Error('Scopes must be a non-empty array');
-    }
-
-    this.config.scopes = scopes;
-
-    // Clear metadata cache to force re-fetch with new scopes
-    this.clearCache();
-  }
 }
 
 /**
  * Creates an OAuth configuration from environment variables.
- * Scopes are always discovered from tools, with optional additional scopes.
  *
  * @returns {OAuthConfig} OAuth configuration
  * @throws {Error} If required environment variables are missing
  */
 export function createOAuthConfigFromEnv(): OAuthConfig {
   const drupalUrl = process.env.DRUPAL_URL || process.env.DRUPAL_BASE_URL;
-  const scopesString = process.env.OAUTH_SCOPES;
-  const additionalScopesString = process.env.OAUTH_ADDITIONAL_SCOPES;
-  const resourceServerUrl = process.env.OAUTH_RESOURCE_SERVER_URL;
 
   if (!drupalUrl) {
     throw new Error(
@@ -169,26 +141,7 @@ export function createOAuthConfigFromEnv(): OAuthConfig {
     );
   }
 
-  // Parse scopes from space or comma-separated string
-  const scopes = scopesString
-    ? scopesString
-        .split(/[\s,]+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 0)
-    : ['profile'];
-
-  // Parse additional scopes from environment (optional)
-  const additionalScopes = additionalScopesString
-    ? additionalScopesString
-        .split(/[\s,]+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 0)
-    : [];
-
   return {
     drupalUrl,
-    scopes,
-    resourceServerUrl,
-    additionalScopes,
   };
 }
