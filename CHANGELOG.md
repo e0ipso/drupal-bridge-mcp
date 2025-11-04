@@ -1,3 +1,10 @@
+## [2.1.1](https://github.com/e0ipso/drupal-bridge-mcp/compare/v2.1.0...v2.1.1) (2025-11-04)
+
+
+### Bug Fixes
+
+* better CLI options ([adae787](https://github.com/e0ipso/drupal-bridge-mcp/commit/adae787fbbc4ed60a04105e4f226f25c08834e68))
+
 # [2.1.0](https://github.com/e0ipso/drupal-bridge-mcp/compare/v2.0.0...v2.1.0) (2025-11-04)
 
 
