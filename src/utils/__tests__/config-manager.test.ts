@@ -195,8 +195,20 @@ describe('Config Manager', () => {
       });
     });
 
-    describe('auth argument', () => {
-      it('should apply auth false to AUTH_ENABLED as string when --no-auth is used', () => {
+    describe('auth argument validation and mapping', () => {
+      beforeEach(() => {
+        delete process.env.AUTH_ENABLED;
+      });
+
+      it('should map auth=enabled to AUTH_ENABLED=true', () => {
+        const args: ParsedCliArgs = {
+          auth: 'enabled',
+        };
+        applyArgsToEnv(args);
+        expect(process.env.AUTH_ENABLED).toBe('true');
+      });
+
+      it('should map auth=disabled to AUTH_ENABLED=false', () => {
         const args: ParsedCliArgs = {
           auth: 'disabled',
         };
@@ -204,13 +216,33 @@ describe('Config Manager', () => {
         expect(process.env.AUTH_ENABLED).toBe('false');
       });
 
-      it('should not modify AUTH_ENABLED when auth is undefined (default)', () => {
-        process.env.AUTH_ENABLED = 'existing-value';
-        const args: ParsedCliArgs = {
-          port: 3000,
-        };
+      it('should default to enabled when auth is undefined and AUTH_ENABLED not set', () => {
+        const args: ParsedCliArgs = {};
         applyArgsToEnv(args);
-        expect(process.env.AUTH_ENABLED).toBe('existing-value');
+        expect(process.env.AUTH_ENABLED).toBe('true');
+      });
+
+      it('should not override existing AUTH_ENABLED when auth is undefined', () => {
+        process.env.AUTH_ENABLED = 'false';
+        const args: ParsedCliArgs = {};
+        applyArgsToEnv(args);
+        expect(process.env.AUTH_ENABLED).toBe('false');
+      });
+
+      it('should throw error for invalid auth value', () => {
+        const args: ParsedCliArgs = {
+          auth: 'yes',
+        };
+        expect(() => applyArgsToEnv(args)).toThrow(
+          "Invalid --auth value: 'yes'. Must be 'enabled' or 'disabled'"
+        );
+      });
+
+      it('should include example in error message', () => {
+        const args: ParsedCliArgs = {
+          auth: 'invalid',
+        };
+        expect(() => applyArgsToEnv(args)).toThrow('Example: --auth=disabled');
       });
     });
 
