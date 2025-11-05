@@ -9,7 +9,7 @@
  * Validation rules:
  * - drupal-url: Must be valid HTTP/HTTPS URL
  * - port: Integer between 1 and 65535
- * - auth: Boolean (true/false, undefined = enabled by default)
+ * - auth: String ('enabled' or 'disabled', undefined = enabled by default)
  */
 
 import type { ParsedCliArgs } from './cli-parser.js';
@@ -71,9 +71,20 @@ export function applyArgsToEnv(args: ParsedCliArgs): void {
     process.env.DRUPAL_BASE_URL = drupalUrl;
   }
 
-  // Auth (convert boolean to string for process.env)
+  // Auth (validate and map string values to boolean env var)
   if (args.auth !== undefined) {
-    process.env.AUTH_ENABLED = args.auth.toString();
+    const validValues = ['enabled', 'disabled'];
+    if (!validValues.includes(args.auth)) {
+      throw new Error(
+        `Invalid --auth value: '${args.auth}'. Must be 'enabled' or 'disabled'. Example: --auth=disabled`
+      );
+    }
+    process.env.AUTH_ENABLED = (args.auth === 'enabled').toString();
+  } else {
+    // Default to enabled if not provided
+    if (process.env.AUTH_ENABLED === undefined) {
+      process.env.AUTH_ENABLED = 'true';
+    }
   }
 
   // Port
