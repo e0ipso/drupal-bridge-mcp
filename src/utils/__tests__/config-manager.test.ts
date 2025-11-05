@@ -198,7 +198,7 @@ describe('Config Manager', () => {
     describe('auth argument', () => {
       it('should apply auth false to AUTH_ENABLED as string when --no-auth is used', () => {
         const args: ParsedCliArgs = {
-          auth: false,
+          auth: 'disabled',
         };
         applyArgsToEnv(args);
         expect(process.env.AUTH_ENABLED).toBe('false');
@@ -279,7 +279,7 @@ describe('Config Manager', () => {
       it('should apply multiple valid arguments', () => {
         const args: ParsedCliArgs = {
           drupalUrl: 'https://example.com',
-          auth: false,
+          auth: 'disabled',
           port: 4000,
         };
         applyArgsToEnv(args);
