@@ -6,7 +6,7 @@
  *
  * Supported arguments:
  * - --drupal-base-url=<url>: Drupal site URL
- * - --no-auth: Disable OAuth authentication (enabled by default)
+ * - --auth=<enabled|disabled>: OAuth authentication mode (default: enabled)
  * - --port=<number>: Server port
  * - --help / -h: Show help message
  * - --version / -v: Show version
