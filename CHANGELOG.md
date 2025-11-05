@@ -1,3 +1,10 @@
+## [2.1.2](https://github.com/e0ipso/drupal-bridge-mcp/compare/v2.1.1...v2.1.2) (2025-11-05)
+
+
+### Bug Fixes
+
+* update remaining --no-auth references in help text and docs ([e26ac75](https://github.com/e0ipso/drupal-bridge-mcp/commit/e26ac75087687b7ec3c6fc6ad8a6c773bdc3540a))
+
 ## [2.1.1](https://github.com/e0ipso/drupal-bridge-mcp/compare/v2.1.0...v2.1.1) (2025-11-04)
 
 

@@ -35,14 +35,14 @@ Required:
   --drupal-url <url>              Drupal site URL (e.g., https://example.com)
 
 Optional:
-  --no-auth                       Disable OAuth authentication (enabled by default)
+  --auth <enabled|disabled>       OAuth authentication mode (default: enabled)
   --port <number>                 Server port (default: 3000)
   --help, -h                      Show this help message
   --version, -v                   Show version number
 
 Examples:
   drupal-bridge-mcp --drupal-url=https://example.com
-  drupal-bridge-mcp --drupal-url=https://example.com --no-auth
+  drupal-bridge-mcp --drupal-url=https://example.com --auth=disabled
   drupal-bridge-mcp --drupal-url=https://example.com --port=4000
 
 Environment Variables:
