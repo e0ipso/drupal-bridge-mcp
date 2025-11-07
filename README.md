@@ -81,7 +81,7 @@ npx @modelcontextprotocol/inspector
 
 ## 📄 License
 
-[MIT](LICENSE.md)
+[MIT](LICENSE)
 
 ## 👨‍💻 Author
 
