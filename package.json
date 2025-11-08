@@ -29,7 +29,7 @@
     "json-rpc"
   ],
   "author": "Mateu Aguiló Bosch (e0ipso) <mateu@mateuaguilo.com>",
-  "license": "proprietary",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/e0ipso/drupal-bridge-mcp.git"
